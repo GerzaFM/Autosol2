@@ -1,11 +1,13 @@
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
+from tkinter import filedialog
 import datetime
 
 class SolicitudApp(tb.Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.master = master
+        self.solictudes_restantes = 0
         self._build_ui()
         self.limpiar_todo()
 
@@ -119,8 +121,8 @@ class SolicitudApp(tb.Frame):
         # Barra inferior
         frame_barra = tb.Frame(self)
         frame_barra.pack(fill=X, side=BOTTOM, padx=15, pady=10)
-        tb.Label(frame_barra, text="Facturas restantes: 0").pack(side=LEFT, padx=2)
-        tb.Button(frame_barra, text="Generar", bootstyle="success").pack(side=RIGHT, padx=5)
+        tb.Label(frame_barra, text=f"Solicitudes restantes: {self.solictudes_restantes}").pack(side=LEFT, padx=2)
+        tb.Button(frame_barra, text="Generar", bootstyle="success", command=self.generar).pack(side=RIGHT, padx=5)
         tb.Button(frame_barra, text="Cargar XML", bootstyle="dark", command=self.cargar_xml).pack(side=RIGHT, padx=5)
 
         # Checkbox "Dividir" junto al botón "Cargar XML"
@@ -149,6 +151,9 @@ class SolicitudApp(tb.Frame):
     def cargar_xml(self):
         self.limpiar_todo()
 
+    def generar(self):
+        pass
+
     def limpiar_todo(self):
         """
         Borra el contenido de todos los Entry y Text hijos de este frame.
@@ -168,5 +173,9 @@ class SolicitudApp(tb.Frame):
 
 if __name__ == "__main__":
 
-    app = SolicitudApp()
+    app = tb.Window(themename="darkly")
+    app.title("Solicitud de Compra")
+    app.geometry("1024x850")
+    frame = SolicitudApp(app)
+    frame.pack(fill="both", expand=True)
     app.mainloop()
