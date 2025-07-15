@@ -14,7 +14,7 @@ class SolicitudApp(tb.Frame):
         self.solictudes_restantes = 0
         self.control = SolicitudLogica()
         self._build_ui()
-        self.limpiar_todo()
+        #self.limpiar_todo()
 
     def _build_ui(self):
         # Frame superior
@@ -41,6 +41,10 @@ class SolicitudApp(tb.Frame):
             tb.Label(frame_sol, text=text+":").grid(row=i, column=0, sticky=E, padx=5, pady=4)
             if text == "Tipo":
                 entry = tb.Combobox(frame_sol, values=["Compra", "Servicio"], width=22, bootstyle="dark")
+                entry.grid(row=i, column=1, padx=5, pady=4, sticky=E)
+            elif text == "Depa":
+                entry = tb.Combobox(frame_sol, values=["Administración", "Ventas", "Servicio", "Refacciones", "HyP"], width=22, bootstyle="dark")
+                entry.set("Administracion")  # Valor por defecto
                 entry.grid(row=i, column=1, padx=5, pady=4, sticky=E)
             elif text == "Fecha":
                 entry = tb.DateEntry(
@@ -306,9 +310,21 @@ class SolicitudApp(tb.Frame):
 
         def on_ok():
             values = [entries[l].get() for l in labels]
-            if all(values):
-                callback(values)
-                popup.destroy()
+            if not all(values):
+                messagebox.showerror("Error", "Todos los campos son obligatorios.")
+                return
+            
+            # Validar que Cantidad, Precio y Total sean números
+            try:
+                float(values[0])  # Cantidad
+                float(values[2])  # Precio
+                float(values[3])  # Total
+            except ValueError:
+                messagebox.showerror("Error", "Los campos Cantidad, Precio y Total deben ser números válidos.")
+                return
+            
+            callback(values)
+            popup.destroy()
 
         tk.Button(popup, text=button_text, command=on_ok).grid(row=2, column=0, columnspan=len(labels), pady=12)
 
@@ -356,12 +372,17 @@ class SolicitudApp(tb.Frame):
         )
         if not descripcion:
             return
+        
+        datos = self.control.get_solicitud()
+        if not datos:
+            messagebox.showerror("Error", "No hay datos de solicitud disponibles.")
+            return
 
         valores_iniciales = [
             "1",  # Cantidad
             descripcion,  # Descripción (lo que el usuario escribió)
-            getattr(self.datos, "subtotal", ""),  # Precio
-            getattr(self.datos, "total", "")      # Total
+            getattr(datos, "subtotal", ""),  # Precio
+            getattr(datos, "total", "")      # Total
         ]
 
         def insertar_concepto(values):

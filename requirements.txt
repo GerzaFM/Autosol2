@@ -1,0 +1,19 @@
+# Dependencias para Solicitud de Compra - Versión Profesional
+
+# UI Framework
+ttkbootstrap>=1.10.1
+
+# Type checking (opcional, para desarrollo)
+mypy>=1.0.0
+
+# Testing (para futuras implementaciones)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Linting y formateo (para desarrollo)
+black>=22.0.0
+flake8>=5.0.0
+isort>=5.10.0
+
+# Documentación
+sphinx>=5.0.0
