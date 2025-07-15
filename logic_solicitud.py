@@ -9,7 +9,7 @@ class SolicitudLogica:
         self.solicitudes.clear()
 
         if not rutas:
-            print("No se ha seleccionado ningún archivo XML.")
+            print("La ruta no ha podido ser cargada.")
             return
         
         for ruta in rutas:
@@ -20,8 +20,17 @@ class SolicitudLogica:
                 print(f"Error al procesar el archivo {ruta}: {e}")
                 continue
 
-    def solicitudes_restantes(self):
+    def get_solicitudes_restantes(self):
         return len(self.solicitudes)
+    
+    def get_solicitud(self):
+        if self.solicitudes:
+            return self.solicitudes[0]
+        return None
+    
+    def delete_solicitud(self):
+        if self.solicitudes:
+            self.solicitudes.pop(0)
 
     def rellenar_formulario(self, datos, ruta_salida):
         """
