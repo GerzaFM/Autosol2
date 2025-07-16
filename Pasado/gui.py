@@ -4,7 +4,7 @@ from tkinter import ttk
 from tkinter import filedialog
 from datetime import datetime
 from xml_control import XML
-from form_control import Form
+from src.solicitudapp.form_control import Form
 from comun import tipos_vale
 from bd import Bd
 

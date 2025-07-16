@@ -1,5 +1,5 @@
 from PyPDFForm import PdfWrapper
-import conf
+import solicitudapp.conf as conf
 
 class FormPDF:
     """

@@ -10,7 +10,7 @@ import datetime
 import logging
 
 try:
-    from logic_solicitud import SolicitudLogica
+    from src.solicitudapp.logic_solicitud import SolicitudLogica
 except ImportError:
     SolicitudLogica = None
 

@@ -7,8 +7,8 @@ from ttkbootstrap.constants import *
 from typing import Dict, List, Callable, Optional
 from decimal import Decimal
 
-from config.app_config import AppConfig
-from services.validation import ValidationService
+from solicitudapp.config.app_config import AppConfig
+from solicitudapp.services.validation import ValidationService
 
 
 class BaseFrame(tb.Labelframe):

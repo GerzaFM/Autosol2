@@ -1,5 +1,5 @@
-from ctrl_xml import XMLFactura as Xml
-import form_control as pdf
+from solicitudapp.ctrl_xml import XMLFactura as Xml
+import solicitudapp.form_control as pdf
 
 class SolicitudLogica:
     def __init__(self):

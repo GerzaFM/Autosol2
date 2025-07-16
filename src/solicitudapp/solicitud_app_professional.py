@@ -9,19 +9,19 @@ from typing import List, Optional
 import datetime
 import logging
  
-from models.solicitud import Solicitud, Proveedor, Concepto, Totales
-from services.validation import ValidationService
-from config.app_config import AppConfig
-from views.components import ProveedorFrame, SolicitudFrame, ConceptoPopup, BaseFrame
-from logic_solicitud import SolicitudLogica
-from form_control import FormPDF
+from solicitudapp.models.solicitud import Solicitud, Proveedor, Concepto, Totales
+from solicitudapp.services.validation import ValidationService
+from solicitudapp.config.app_config import AppConfig
+from solicitudapp.views.components import ProveedorFrame, SolicitudFrame, ConceptoPopup, BaseFrame
+from solicitudapp.logic_solicitud import SolicitudLogica
+from solicitudapp.form_control import FormPDF
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class SolicitudAppProfessional(tb.Frame):
+class SolicitudApp(tb.Frame):
     """
     Aplicación principal para gestión de solicitudes de compra.
     Versión profesional con arquitectura limpia y separación de responsabilidades.
@@ -757,7 +757,7 @@ def main():
         app.title("Solicitud de Compra - Versión Profesional")
         app.geometry(AppConfig.WINDOW_SIZE)
         
-        frame = SolicitudAppProfessional(app)
+        frame = SolicitudApp(app)
         frame.pack(fill="both", expand=True)
         
         logger.info("Aplicación iniciada")
@@ -770,3 +770,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+ 
