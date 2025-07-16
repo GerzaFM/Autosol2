@@ -121,19 +121,24 @@ class SolicitudFrame(BaseFrame):
             )
             
             if campo == "Tipo":
+                # Generar la lista "key - value" para el Combobox
+                tipo_vales_list = [f"{k} - {v}" for k, v in AppConfig.TIPO_VALE.items()]
                 widget = tb.Combobox(
                     self, 
-                    values=AppConfig.TIPOS_SOLICITUD, 
+                    values=tipo_vales_list, 
                     width=22, 
                     bootstyle="dark"
                 )
-                widget.set(AppConfig.DEFAULT_VALUES["tipo_solicitud"])
+                widget.set(tipo_vales_list[0] if tipo_vales_list else "")
+                widget.bind("<FocusOut>", self._validar_tipo_vale)
+                widget.bind("<Return>", self._validar_tipo_vale)
             elif campo == "Depa":
                 widget = tb.Combobox(
                     self, 
                     values=AppConfig.DEPARTAMENTOS, 
                     width=22, 
-                    bootstyle="dark"
+                    bootstyle="dark",
+                    state="readonly"  # <-- Esto evita que el usuario escriba
                 )
                 widget.set(AppConfig.DEFAULT_VALUES["departamento"])
             elif campo == "Fecha":
@@ -171,6 +176,22 @@ class SolicitudFrame(BaseFrame):
                 else:
                     widget.delete(0, 'end')
                     widget.insert(0, valor)
+    
+    def _validar_tipo_vale(self, event=None):
+        """
+        Valida el texto del Combobox Tipo.
+        Si es una clave válida en AppConfig.TIPO_VALE, lo formatea como 'key - value'.
+        Si no, borra el contenido.
+        """
+        cb_tipo = self.entries["Tipo"]
+        texto = cb_tipo.get().strip().upper()
+        # Extraer solo la clave si el usuario seleccionó "KEY - VALUE"
+        clave = texto.split(" - ")[0]
+        if clave in AppConfig.TIPO_VALE:
+            valor = AppConfig.TIPO_VALE[clave]
+            cb_tipo.set(f"{clave} - {valor}")
+        else:
+            cb_tipo.set("")
 
 
 class ConceptoPopup:

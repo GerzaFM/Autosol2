@@ -32,6 +32,11 @@ class SolicitudLogica:
         if self.solicitudes:
             self.solicitudes.pop(0)
 
+    def siguiente_solicitud(self):
+        self.delete_solicitud()
+
+        return self.get_solicitud()
+
     def rellenar_formulario(self, datos, ruta_salida):
         """
         Rellena el formulario PDF con los datos y lo guarda en la ruta indicada.

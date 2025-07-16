@@ -68,6 +68,24 @@ class ValidationService:
             if not str(valor).strip():
                 errores.append(f"El campo {campo} es obligatorio")
         return errores
+    
+    @staticmethod
+    def validar_suma_categorias(valores: List[str]) -> Tuple[bool, str]:
+        """
+        Valida que la suma de los valores numéricos de categorías sea exactamente 100.
+        :param valores: Lista de strings con los valores de las categorías.
+        :return: (bool, mensaje de error si aplica)
+        """
+        try:
+            suma = 0
+            for valor in valores:
+                if valor.strip():
+                    suma += float(valor)
+            if suma != 100:
+                return False, "La suma de las categorías debe ser exactamente 100"
+            return True, ""
+        except ValueError:
+            return False, "Todos los valores de categorías deben ser numéricos"
 
 
 class ValidationError(Exception):

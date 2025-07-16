@@ -8,12 +8,13 @@ from tkinter import filedialog, messagebox, simpledialog
 from typing import List, Optional
 import datetime
 import logging
-
+ 
 from models.solicitud import Solicitud, Proveedor, Concepto, Totales
 from services.validation import ValidationService
 from config.app_config import AppConfig
 from views.components import ProveedorFrame, SolicitudFrame, ConceptoPopup, BaseFrame
 from logic_solicitud import SolicitudLogica
+from form_control import FormPDF
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +134,15 @@ class SolicitudAppProfessional(tb.Frame):
             command=self.editar_concepto_seleccionado,
             bootstyle="warning"
         ).pack(side=RIGHT, padx=(0, 5))
+
+        # Botón calcular
+        tb.Button(
+            frame_btn_tabla,
+            text="🧮",
+            width=btn_width,
+            command=self.calcular_totales,
+            bootstyle="primary"
+        ).pack(side=RIGHT, padx=(0, 5))
     
     def _create_bottom_frame(self):
         """Crea el frame inferior con categorías y totales."""
@@ -244,28 +254,32 @@ class SolicitudAppProfessional(tb.Frame):
         self.lbl_sol_rest.pack(side=LEFT, padx=2)
         
         # Botones principales
+        width_btn = 10
         tb.Button(
             frame_barra,
             text="Generar",
             bootstyle="success",
-            command=self.generar
+            command=self.generar,
+            width=width_btn
         ).pack(side=RIGHT, padx=5)
         
         tb.Button(
             frame_barra,
             text="Cargar XML",
             bootstyle="primary",
-            command=self.cargar_xml
+            command=self.cargar_xml,
+            width=width_btn
         ).pack(side=RIGHT, padx=5)
         
         # Checkbox dividir
         self.dividir_var = tb.BooleanVar()
-        tb.Checkbutton(
+        self.chb_dividir = tb.Checkbutton(
             frame_barra,
             text="Dividir",
             variable=self.dividir_var,
             bootstyle="info"
-        ).pack(side=RIGHT, padx=5)
+        )
+        self.chb_dividir.pack(side=RIGHT, padx=5)
     
     def _setup_bindings(self):
         """Configura los eventos y bindings."""
@@ -372,17 +386,21 @@ class SolicitudAppProfessional(tb.Frame):
         """Rellena la tabla de conceptos."""
         try:
             # Limpiar tabla
-            for item in self.tree.get_children():
-                self.tree.delete(item)
+            self.borrar_conceptos()
             
             # Insertar conceptos
             for concepto in conceptos:
                 self.tree.insert("", "end", values=concepto)
-            
+
             self.comprobar_numero_conceptos()
             
         except Exception as e:
             logger.error(f"Error al rellenar conceptos: {e}")
+
+    def borrar_conceptos(self):
+        # Limpiar tabla
+            for item in self.tree.get_children():
+                self.tree.delete(item)
     
     def agregar_concepto(self):
         """Muestra el popup para agregar un concepto."""
@@ -444,6 +462,39 @@ class SolicitudAppProfessional(tb.Frame):
             for item in selected:
                 self.tree.delete(item)
             logger.info(f"Eliminados {len(selected)} concepto(s)")
+
+    def calcular_totales(self):
+        """Calcula Subtotal, IVA (16%) y Total en los campos correspondientes."""
+        try:
+            # Sumar columna 'Total' para obtener el Subtotal
+            subtotal = 0.0
+            for item in self.tree.get_children():
+                valores = self.tree.item(item, "values")
+                if len(valores) >= 4:
+                    try:
+                        subtotal += float(valores[3])
+                    except (ValueError, TypeError):
+                        continue  # Ignora valores no numéricos
+
+            # Calcular IVA (16% del subtotal)
+            iva = subtotal * 0.16
+            # Calcular Total (subtotal + iva)
+            total = subtotal + iva
+
+            # Actualizar los campos
+            self.entries_totales["Subtotal"].delete(0, "end")
+            self.entries_totales["Subtotal"].insert(0, f"{subtotal:.2f}")
+
+            self.entries_totales["IVA"].delete(0, "end")
+            self.entries_totales["IVA"].insert(0, f"{iva:.2f}")
+
+            self.entries_totales["TOTAL"].delete(0, "end")
+            self.entries_totales["TOTAL"].insert(0, f"{total:.2f}")
+
+            logger.info(f"Totales calculados: Subtotal={subtotal:.2f}, IVA={iva:.2f}, Total={total:.2f}")
+        except Exception as e:
+            logger.error(f"Error al calcular totales: {e}")
+            messagebox.showerror("Error", f"Error al calcular totales: {str(e)}")
     
     def comprobar_numero_conceptos(self):
         """Comprueba si hay demasiados conceptos."""
@@ -454,17 +505,20 @@ class SolicitudAppProfessional(tb.Frame):
                 AppConfig.ERROR_MESSAGES["demasiados_conceptos"]
             )
             if respuesta:
+                self.borrar_conceptos()
                 self.agregar_concepto_general()
     
     def agregar_concepto_general(self):
         """Agrega un concepto general."""
         try:
+            """""
             descripcion = simpledialog.askstring(
                 "Concepto general",
                 "Escriba el concepto general que desea usar:"
             )
             if not descripcion:
                 return
+            """
             
             datos = self.control.get_solicitud()
             if not datos:
@@ -473,8 +527,8 @@ class SolicitudAppProfessional(tb.Frame):
             
             valores_iniciales = [
                 "1",
-                descripcion,
-                getattr(datos, "subtotal", ""),
+                "",
+                getattr(datos, "total", ""),
                 getattr(datos, "total", "")
             ]
             
@@ -488,6 +542,8 @@ class SolicitudAppProfessional(tb.Frame):
                 insertar_concepto,
                 valores_iniciales
             )
+
+            logger.info("Concepto general agregado correctamente")
             
         except Exception as e:
             logger.error(f"Error al agregar concepto general: {e}")
@@ -553,16 +609,96 @@ class SolicitudAppProfessional(tb.Frame):
         try:
             # Validar datos antes de generar
             es_valido, errores = self.validar_formulario()
-            
             if not es_valido:
-                mensaje_error = "\\n".join(errores)
+                mensaje_error = "\n".join(errores)
                 messagebox.showerror("Errores de validación", mensaje_error)
                 return
-            
-            # TODO: Implementar generación de documento
-            messagebox.showinfo("Info", "Función de generar documento pendiente de implementar")
-            logger.info("Solicitud de generación de documento")
-            
+
+            # Recopilar datos del formulario
+            proveedor_data = self.proveedor_frame.get_data()
+            solicitud_data = self.solicitud_frame.get_data()
+            conceptos = [self.tree.item(item, "values") for item in self.tree.get_children()]
+            totales = {k: v.get() for k, v in self.entries_totales.items()}
+            categorias = {k: v.get() for k, v in self.entries_categorias.items()}
+            comentarios = self.comentarios.get("1.0", "end").strip()
+
+            # Dividir totales si el checkbox está marcado y habilitado
+            if self.dividir_var.get() and self.chb_dividir.cget("state") == "normal":
+                for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
+                    try:
+                        valor = float(totales.get(k, "0"))
+                        totales[k] = f"{valor / 2:.2f}"
+                        # Actualiza el Entry visual también
+                        self.entries_totales[k].delete(0, "end")
+                        self.entries_totales[k].insert(0, totales[k])
+                    except (ValueError, TypeError):
+                        pass
+
+            data = {
+                "TIPO DE VALE": solicitud_data.get("Tipo", ""),
+                "C A N T I D A D": "\n".join([c[0] for c in conceptos]),
+                "C O M E N T A R I O S": comentarios,
+                "Nombre de Empresa": proveedor_data.get("Nombre", ""), 
+                "RFC": proveedor_data.get("RFC", ""), 
+                "Teléfono": proveedor_data.get("Teléfono", ""), 
+                "Correo": proveedor_data.get("Correo", ""), 
+                "Nombre Contacto": proveedor_data.get("Contacto", ""),
+                "Menudeo": categorias.get("Comer", ""), 
+                "Seminuevos": categorias.get("Semis", ""), 
+                "Flotas": categorias.get("Fleet", ""),
+                "Administración": categorias.get("Admin", ""),
+                "Refacciones": categorias.get("Refa", ""),
+                "Servicio": categorias.get("Serv", ""),
+                "HYP": categorias.get("HyP", ""),
+                "DESCRIPCIÓN": "\n".join([c[1] for c in conceptos]),
+                "PRECIO UNITARIO": "\n".join([c[2] for c in conceptos]),
+                "TOTAL": "\n".join([c[3] for c in conceptos]),
+                "FECHA GERENTE DE ÁREA": "", 
+                "FECHA GERENTE ADMINISTRATIVO": "", 
+                "FECHA DE AUTORIZACIÓN GG O DIRECTOR DE MARCA": "", 
+                "SUBTOTAL": totales.get("Subtotal", ""), 
+                "IVA": totales.get("IVA", ""), 
+                "TOTAL, SUMATORIA": totales.get("TOTAL", ""), 
+                "FECHA CREACIÓN SOLICITUD": solicitud_data.get("Fecha", ""), 
+                "FOLIO": solicitud_data.get("Clase", ""),
+                "RETENCIÓN": totales.get("Ret", ""), 
+                "Departamento": solicitud_data.get("Depa", "")
+            }
+
+            # Seleccionar ruta de guardado
+            ruta = filedialog.asksaveasfilename(
+                title="Guardar solicitud",
+                filetypes=[("PDF", "*.pdf")],
+                initialfile=f"{solicitud_data.get('Folio', '')} {proveedor_data.get('Nombre', '')}".strip()
+            )
+            if not ruta:
+                logger.info("Exportación cancelada por el usuario")
+                return
+            if not ruta.lower().endswith(".pdf"):
+                ruta += ".pdf"
+
+            # TODO: Aquí deberías llamar a tu servicio de generación de PDF/documento
+            self.control.rellenar_formulario(data, ruta)
+
+            # Placeholder de éxito
+            messagebox.showinfo("Éxito", f"Solicitud generada correctamente en:\n{ruta}")
+            logger.info(f"Solicitud generada y guardada en: {ruta}")
+
+            # Alternar estado del checkbox dividir
+            if self.chb_dividir.cget("state") == "normal":
+                self.chb_dividir.config(state="disabled")
+                self.solicitud_frame.entries["Tipo"].set("VC - VALE DE CONTROL")
+                return
+            else:
+                self.chb_dividir.config(state="normal")
+
+            # Limpiar formulario y actualizar solicitudes restantes
+            self.control.delete_solicitud()
+            self.limpiar_todo()
+            self.rellenar_campos()
+            self.actualizar_solicitudes_restantes()
+
+
         except Exception as e:
             logger.error(f"Error al generar documento: {e}")
             messagebox.showerror("Error", f"Error al generar documento: {str(e)}")
@@ -585,12 +721,31 @@ class SolicitudAppProfessional(tb.Frame):
             solicitud_data = self.solicitud_frame.get_data()
             if not solicitud_data.get("Folio", "").strip():
                 errores.append("El folio es obligatorio")
-            
+            if not solicitud_data.get("Tipo", "").strip():
+                errores.append("El tipo de vale es obligatorio")
+
+            # Validar suma de categorías
+            valores = [entry.get() for entry in self.entries_categorias.values()]
+            es_valido, mensaje = self.validation_service.validar_suma_categorias(valores)
+            if not es_valido:
+                errores.append(mensaje)
+
         except Exception as e:
             logger.error(f"Error en validación: {e}")
             errores.append(f"Error en validación: {str(e)}")
         
         return len(errores) == 0, errores
+
+    def validar_suma_categorias(self) -> bool:
+        """
+        Valida que la suma de los valores numéricos de las categorías sea exactamente 100.
+        Muestra un mensaje de error si no se cumple la condición.
+        """
+        valores = [entry.get() for entry in self.entries_categorias.values()]
+        es_valido, mensaje = self.validation_service.validar_suma_categorias(valores)
+        if not es_valido:
+            messagebox.showerror("Error de validación", mensaje)
+        return es_valido
 
 
 def main():
