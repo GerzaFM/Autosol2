@@ -613,7 +613,7 @@ class SolicitudAppProfessional(tb.Frame):
                 mensaje_error = "\n".join(errores)
                 messagebox.showerror("Errores de validación", mensaje_error)
                 return
-
+            
             # Recopilar datos del formulario
             proveedor_data = self.proveedor_frame.get_data()
             solicitud_data = self.solicitud_frame.get_data()
@@ -622,13 +622,27 @@ class SolicitudAppProfessional(tb.Frame):
             categorias = {k: v.get() for k, v in self.entries_categorias.items()}
             comentarios = self.comentarios.get("1.0", "end").strip()
 
+            # Seleccionar ruta de guardado
+            ruta = filedialog.asksaveasfilename(
+                title="Guardar solicitud",
+                filetypes=[("PDF", "*.pdf")],
+                initialfile=f"{solicitud_data.get('Folio', '')} {proveedor_data.get('Nombre', '')}".strip()
+            )
+            if not ruta:
+                logger.info("Exportación cancelada por el usuario")
+                return
+            if not ruta.lower().endswith(".pdf"):
+                ruta += ".pdf"
+
             # Dividir totales si el checkbox está marcado y habilitado
-            if self.dividir_var.get() and self.chb_dividir.cget("state") == "normal":
+            dividir_marcado = self.dividir_var.get()
+            dividir_habilitado = str(self.chb_dividir.cget('state')) == "normal"
+            if dividir_marcado and dividir_habilitado:
+                logger.info("Casilla dividir activa, dividiendo totales")
                 for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
                     try:
                         valor = float(totales.get(k, "0"))
                         totales[k] = f"{valor / 2:.2f}"
-                        # Actualiza el Entry visual también
                         self.entries_totales[k].delete(0, "end")
                         self.entries_totales[k].insert(0, totales[k])
                     except (ValueError, TypeError):
@@ -665,18 +679,6 @@ class SolicitudAppProfessional(tb.Frame):
                 "Departamento": solicitud_data.get("Depa", "")
             }
 
-            # Seleccionar ruta de guardado
-            ruta = filedialog.asksaveasfilename(
-                title="Guardar solicitud",
-                filetypes=[("PDF", "*.pdf")],
-                initialfile=f"{solicitud_data.get('Folio', '')} {proveedor_data.get('Nombre', '')}".strip()
-            )
-            if not ruta:
-                logger.info("Exportación cancelada por el usuario")
-                return
-            if not ruta.lower().endswith(".pdf"):
-                ruta += ".pdf"
-
             # TODO: Aquí deberías llamar a tu servicio de generación de PDF/documento
             self.control.rellenar_formulario(data, ruta)
 
@@ -685,7 +687,7 @@ class SolicitudAppProfessional(tb.Frame):
             logger.info(f"Solicitud generada y guardada en: {ruta}")
 
             # Alternar estado del checkbox dividir
-            if self.chb_dividir.cget("state") == "normal":
+            if dividir_habilitado and dividir_marcado:
                 self.chb_dividir.config(state="disabled")
                 self.solicitud_frame.entries["Tipo"].set("VC - VALE DE CONTROL")
                 return
