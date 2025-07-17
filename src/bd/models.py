@@ -1,0 +1,127 @@
+from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, ForeignKeyField, IntegerField
+
+db = SqliteDatabase("facturas.db")
+
+class Proveedor(Model):
+    id = CharField(primary_key=True)
+    nombre = CharField()
+    rfc = CharField(unique=True)
+    telefono = CharField(null=True)
+    email = CharField(null=True)
+    nombre_contacto = CharField(null=True)
+    codigo_quiter = IntegerField(null=True)
+
+    class Meta:
+        database = db
+
+
+class Factura(Model):
+    folio_interno = IntegerField(primary_key=True)
+    serie = IntegerField()
+    folio = IntegerField()
+    fecha = DateField()
+    nombre_emisor = CharField()
+    rfc_emisor = CharField()
+    nombre_receptor = CharField()
+    rfc_receoptor = CharField()
+    subtotal = DecimalField()
+    ret_iva = DecimalField(null=True)
+    ret_isr = DecimalField(null=True)
+    iva_trasladado = DecimalField(null=True)
+    total = DecimalField()
+    comentario = CharField(null=True)
+    proveedor = ForeignKeyField(Proveedor, backref='facturas')
+
+    class Meta:
+        database = db
+        indexes = (
+            (('proveedor', 'serie', 'folio'), True),  # Sin espacio extra
+        )
+
+
+class Concepto(Model):
+    id = IntegerField(primary_key=True)
+    descripcion = CharField()
+    cantidad = DecimalField()
+    precio_unitario = DecimalField()
+    total = DecimalField()
+    factura = ForeignKeyField(Factura, backref='conceptos')
+
+    class Meta:
+        database = db
+
+class Reparto(Model):
+    id = IntegerField(primary_key=True)
+    comercial = DecimalField(null=True)
+    fleet = DecimalField(null=True)
+    seminuevos = DecimalField(null=True)
+    refacciones = DecimalField(null=True)
+    hyp = DecimalField(null=True)
+    administracion = DecimalField(null=True)
+    factura = ForeignKeyField(Factura, backref='repartos')
+
+    class Meta:
+        database = db
+
+class Vale(Model):
+    noVale = IntegerField(primary_key=True)
+    tipo = CharField()
+    noDocumento = CharField()
+    descripcion = CharField()
+    referencia = IntegerField()
+    total = CharField()
+
+    fechaVale = DateField(null=True)
+    departameto = IntegerField(null=True)
+    sucursal = IntegerField(null=True)
+    marca = IntegerField(null=True)
+    responsable = IntegerField(null=True)
+    proveedor = CharField(null=True)
+
+    factura = ForeignKeyField(Factura, backref='vales', null=True)
+
+    class Meta:
+        database = db
+
+class OrdenCompra(Model):
+    id = IntegerField(primary_key=True)
+    factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True)
+    cuenta =IntegerField()
+    nombre = IntegerField()
+    referencia = IntegerField()
+    fecha = DateField()
+
+    importe = DecimalField()
+    importe_en_letras = CharField()
+
+    iva = DecimalField(null=True)
+    cuenta_mayor = IntegerField(null=True)
+
+    class Meta:
+        database = db
+
+class Banco(Model):
+    id = IntegerField(primary_key=True)
+    nombre = CharField()
+    cuenta = CharField(unique=True)
+    codigo = CharField(unique=True)
+
+    class Meta:
+        database = db
+
+class Usuario(Model):
+    codigo = IntegerField(primary_key=True)
+    nombre = CharField()
+    empresa = IntegerField()
+    centro = IntegerField()
+    sucursal = IntegerField()
+    marca = IntegerField()
+    email = CharField(null=True)
+    permisos = CharField(null=True)
+    responsable = ForeignKeyField('self', null=True, backref='subordinados')
+
+    username = CharField(unique=True)
+    password = CharField()
+
+    class Meta:
+        database = db
