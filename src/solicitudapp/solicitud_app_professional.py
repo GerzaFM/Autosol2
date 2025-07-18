@@ -15,6 +15,7 @@ from solicitudapp.config.app_config import AppConfig
 from solicitudapp.views.components import ProveedorFrame, SolicitudFrame, ConceptoPopup, BaseFrame
 from solicitudapp.logic_solicitud import SolicitudLogica
 from solicitudapp.form_control import FormPDF
+from bd.models import Factura, Proveedor
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -305,8 +306,32 @@ class SolicitudApp(tb.Frame):
             self.limpiar_todo()
             self.control.agregar_solicitud(rutas)
             self.actualizar_solicitudes_restantes()
-            self.rellenar_campos()
             
+            # Obtén los datos del primer XML
+            datos = self.control.get_solicitud()
+            if not datos:
+                return
+
+            # Comprobación en la base de datos
+            proveedor_rfc = getattr(datos, "rfc_emisor", "")
+            serie = getattr(datos, "serie", "")
+            folio = getattr(datos, "folio", "")
+
+            proveedor = Proveedor.get_or_none(Proveedor.rfc == proveedor_rfc)
+            if proveedor:
+                existe = Factura.select().where(
+                    (Factura.proveedor == proveedor) &
+                    (Factura.serie == serie) &
+                    (Factura.folio == folio)
+                ).exists()
+                if existe:
+                    messagebox.showerror(
+                        "Factura duplicada",
+                        f"Ya existe una factura con serie {serie} y folio {folio} para el proveedor {proveedor.nombre}."
+                    )
+                    return
+
+            self.rellenar_campos()
             logger.info(f"Cargados {len(rutas)} archivos XML")
             
         except Exception as e:
@@ -607,10 +632,12 @@ class SolicitudApp(tb.Frame):
     def generar(self):
         """Genera el documento final."""
         try:
+            logger.info("Inicio de generación de documento")
             # Validar datos antes de generar
             es_valido, errores = self.validar_formulario()
             if not es_valido:
                 mensaje_error = "\n".join(errores)
+                logger.error(f"Errores de validación: {mensaje_error}")
                 messagebox.showerror("Errores de validación", mensaje_error)
                 return
             
@@ -621,6 +648,7 @@ class SolicitudApp(tb.Frame):
             totales = {k: v.get() for k, v in self.entries_totales.items()}
             categorias = {k: v.get() for k, v in self.entries_categorias.items()}
             comentarios = self.comentarios.get("1.0", "end").strip()
+            logger.info("Datos del formulario recopilados correctamente")
 
             # Seleccionar ruta de guardado
             ruta = filedialog.asksaveasfilename(
@@ -633,6 +661,7 @@ class SolicitudApp(tb.Frame):
                 return
             if not ruta.lower().endswith(".pdf"):
                 ruta += ".pdf"
+            logger.info(f"Ruta de guardado seleccionada: {ruta}")
 
             # Dividir totales si el checkbox está marcado y habilitado
             dividir_marcado = self.dividir_var.get()
@@ -646,6 +675,7 @@ class SolicitudApp(tb.Frame):
                         self.entries_totales[k].delete(0, "end")
                         self.entries_totales[k].insert(0, totales[k])
                     except (ValueError, TypeError):
+                        logger.error(f"Error al dividir el total para {k}")
                         pass
 
             data = {
@@ -674,13 +704,18 @@ class SolicitudApp(tb.Frame):
                 "IVA": totales.get("IVA", ""), 
                 "TOTAL, SUMATORIA": totales.get("TOTAL", ""), 
                 "FECHA CREACIÓN SOLICITUD": solicitud_data.get("Fecha", ""), 
-                "FOLIO": solicitud_data.get("Clase", ""),
+                "FOLIO": "",
                 "RETENCIÓN": totales.get("Ret", ""), 
                 "Departamento": solicitud_data.get("Depa", "")
             }
+            logger.info("Datos preparados para generación de documento")
 
             # TODO: Aquí deberías llamar a tu servicio de generación de PDF/documento
+            factura = self.control.guardar_solicitud(proveedor_data, solicitud_data, conceptos, totales, categorias, comentarios)
+            logger.info(f"Factura guardada en la base de datos con folio_interno: {factura.folio_interno}")
+            data["FOLIO"] = factura.folio_interno
             self.control.rellenar_formulario(data, ruta)
+            logger.info("Formulario rellenado con datos de la factura")
 
             # Placeholder de éxito
             messagebox.showinfo("Éxito", f"Solicitud generada correctamente en:\n{ruta}")
@@ -690,16 +725,21 @@ class SolicitudApp(tb.Frame):
             if dividir_habilitado and dividir_marcado:
                 self.chb_dividir.config(state="disabled")
                 self.solicitud_frame.entries["Tipo"].set("VC - VALE DE CONTROL")
+                logger.info("Checkbox dividir deshabilitado y tipo de vale cambiado")
                 return
             else:
                 self.chb_dividir.config(state="normal")
+                logger.info("Checkbox dividir habilitado")
 
             # Limpiar formulario y actualizar solicitudes restantes
             self.control.delete_solicitud()
+            logger.info("Solicitud eliminada del control")
             self.limpiar_todo()
+            logger.info("Formulario limpiado")
             self.rellenar_campos()
+            logger.info("Campos rellenados")
             self.actualizar_solicitudes_restantes()
-
+            logger.info("Solicitudes restantes actualizadas")
 
         except Exception as e:
             logger.error(f"Error al generar documento: {e}")
@@ -770,4 +810,3 @@ def main():
 
 if __name__ == "__main__":
     main()
- 

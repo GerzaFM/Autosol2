@@ -5,95 +5,59 @@ class DBManager:
         db.connect(reuse_if_open=True)
         db.create_tables([Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario], safe=True)
 
-    def guardar_formulario(self, proveedor_data, factura_data, conceptos_data, reparto_data=None, vales_data=None, ordenes_data=None):
-        # Guardar proveedor (o recuperar si ya existe)
-        proveedor, created = Proveedor.get_or_create(
-            id=proveedor_data.get("id"),
+    def guardar_formulario(self, data):
+        # Guardar proveedor
+        proveedor, _ = Proveedor.get_or_create(
+            rfc=data.get("rfc_proveedor"),
             defaults={
-                "nombre": proveedor_data.get("nombre"),
-                "rfc": proveedor_data.get("rfc"),
-                "telefono": proveedor_data.get("telefono"),
-                "email": proveedor_data.get("email"),
-                "nombre_contacto": proveedor_data.get("nombre_contacto"),
-                "codigo_quiter": proveedor_data.get("codigo_quiter"),
+                "nombre": data.get("nombre_proveedor"),
+                "telefono": data.get("telefono_proveedor"),
+                "email": data.get("email_proveedor"),
+                "nombre_contacto": data.get("nombre_contacto_proveedor"),
             }
         )
 
         # Guardar factura
         factura = Factura.create(
-            folio_interno=factura_data.get("folio_interno"),
-            serie=factura_data.get("serie"),
-            folio=factura_data.get("folio"),
-            fecha=factura_data.get("fecha"),
-            nombre_emisor=factura_data.get("nombre_emisor"),
-            rfc_emisor=factura_data.get("rfc_emisor"),
-            nombre_receptor=factura_data.get("nombre_receptor"),
-            rfc_receoptor=factura_data.get("rfc_receoptor"),
-            subtotal=factura_data.get("subtotal"),
-            ret_iva=factura_data.get("ret_iva"),
-            ret_isr=factura_data.get("ret_isr"),
-            iva_trasladado=factura_data.get("iva_trasladado"),
-            total=factura_data.get("total"),
-            comentario=factura_data.get("comentario"),
+            serie=data.get("serie"),
+            folio=data.get("folio"),
+            fecha=data.get("fecha"),
+            nombre_emisor=data.get("nombre_proveedor"),
+            rfc_emisor=data.get("rfc_proveedor"),
+            nombre_receptor=data.get("nombre_receptor"),
+            rfc_receptor=data.get("rfc_receptor"),
+            subtotal=data.get("subtotal"),
+            iva_trasladado=data.get("iva_trasladado"),
+            ret_iva=data.get("ret_iva"),
+            ret_isr=data.get("ret_isr"),
+            total=data.get("total"),
+            comentario=data.get("comentario"),
             proveedor=proveedor
         )
 
         # Guardar conceptos
-        for concepto in conceptos_data:
+        for concepto in data.get("conceptos", []):
             Concepto.create(
                 descripcion=concepto.get("descripcion"),
                 cantidad=concepto.get("cantidad"),
                 precio_unitario=concepto.get("precio_unitario"),
-                total=concepto.get("total"),
+                total=concepto.get("importe"),
                 factura=factura
             )
 
-        # Guardar reparto si existe
-        if reparto_data:
+        # Guardar reparto/prorrateo si existe
+        if any(data.get(k) for k in ["p_comercial", "p_fleet", "p_seminuevos", "p_refacciones", "p_hyp", "p_administracion"]):
             Reparto.create(
-                comercial=reparto_data.get("comercial"),
-                fleet=reparto_data.get("fleet"),
-                seminuevos=reparto_data.get("seminuevos"),
-                refacciones=reparto_data.get("refacciones"),
-                hyp=reparto_data.get("hyp"),
-                administracion=reparto_data.get("administracion"),
+                comercial=data.get("p_comercial"),
+                fleet=data.get("p_fleet"),
+                seminuevos=data.get("p_seminuevos"),
+                refacciones=data.get("p_refacciones"),
+                hyp=data.get("p_hyp"),
+                administracion=data.get("p_administracion"),
                 factura=factura
             )
 
-        # Guardar vales si existen
-        if vales_data:
-            for vale in vales_data:
-                Vale.create(
-                    noVale=vale.get("noVale"),
-                    tipo=vale.get("tipo"),
-                    noDocumento=vale.get("noDocumento"),
-                    descripcion=vale.get("descripcion"),
-                    referencia=vale.get("referencia"),
-                    total=vale.get("total"),
-                    fechaVale=vale.get("fechaVale"),
-                    departameto=vale.get("departameto"),
-                    sucursal=vale.get("sucursal"),
-                    marca=vale.get("marca"),
-                    responsable=vale.get("responsable"),
-                    proveedor=vale.get("proveedor"),
-                    factura=factura
-                )
-
-        # Guardar ordenes de compra si existen
-        if ordenes_data:
-            for orden in ordenes_data:
-                OrdenCompra.create(
-                    id=orden.get("id"),
-                    factura=factura,
-                    cuenta=orden.get("cuenta"),
-                    nombre=orden.get("nombre"),
-                    referencia=orden.get("referencia"),
-                    fecha=orden.get("fecha"),
-                    importe=orden.get("importe"),
-                    importe_en_letras=orden.get("importe_en_letras"),
-                    iva=orden.get("iva"),
-                    cuenta_mayor=orden.get("cuenta_mayor")
-                )
+        # Puedes agregar aquí la lógica para guardar vales, ordenes, etc. si lo necesitas
 
         return factura
 

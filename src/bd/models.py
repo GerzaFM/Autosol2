@@ -1,9 +1,9 @@
-from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, ForeignKeyField, IntegerField
+from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, ForeignKeyField, IntegerField, AutoField
 
 db = SqliteDatabase("facturas.db")
 
 class Proveedor(Model):
-    id = CharField(primary_key=True)
+    id = AutoField()  # Autoincremental
     nombre = CharField()
     rfc = CharField(unique=True)
     telefono = CharField(null=True)
@@ -15,15 +15,24 @@ class Proveedor(Model):
         database = db
 
 
+class Layout(Model):
+    id = AutoField()
+    nombre = CharField()
+    fecha = DateField()
+
+    class Meta:
+        database = db
+
+
 class Factura(Model):
-    folio_interno = IntegerField(primary_key=True)
+    folio_interno = AutoField(primary_key=True)
     serie = IntegerField()
     folio = IntegerField()
     fecha = DateField()
     nombre_emisor = CharField()
     rfc_emisor = CharField()
     nombre_receptor = CharField()
-    rfc_receoptor = CharField()
+    rfc_receptor = CharField()
     subtotal = DecimalField()
     ret_iva = DecimalField(null=True)
     ret_isr = DecimalField(null=True)
@@ -31,6 +40,7 @@ class Factura(Model):
     total = DecimalField()
     comentario = CharField(null=True)
     proveedor = ForeignKeyField(Proveedor, backref='facturas')
+    layout = ForeignKeyField(Layout, backref='facturas', null=True)
 
     class Meta:
         database = db
@@ -40,7 +50,7 @@ class Factura(Model):
 
 
 class Concepto(Model):
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     descripcion = CharField()
     cantidad = DecimalField()
     precio_unitario = DecimalField()
@@ -51,7 +61,7 @@ class Concepto(Model):
         database = db
 
 class Reparto(Model):
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     comercial = DecimalField(null=True)
     fleet = DecimalField(null=True)
     seminuevos = DecimalField(null=True)
@@ -84,7 +94,7 @@ class Vale(Model):
         database = db
 
 class OrdenCompra(Model):
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True)
     cuenta =IntegerField()
     nombre = IntegerField()
@@ -101,7 +111,7 @@ class OrdenCompra(Model):
         database = db
 
 class Banco(Model):
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     nombre = CharField()
     cuenta = CharField(unique=True)
     codigo = CharField(unique=True)
@@ -125,3 +135,4 @@ class Usuario(Model):
 
     class Meta:
         database = db
+

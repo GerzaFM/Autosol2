@@ -1,5 +1,8 @@
-from solicitudapp.ctrl_xml import XMLFactura as Xml
+import dbm
 import solicitudapp.form_control as pdf
+
+from solicitudapp.ctrl_xml import XMLFactura as Xml
+from bd.bd_control import DBManager
 
 class SolicitudLogica:
     def __init__(self):
@@ -45,3 +48,51 @@ class SolicitudLogica:
         """
         form = pdf.FormPDF()
         form.rellenar(datos, ruta_salida)
+
+    def guardar_solicitud(self, proveedor_data, solicitud_data, conceptos, totales, categorias, comentarios):
+        dbm = DBManager()
+        # Construye el diccionario 'data' como lo haces
+        data = {
+            # Datos del proveedor
+            "nombre_proveedor": proveedor_data.get("nombre"),
+            "rfc_proveedor": proveedor_data.get("rfc"),
+            "telefono_proveedor": proveedor_data.get("telefono"),
+            "email_proveedor": proveedor_data.get("email"),
+            "nombre_contacto_proveedor": proveedor_data.get("nombre_contacto"),
+            # Datos de la solicitud
+            "serie": solicitud_data.get("serie"),
+            "folio": solicitud_data.get("folio"),
+            "fecha": solicitud_data.get("fecha"),
+            "nombre_receptor": solicitud_data.get("nombre_receptor"),
+            "rfc_receptor": solicitud_data.get("rfc_receptor"),
+            "subtotal": totales.get("subtotal"),
+            "iva_trasladado": totales.get("iva_trasladado"),
+            "ret_iva": totales.get("ret_iva"),
+            "ret_isr": totales.get("ret_isr"),
+            "total": totales.get("total"),
+            "comentario": comentarios.get("comentario"),
+            # Datos de los conceptos
+            "conceptos": [
+                {
+                    "descripcion": concepto.get("descripcion"),
+                    "cantidad": concepto.get("cantidad"),
+                    "unidad": concepto.get("unidad"),
+                    "precio_unitario": concepto.get("precio_unitario"),
+                    "importe": concepto.get("importe"),
+                }
+                for concepto in conceptos
+            ],
+            # Prorrateo y reparto
+            "p_comercial": categorias.get("comercial"),
+            "p_fleet": categorias.get("fleet"),
+            "p_seminuevos": categorias.get("seminuevos"),
+            "p_refacciones": categorias.get("refacciones"),
+            "p_hyp": categorias.get("hyp"),
+            "p_administracion": categorias.get("administracion"),
+            # Comentarios adicionales
+            "comentarios": comentarios.get("comentarios"),
+        }
+
+        factura = dbm.guardar_formulario(data)
+        dbm.cerrar()
+        return factura 
