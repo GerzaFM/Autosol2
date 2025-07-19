@@ -70,7 +70,7 @@ class Reparto(Model):
     servicio = DecimalField(null=True)
     hyp = DecimalField(null=True)
     administracion = DecimalField(null=True)
-    factura = ForeignKeyField(Factura, backref='repartos')
+    factura = ForeignKeyField(Factura, backref='reparto', unique=True, null=True)  # Relación uno a uno
 
     class Meta:
         database = db
@@ -137,4 +137,22 @@ class Usuario(Model):
 
     class Meta:
         database = db
+
+class RepartoFavorito(Model):
+    usuario = ForeignKeyField(Usuario, backref='repartos_favoritos')
+    nombre_personalizado = CharField()  # Nombre que aparecerá en el botón
+    comercial = DecimalField(null=True)
+    fleet = DecimalField(null=True)
+    seminuevos = DecimalField(null=True)
+    refacciones = DecimalField(null=True)
+    servicio = DecimalField(null=True)
+    hyp = DecimalField(null=True)
+    administracion = DecimalField(null=True)
+    posicion = IntegerField()  # Para saber qué botón es (0-4)
+
+    class Meta:
+        database = db
+        indexes = (
+            (('usuario', 'posicion'), True),  # Un usuario no puede tener dos favoritos en la misma posición
+        )
 

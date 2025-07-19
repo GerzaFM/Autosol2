@@ -65,6 +65,12 @@ class SolicitudApp(tb.Frame):
         self.lbl_sol_rest: Optional[tb.Label] = None
         self.dividir_var: Optional[tb.BooleanVar] = None
         
+        # ID del usuario actual (deberías obtenerlo del login)
+        self.usuario_actual_id = 294379  # Reemplaza con el sistema de login real
+        
+        # Lista para guardar referencias a los botones de favoritos
+        self.botones_favoritos = []
+        
         self._build_ui()
         self._setup_bindings()
         logger.info("Aplicación inicializada correctamente")
@@ -224,17 +230,41 @@ class SolicitudApp(tb.Frame):
             padx=8, pady=(10, 0), sticky="ew"
         )
         
+        self.botones_favoritos = []
         for i in range(5):
-            tb.Button(
+            btn = tb.Button(
                 frame_fav,
                 text=f"Favorito {i + 1}",
                 bootstyle="info",
-                width=10,
+                width=12,
                 command=lambda idx=i: self.cargar_favorito(idx)
-            ).grid(row=0, column=i, padx=4, pady=6, sticky="s")
+            )
+            btn.grid(row=0, column=i, padx=4, pady=6, sticky="s")
+            self.botones_favoritos.append(btn)
+        
+        # Cargar nombres de favoritos al inicializar
+        self.actualizar_nombres_favoritos()
         
         parent.grid_rowconfigure(3, weight=1)
     
+    def actualizar_nombres_favoritos(self):
+        """Actualiza los nombres de los botones de favoritos desde la base de datos."""
+        try:
+            favoritos = self.db_manager.obtener_favoritos_usuario(self.usuario_actual_id)
+            
+            # Resetear todos los botones a nombres por defecto
+            for i, btn in enumerate(self.botones_favoritos):
+                btn.config(text=f"Favorito {i + 1}")
+            
+            # Actualizar botones con nombres personalizados
+            for favorito in favoritos:
+                if 0 <= favorito.posicion < len(self.botones_favoritos):
+                    self.botones_favoritos[favorito.posicion].config(
+                        text=favorito.nombre_personalizado
+                    )
+        except Exception as e:
+            logger.error(f"Error al actualizar nombres de favoritos: {e}")
+
     def _create_totals_frame(self, parent):
         """Crea el frame de totales."""
         frame_tot = tb.Labelframe(parent, text="Totales", width=320)
@@ -774,14 +804,186 @@ class SolicitudApp(tb.Frame):
             entry.delete(0, "end")
     
     def guardar_categorias(self):
-        """Guarda las categorías (placeholder)."""
-        # TODO: Implementar guardado de categorías
-        messagebox.showinfo("Info", "Función de guardar categorías pendiente de implementar")
+        """Guarda las categorías como favorito."""
+        try:
+            # Obtener valores actuales de las categorías
+            categorias = {k: v.get() for k, v in self.entries_categorias.items()}
+            
+            # Verificar que hay al menos un valor
+            if not any(categorias.values()):
+                messagebox.showwarning("Advertencia", "No hay valores en las categorías para guardar.")
+                return
+            
+            # Validar que la suma sea 100 antes de mostrar el popup
+            valores = [entry.get() for entry in self.entries_categorias.values()]
+            es_valido, mensaje = self.validation_service.validar_suma_categorias(valores)
+            if not es_valido:
+                messagebox.showerror("Error de validación", mensaje)
+                return
+            
+            # Popup para seleccionar posición y nombre
+            self.mostrar_popup_guardar_favorito(categorias)
+            
+        except Exception as e:
+            logger.error(f"Error al guardar categorías: {e}")
+            messagebox.showerror("Error", f"Error al guardar categorías: {str(e)}")
+
+    def mostrar_popup_guardar_favorito(self, categorias):
+        """Muestra popup para guardar favorito con diseño horizontal usando ttkbootstrap."""
+        popup = tb.Toplevel(self)
+        popup.title("Guardar Favorito")
+        popup.geometry("600x280")
+        popup.resizable(False, False)
+        popup.grab_set()  # Modal
+        
+        # Centrar el popup
+        popup.transient(self)
+        popup.geometry("+%d+%d" % (
+            self.winfo_rootx() + 50,
+            self.winfo_rooty() + 50
+        ))
+        
+        # Frame principal
+        main_frame = tb.Frame(popup)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Título
+        tb.Label(
+            main_frame, 
+            text="Nombre del favorito:", 
+            font=("Segoe UI", 14, "bold"),
+            #bootstyle="inverse"
+        ).pack(pady=(0, 15))
+        
+        # Entry para el nombre
+        entry_nombre = tb.Entry(
+            main_frame, 
+            width=40, 
+            font=("Segoe UI", 12),
+            justify="center",
+            bootstyle="dark"
+        )
+        entry_nombre.pack(pady=(0, 25))
+        entry_nombre.insert(0, "Nuevo Favorito")
+        entry_nombre.select_range(0, "end")
+        entry_nombre.focus()
+        
+        # Frame para los 5 botones horizontales
+        frame_botones = tb.Frame(main_frame)
+        frame_botones.pack(pady=10)
+        
+        # Obtener favoritos existentes para mostrar nombres actuales
+        try:
+            favoritos_existentes = self.db_manager.obtener_favoritos_usuario(self.usuario_actual_id)
+            favoritos_dict = {f.posicion: f.nombre_personalizado for f in favoritos_existentes}
+        except:
+            favoritos_dict = {}
+        
+        def guardar_favorito(posicion):
+            """Guarda el favorito en la posición especificada."""
+            nombre = entry_nombre.get().strip()
+            if not nombre:
+                messagebox.showerror("Error", "El nombre no puede estar vacío.")
+                entry_nombre.focus()
+                return
+            
+            # Confirmar si va a sobrescribir
+            if posicion in favoritos_dict:
+                respuesta = messagebox.askyesno(
+                    "Confirmar sobrescritura",
+                    f"¿Desea sobrescribir el favorito '{favoritos_dict[posicion]}'?"
+                )
+                if not respuesta:
+                    return
     
+        # Guardar en la base de datos
+            try:
+                favorito = self.db_manager.guardar_reparto_favorito(
+                    self.usuario_actual_id, posicion, nombre, categorias
+                )
+                
+                if favorito:
+                    messagebox.showinfo("Éxito", f"Favorito '{nombre}' guardado en posición {posicion + 1}")
+                    self.actualizar_nombres_favoritos()
+                    popup.destroy()
+                else:
+                    messagebox.showerror("Error", "No se pudo guardar el favorito.")
+            except Exception as e:
+                logger.error(f"Error al guardar favorito: {e}")
+                messagebox.showerror("Error", f"Error al guardar favorito: {str(e)}")
+
+    # Crear los 5 botones horizontales
+        for i in range(5):
+            nombre_actual = favoritos_dict.get(i, "Vacío")
+            texto_boton = f"Pos {i + 1}\n{nombre_actual}"
+            
+            # Determinar estilo del botón
+            if i in favoritos_dict:
+                estilo = "warning"  # Naranja para ocupados
+            else:
+                estilo = "success"  # Verde para vacíos
+            
+            btn = tb.Button(
+                frame_botones,
+                text=texto_boton,
+                bootstyle=estilo,
+                width=12,
+                command=lambda pos=i: guardar_favorito(pos)
+            )
+            btn.grid(row=0, column=i, padx=5, pady=5)
+        
+        # Frame para botón cancelar
+        frame_cancelar = tb.Frame(main_frame)
+        frame_cancelar.pack(pady=(20, 0))
+        
+        tb.Button(
+            frame_cancelar,
+            text="Cancelar",
+            bootstyle="danger",
+            width=15,
+            command=popup.destroy
+        ).pack()
+        
+        # Solo Escape para cancelar (no Enter)
+        popup.bind('<Escape>', lambda e: popup.destroy())
+        
+        # Enfocar el entry al mostrar el popup
+        popup.after(100, lambda: entry_nombre.focus())
+
     def cargar_favorito(self, indice: int):
-        """Carga un favorito (placeholder)."""
-        # TODO: Implementar carga de favoritos
-        messagebox.showinfo("Info", f"Función de cargar favorito {indice + 1} pendiente de implementar")
+        """Carga un favorito en los campos de categorías."""
+        try:
+            favorito = self.db_manager.obtener_favorito_por_posicion(self.usuario_actual_id, indice)
+            
+            if not favorito:
+                messagebox.showinfo("Info", f"No hay favorito guardado en la posición {indice + 1}")
+                return
+            
+            # Limpiar categorías actuales
+            self.limpiar_categorias()
+            
+            # Cargar valores del favorito
+            valores_favorito = {
+                "Comer": favorito.comercial or 0,
+                "Fleet": favorito.fleet or 0,
+                "Semis": favorito.seminuevos or 0,
+                "Refa": favorito.refacciones or 0,
+                "Serv": favorito.servicio or 0,
+                "HyP": favorito.hyp or 0,
+                "Admin": favorito.administracion or 0
+            }
+            
+            # Llenar los campos
+            for categoria, valor in valores_favorito.items():
+                if categoria in self.entries_categorias and valor != 0:
+                    self.entries_categorias[categoria].delete(0, "end")
+                    self.entries_categorias[categoria].insert(0, str(valor))
+            
+            logger.info(f"Favorito '{favorito.nombre_personalizado}' cargado desde posición {indice + 1}")
+            
+        except Exception as e:
+            logger.error(f"Error al cargar favorito: {e}")
+            messagebox.showerror("Error", f"Error al cargar favorito: {str(e)}")
     
     def generar(self):
         """Genera el documento final."""

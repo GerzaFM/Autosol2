@@ -1,9 +1,9 @@
-from bd.models import db, Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario
+from bd.models import db, Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario, RepartoFavorito
 
 class DBManager:
     def __init__(self):
         db.connect(reuse_if_open=True)
-        db.create_tables([Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario], safe=True)
+        db.create_tables([Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario, RepartoFavorito], safe=True)
 
     def guardar_formulario(self, data):
         # Verificar si la factura ya existe
@@ -75,3 +75,43 @@ class DBManager:
     def cerrar(self):
         if not db.is_closed():
             db.close()
+    
+    def guardar_reparto_favorito(self, usuario_id, posicion, nombre, categorias):
+        """Guarda un reparto como favorito para un usuario en una posición específica."""
+        try:
+            # Eliminar favorito existente en esa posición
+            RepartoFavorito.delete().where(
+                (RepartoFavorito.usuario == usuario_id) & 
+                (RepartoFavorito.posicion == posicion)
+            ).execute()
+            
+            # Crear nuevo favorito
+            favorito = RepartoFavorito.create(
+                usuario=usuario_id,
+                nombre_personalizado=nombre,
+                comercial=categorias.get("Comer", 0),
+                fleet=categorias.get("Fleet", 0),
+                seminuevos=categorias.get("Semis", 0),
+                refacciones=categorias.get("Refa", 0),
+                servicio=categorias.get("Serv", 0),
+                hyp=categorias.get("HyP", 0),
+                administracion=categorias.get("Admin", 0),
+                posicion=posicion
+            )
+            return favorito
+        except Exception as e:
+            print(f"Error al guardar favorito: {e}")
+            return None
+
+    def obtener_favoritos_usuario(self, usuario_id):
+        """Obtiene todos los favoritos de un usuario ordenados por posición."""
+        return list(RepartoFavorito.select().where(
+            RepartoFavorito.usuario == usuario_id
+        ).order_by(RepartoFavorito.posicion))
+
+    def obtener_favorito_por_posicion(self, usuario_id, posicion):
+        """Obtiene un favorito específico por usuario y posición."""
+        return RepartoFavorito.get_or_none(
+            (RepartoFavorito.usuario == usuario_id) & 
+            (RepartoFavorito.posicion == posicion)
+        )
