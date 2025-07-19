@@ -1,8 +1,33 @@
 import dbm
-import solicitudapp.form_control as pdf
+import sys
+import os
 
-from solicitudapp.ctrl_xml import XMLFactura as Xml
-from bd.bd_control import DBManager
+# Manejar importaciones para diferentes contextos de ejecución
+try:
+    # Intento 1: importación relativa desde el mismo directorio
+    from . import form_control as pdf
+    from .ctrl_xml import XMLFactura as Xml
+except ImportError:
+    try:
+        # Intento 2: importación absoluta (cuando se ejecuta desde src/)
+        import solicitudapp.form_control as pdf
+        from solicitudapp.ctrl_xml import XMLFactura as Xml
+    except ImportError:
+        # Intento 3: agregar el path correcto si es necesario
+        current_dir = os.path.dirname(__file__)
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+        import solicitudapp.form_control as pdf
+        from solicitudapp.ctrl_xml import XMLFactura as Xml
+
+# Importar el controlador de BD
+try:
+    from bd.bd_control import DBManager
+except ImportError:
+    # Si falla, intentar con ruta relativa
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from bd.bd_control import DBManager
 
 class SolicitudLogica:
     def __init__(self):
@@ -63,6 +88,7 @@ class SolicitudLogica:
             "serie": solicitud_data.get("serie"),
             "folio": solicitud_data.get("folio"),
             "fecha": solicitud_data.get("fecha"),
+            "tipo": solicitud_data.get("tipo"),
             "nombre_receptor": solicitud_data.get("nombre_receptor"),
             "rfc_receptor": solicitud_data.get("rfc_receptor"),
             "subtotal": totales.get("subtotal"),
@@ -88,6 +114,7 @@ class SolicitudLogica:
             "p_seminuevos": categorias.get("seminuevos"),
             "p_refacciones": categorias.get("refacciones"),
             "p_hyp": categorias.get("hyp"),
+            "p_servicio": categorias.get("servicio"),
             "p_administracion": categorias.get("administracion"),
             # Comentarios adicionales
             "comentarios": comentarios.get("comentarios"),

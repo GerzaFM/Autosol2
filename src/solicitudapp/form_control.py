@@ -1,5 +1,13 @@
 from PyPDFForm import PdfWrapper
-import solicitudapp.conf as conf
+import sys
+import os
+
+# Manejar importaciones dependiendo del contexto
+try:
+    import solicitudapp.conf as conf
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    import solicitudapp.conf as conf
 
 class FormPDF:
     """

@@ -9,13 +9,23 @@ from typing import List, Optional
 import datetime
 import logging
  
+import sys
+import os
+# Agregar el directorio src al path para importaciones absolutas
+if __name__ == "__main__":
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+else:
+    # Cuando se ejecuta desde main.py, usar rutas relativas al src
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from solicitudapp.models.solicitud import Solicitud, Proveedor, Concepto, Totales
 from solicitudapp.services.validation import ValidationService
 from solicitudapp.config.app_config import AppConfig
 from solicitudapp.views.components import ProveedorFrame, SolicitudFrame, ConceptoPopup, BaseFrame
 from solicitudapp.logic_solicitud import SolicitudLogica
 from solicitudapp.form_control import FormPDF
-from bd.models import Factura, Proveedor
+from bd.models import Factura, Proveedor, Reparto
+from bd.bd_control import DBManager
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +42,9 @@ class SolicitudApp(tb.Frame):
         super().__init__(master)
         self.master = master
         
+        # Inicializar base de datos
+        self.db_manager = DBManager()
+        
         # Servicios
         self.validation_service = ValidationService()
         self.control = SolicitudLogica()
@@ -39,6 +52,8 @@ class SolicitudApp(tb.Frame):
         # Estado de la aplicación
         self.solicitudes_restantes = 0
         self.solicitud_actual: Optional[Solicitud] = None
+        self.factura_duplicada = False  # Flag para indicar si la factura está duplicada
+        self.folio_interno_manual = None  # Almacenar folio interno ingresado manualmente
         
         # Componentes UI
         self.proveedor_frame: Optional[ProveedorFrame] = None
@@ -290,6 +305,21 @@ class SolicitudApp(tb.Frame):
         # Delete key para eliminar conceptos
         self.tree.bind("<Delete>", lambda e: self.eliminar_concepto_seleccionado())
     
+    def _extraer_clave_tipo(self, tipo_completo: str) -> str:
+        """
+        Extrae la clave del tipo de vale del formato 'CLAVE - DESCRIPCION'.
+        Si no está en ese formato, devuelve el valor tal como está.
+        """
+        if not tipo_completo:
+            return "VC"  # Valor por defecto
+        
+        # Si está en formato "CLAVE - DESCRIPCION", extraer solo la clave
+        if " - " in tipo_completo:
+            return tipo_completo.split(" - ")[0].strip()
+        
+        # Si no está en ese formato, asumir que ya es la clave
+        return tipo_completo.strip()
+
     # Métodos de negocio
     
     def cargar_xml(self):
@@ -317,19 +347,43 @@ class SolicitudApp(tb.Frame):
             serie = getattr(datos, "serie", "")
             folio = getattr(datos, "folio", "")
 
+            self.factura_duplicada = False  # Resetear flag
+            self.folio_interno_manual = None  # Resetear folio manual
+
             proveedor = Proveedor.get_or_none(Proveedor.rfc == proveedor_rfc)
             if proveedor:
-                existe = Factura.select().where(
+                factura_existente = Factura.get_or_none(
                     (Factura.proveedor == proveedor) &
                     (Factura.serie == serie) &
                     (Factura.folio == folio)
-                ).exists()
-                if existe:
-                    messagebox.showerror(
+                )
+                if factura_existente:
+                    # Marcar como duplicada pero continuar con el proceso
+                    self.factura_duplicada = True
+                    
+                    # Mostrar mensaje informativo
+                    messagebox.showwarning(
                         "Factura duplicada",
-                        f"Ya existe una factura con serie {serie} y folio {folio} para el proveedor {proveedor.nombre}."
+                        f"La factura con serie {serie} y folio {folio} del proveedor {proveedor.nombre} "
+                        f"ya se encuentra en la base de datos.\n\n"
+                        f"Se rellenará el formulario pero no se guardará en la base de datos."
                     )
-                    return
+                    
+                    # Usar el folio interno de la factura existente como valor inicial
+                    folio_inicial = str(factura_existente.folio_interno)
+                    
+                    # Solicitar folio interno manual
+                    folio_manual = simpledialog.askstring(
+                        "Folio interno manual",
+                        f"La factura ya existe con folio interno: {folio_inicial}\n\n"
+                        f"Ingrese el número de folio interno para el documento:",
+                        initialvalue=folio_inicial
+                    )
+                    
+                    if folio_manual:
+                        self.folio_interno_manual = folio_manual
+                    else:
+                        self.folio_interno_manual = folio_inicial
 
             self.rellenar_campos()
             logger.info(f"Cargados {len(rutas)} archivos XML")
@@ -376,6 +430,9 @@ class SolicitudApp(tb.Frame):
             
             # Rellenar conceptos
             self.rellenar_conceptos(getattr(datos, "conceptos", []))
+
+            # Rellenar categorías y tipo desde la última factura del proveedor
+            self.rellenar_datos_proveedor_anterior(getattr(datos, "rfc_emisor", ""))
             
         except Exception as e:
             logger.error(f"Error al rellenar campos: {e}")
@@ -426,6 +483,99 @@ class SolicitudApp(tb.Frame):
         # Limpiar tabla
             for item in self.tree.get_children():
                 self.tree.delete(item)
+    
+    def rellenar_datos_proveedor_anterior(self, rfc_emisor: str):
+        """
+        Rellena los campos de categorías y tipo con los datos de la última factura
+        del proveedor si existe en la base de datos.
+        """
+        print(f"🔍 DEBUG: rellenar_datos_proveedor_anterior llamado con RFC: {rfc_emisor}")
+        try:
+            if not rfc_emisor:
+                print("🔍 DEBUG: RFC emisor vacío, retornando")
+                return
+            
+            print(f"🔍 DEBUG: Buscando proveedor con RFC: {rfc_emisor}")
+            # Buscar el proveedor en la base de datos
+            proveedor_bd = Proveedor.get_or_none(Proveedor.rfc == rfc_emisor)
+            if not proveedor_bd:
+                print(f"🔍 DEBUG: Proveedor con RFC {rfc_emisor} no encontrado en BD")
+                logger.info(f"Proveedor con RFC {rfc_emisor} no encontrado en BD")
+                return
+            print(f"🔍 DEBUG: Proveedor encontrado: {proveedor_bd.nombre}")
+            
+            # Buscar la última factura del proveedor
+            ultima_factura = (Factura
+                            .select()
+                            .where(Factura.proveedor == proveedor_bd)
+                            .order_by(Factura.folio_interno.desc())
+                            .first())
+            
+            if not ultima_factura:
+                print(f"🔍 DEBUG: No se encontraron facturas anteriores para {proveedor_bd.nombre}")
+                logger.info(f"No se encontraron facturas anteriores para el proveedor {proveedor_bd.nombre}")
+                return
+            print(f"🔍 DEBUG: Factura encontrada: {ultima_factura.serie}-{ultima_factura.folio}, Tipo: {ultima_factura.tipo}")
+            logger.info(f"Encontrada factura anterior para {proveedor_bd.nombre}: {ultima_factura.serie}-{ultima_factura.folio}")
+            
+            # Buscar el reparto de la última factura
+            ultimo_reparto = Reparto.get_or_none(Reparto.factura == ultima_factura)
+            
+            if ultimo_reparto:
+                print(f"🔍 DEBUG: Reparto encontrado, rellenando categorías...")
+                # Rellenar categorías con los datos del último reparto
+                categorias_data = {
+                    "Comer": ultimo_reparto.comercial or 0,
+                    "Fleet": ultimo_reparto.fleet or 0,
+                    "Semis": ultimo_reparto.seminuevos or 0,
+                    "Refa": ultimo_reparto.refacciones or 0,
+                    "Serv": ultimo_reparto.servicio or 0,
+                    "HyP": ultimo_reparto.hyp or 0,
+                    "Admin": ultimo_reparto.administracion or 0
+                }
+                
+                # Llenar los campos de categorías
+                for categoria, valor in categorias_data.items():
+                    if categoria in self.entries_categorias:
+                        self.entries_categorias[categoria].delete(0, "end")
+                        if valor and valor != 0:
+                            self.entries_categorias[categoria].insert(0, str(valor))
+                
+                logger.info("Categorías rellenadas desde la última factura")
+            
+            # Usar el tipo directamente del modelo Factura
+            if ultima_factura.tipo:
+                # Buscar el tipo en el diccionario TIPO_VALE
+                tipo_factura = ultima_factura.tipo.strip()
+                
+                # Si el tipo está en formato "KEY - VALUE", extraer solo la clave
+                if " - " in tipo_factura:
+                    clave_tipo = tipo_factura.split(" - ")[0]
+                else:
+                    clave_tipo = tipo_factura
+                
+                # Verificar si la clave existe en TIPO_VALE
+                if clave_tipo in AppConfig.TIPO_VALE:
+                    tipo_sugerido = f"{clave_tipo} - {AppConfig.TIPO_VALE[clave_tipo]}"
+                    logger.info(f"Tipo encontrado en Factura: {tipo_sugerido}")
+                else:
+                    # Si no está en el diccionario, usar valor por defecto
+                    tipo_sugerido = AppConfig.DEFAULT_VALUES["tipo_solicitud"]
+                    logger.info(f"Tipo de factura no encontrado en diccionario, usando por defecto: {tipo_sugerido}")
+            else:
+                # Fallback: usar valor por defecto
+                tipo_sugerido = AppConfig.DEFAULT_VALUES["tipo_solicitud"]
+                logger.info(f"Sin tipo en factura, usando por defecto: {tipo_sugerido}")
+            
+            # Actualizar el tipo en la interfaz
+            solicitud_data = self.solicitud_frame.get_data()
+            solicitud_data["Tipo"] = tipo_sugerido
+            self.solicitud_frame.set_data(solicitud_data)
+            logger.info(f"Tipo de solicitud establecido como: {tipo_sugerido}")
+            
+        except Exception as e:
+            logger.error(f"Error al cargar datos del proveedor anterior: {e}")
+            # No mostramos error al usuario ya que es una funcionalidad adicional
     
     def agregar_concepto(self):
         """Muestra el popup para agregar un concepto."""
@@ -587,6 +737,10 @@ class SolicitudApp(tb.Frame):
     def limpiar_todo(self):
         """Limpia todos los campos del formulario."""
         try:
+            # Resetear flags de factura duplicada
+            self.factura_duplicada = False
+            self.folio_interno_manual = None
+            
             # Limpiar frames principales
             self.proveedor_frame.clear_entries()
             self.solicitud_frame.clear_entries()
@@ -711,14 +865,93 @@ class SolicitudApp(tb.Frame):
             logger.info("Datos preparados para generación de documento")
 
             # TODO: Aquí deberías llamar a tu servicio de generación de PDF/documento
-            factura = self.control.guardar_solicitud(proveedor_data, solicitud_data, conceptos, totales, categorias, comentarios)
-            logger.info(f"Factura guardada en la base de datos con folio_interno: {factura.folio_interno}")
-            data["FOLIO"] = factura.folio_interno
+            try:
+                # Verificar si la factura está duplicada
+                if self.factura_duplicada:
+                    logger.info("Factura duplicada detectada, omitiendo guardado en base de datos")
+                    # Usar el folio interno manual proporcionado por el usuario
+                    data["FOLIO"] = self.folio_interno_manual or "DUPLICADO"
+                else:
+                    # Proceder con el guardado normal en la base de datos
+                    # Mapear los datos correctamente para guardar_solicitud
+                    proveedor_mapped = {
+                        "nombre": proveedor_data.get("Nombre", ""),
+                        "rfc": proveedor_data.get("RFC", ""),
+                        "telefono": proveedor_data.get("Teléfono", ""),
+                        "email": proveedor_data.get("Correo", ""),
+                        "nombre_contacto": proveedor_data.get("Contacto", "")
+                    }
+                    
+                    solicitud_mapped = {
+                        "serie": getattr(self.control.get_solicitud(), "serie", "A") if self.control.get_solicitud() else "A",
+                        "folio": solicitud_data.get("Folio", "001"),
+                        "fecha": solicitud_data.get("Fecha", ""),
+                        "tipo": self._extraer_clave_tipo(solicitud_data.get("Tipo", "")),  # Extraer solo la clave
+                        "nombre_receptor": "TCM MATEHUALA",  # Valor por defecto
+                        "rfc_receptor": "TMM860630PH1"  # Valor por defecto
+                    }
+                    
+                    totales_mapped = {
+                        "subtotal": totales.get("Subtotal", ""),
+                        "iva_trasladado": totales.get("IVA", ""),
+                        "ret_iva": totales.get("Ret", ""),
+                        "ret_isr": "0",  # Por defecto
+                        "total": totales.get("TOTAL", "")
+                    }
+                    
+                    comentarios_mapped = {
+                        "comentario": comentarios
+                    }
+                    
+                    # Mapear conceptos
+                    conceptos_mapped = []
+                    for concepto in conceptos:
+                        if len(concepto) >= 4:
+                            conceptos_mapped.append({
+                                "descripcion": concepto[1],
+                                "cantidad": concepto[0],
+                                "unidad": "PZ",  # Por defecto
+                                "precio_unitario": concepto[2],
+                                "importe": concepto[3]
+                            })
+                    
+                    categorias_mapped = {
+                        "comercial": categorias.get("Comer", ""),
+                        "fleet": categorias.get("Fleet", ""),
+                        "seminuevos": categorias.get("Semis", ""),
+                        "refacciones": categorias.get("Refa", ""),
+                        "servicio": categorias.get("Serv", ""),
+                        "hyp": categorias.get("HyP", ""),
+                        "administracion": categorias.get("Admin", "")
+                    }
+                    
+                    factura = self.control.guardar_solicitud(
+                        proveedor_mapped, solicitud_mapped, conceptos_mapped, 
+                        totales_mapped, categorias_mapped, comentarios_mapped
+                    )
+                    logger.info(f"Factura guardada en la base de datos con folio_interno: {factura.folio_interno}")
+                    data["FOLIO"] = str(factura.folio_interno)
+                
+            except Exception as db_error:
+                logger.warning(f"Error al guardar en base de datos: {db_error}")
+                # Continúa sin guardar en BD pero genera el PDF
+                data["FOLIO"] = self.folio_interno_manual or "ERROR"
+                
             self.control.rellenar_formulario(data, ruta)
             logger.info("Formulario rellenado con datos de la factura")
 
-            # Placeholder de éxito
-            messagebox.showinfo("Éxito", f"Solicitud generada correctamente en:\n{ruta}")
+            # Mensaje de éxito personalizado según si se guardó en BD o no
+            if self.factura_duplicada:
+                mensaje_exito = (
+                    f"Solicitud generada correctamente en:\n{ruta}\n\n"
+                    f"NOTA: La factura ya existía en la base de datos, "
+                    f"por lo que no se guardó nuevamente.\n"
+                    f"Folio interno asignado: {self.folio_interno_manual}"
+                )
+            else:
+                mensaje_exito = f"Solicitud generada y guardada correctamente en:\n{ruta}"
+            
+            messagebox.showinfo("Éxito", mensaje_exito)
             logger.info(f"Solicitud generada y guardada en: {ruta}")
 
             # Alternar estado del checkbox dividir
@@ -733,13 +966,9 @@ class SolicitudApp(tb.Frame):
 
             # Limpiar formulario y actualizar solicitudes restantes
             self.control.delete_solicitud()
-            logger.info("Solicitud eliminada del control")
             self.limpiar_todo()
-            logger.info("Formulario limpiado")
             self.rellenar_campos()
-            logger.info("Campos rellenados")
             self.actualizar_solicitudes_restantes()
-            logger.info("Solicitudes restantes actualizadas")
 
         except Exception as e:
             logger.error(f"Error al generar documento: {e}")

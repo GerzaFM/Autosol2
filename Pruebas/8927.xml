@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd" Version="4.0" Serie="CC" Folio="8927" Fecha="2024-12-20T10:05:28" FormaPago="99" NoCertificado="00001000000516869396" Certificado="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" SubTotal="4719.21" Moneda="MXN" Total="5455.51" TipoDeComprobante="I" Exportacion="01" MetodoPago="PPD" LugarExpedicion="78700" Sello="a3gCZT7xeNDOtFLekZ790IcHaLoK0gF+fX9v1kG7+E7822zeCcC1AgqVGfqF/H6E+C3ARC9P6fvlLMmjKZxmLJJ2Cvw7FO+LuQpsaR9UWS7870/yCtkphe2q6snxsrwxeOmiCd96wv4puADt8foG3XC8IpKK/JT7bO+kN6CkM1aTbbjIs5e6jyjOttmGp4WLI3I64/PuPctuevJm3+i4lUsQTfsEHrGz8bgBlfJtWdmYy2RI3hKfw0yyjyOEkeTU1ooEVap+PGeu30OMqq6tCmWhnYQejDBD2DHS0qrzEdDla335oZ4mAXGjQPn5hBxJqfomt3TwzZEsCmSPOfhTxg==">
+    <cfdi:Emisor Rfc="SNM9308204J3" Nombre="SERVICIO NAVA MEDRANO" RegimenFiscal="601" />
+    <cfdi:Receptor Rfc="TCM220209MQ2" Nombre="TORRES CORZO MOTORS" DomicilioFiscalReceptor="78399" RegimenFiscalReceptor="601" UsoCFDI="G03" />
+    <cfdi:Conceptos>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6323991" Cantidad="27.003" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="592.37" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="577.66" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="92.43" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6325130" Cantidad="11.830" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="259.51" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="253.06" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="40.49" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6325173" Cantidad="11.830" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="259.51" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="253.06" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="40.49" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6326022" Cantidad="31.546" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="692.03" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="674.83" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="107.97" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6326094" Cantidad="31.546" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="692.03" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="674.83" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="107.97" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6328267" Cantidad="31.546" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="692.03" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="674.83" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="107.97" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6329321" Cantidad="18.561" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="407.18" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="397.06" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="63.53" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6329470" Cantidad="31.546" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="692.03" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="674.83" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="107.97" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+        <cfdi:Concepto ClaveProdServ="15101514" NoIdentificacion="PL/7215/EXP/ES/2015-6329762" Cantidad="19.716" ClaveUnidad="LTR" Unidad="LITROS" Descripcion="MAGNA" ValorUnitario="21.937248" Importe="432.52" ObjetoImp="02">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="421.77" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="67.48" />
+                </cfdi:Traslados>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+    </cfdi:Conceptos>
+    <cfdi:Impuestos TotalImpuestosTrasladados="736.30">
+        <cfdi:Traslados>
+            <cfdi:Traslado Base="4601.93" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="736.30" />
+        </cfdi:Traslados>
+    </cfdi:Impuestos>
+<cfdi:Complemento><tfd:TimbreFiscalDigital xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital" xsi:schemaLocation="http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="1.1" UUID="F525E788-9F64-428F-B3AF-CE0D8CC95BE6" FechaTimbrado="2024-12-20T10:05:44" RfcProvCertif="SFE0807172W8" SelloCFD="a3gCZT7xeNDOtFLekZ790IcHaLoK0gF+fX9v1kG7+E7822zeCcC1AgqVGfqF/H6E+C3ARC9P6fvlLMmjKZxmLJJ2Cvw7FO+LuQpsaR9UWS7870/yCtkphe2q6snxsrwxeOmiCd96wv4puADt8foG3XC8IpKK/JT7bO+kN6CkM1aTbbjIs5e6jyjOttmGp4WLI3I64/PuPctuevJm3+i4lUsQTfsEHrGz8bgBlfJtWdmYy2RI3hKfw0yyjyOEkeTU1ooEVap+PGeu30OMqq6tCmWhnYQejDBD2DHS0qrzEdDla335oZ4mAXGjQPn5hBxJqfomt3TwzZEsCmSPOfhTxg==" NoCertificadoSAT="00001000000710052019" SelloSAT="dTjwTBFZbQXLbWIC4rIG4P3Ddfvf4lhOx6zk4FBSiVG1pNVNtpt9uev1p3XllJaqOWYxdirvxTTCUNBuAHJBwq9YIZp2iLUVQ64AG51esd6YaHZOFMn/L8ty3poMkqH6IcvXWUqT1B4VqyJiGMviVzI1lLpHgVqD4iM6I6ChUD4MTU0rKMfRIR1xmQZ5S1i9J0bi8SOt0OfiRTyrqFHGTDeiIB1CZqwhr/mASLUh1XRnBlz01qLXuKP+VeTq739ZCHTsOLNYrjY6XuyNiIResZIIMD9TPZOGc+SqhSBDoOmMxzWxNq5XLc++evMm1IQzqcT5/YNJKObQ97FYvYyusg==" /></cfdi:Complemento></cfdi:Comprobante>

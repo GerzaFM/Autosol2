@@ -6,6 +6,15 @@ class DBManager:
         db.create_tables([Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario], safe=True)
 
     def guardar_formulario(self, data):
+        # Verificar si la factura ya existe
+        factura_existente = Factura.get_or_none(
+            (Factura.serie == data.get("serie")) & 
+            (Factura.folio == data.get("folio"))
+        )
+        
+        if factura_existente:
+            raise ValueError(f"La factura {data.get('serie')}-{data.get('folio')} ya está registrada en la base de datos")
+        
         # Guardar proveedor
         proveedor, _ = Proveedor.get_or_create(
             rfc=data.get("rfc_proveedor"),
@@ -22,6 +31,7 @@ class DBManager:
             serie=data.get("serie"),
             folio=data.get("folio"),
             fecha=data.get("fecha"),
+            tipo=data.get("tipo", "VC"),  # Agregar campo tipo con valor por defecto
             nombre_emisor=data.get("nombre_proveedor"),
             rfc_emisor=data.get("rfc_proveedor"),
             nombre_receptor=data.get("nombre_receptor"),
@@ -45,13 +55,14 @@ class DBManager:
                 factura=factura
             )
 
-        # Guardar reparto/prorrateo si existe
-        if any(data.get(k) for k in ["p_comercial", "p_fleet", "p_seminuevos", "p_refacciones", "p_hyp", "p_administracion"]):
+        # Guardar reparto/prorrateo si existe (incluir campo servicio)
+        if any(data.get(k) for k in ["p_comercial", "p_fleet", "p_seminuevos", "p_refacciones", "p_servicio", "p_hyp", "p_administracion"]):
             Reparto.create(
                 comercial=data.get("p_comercial"),
                 fleet=data.get("p_fleet"),
                 seminuevos=data.get("p_seminuevos"),
                 refacciones=data.get("p_refacciones"),
+                servicio=data.get("p_servicio"),
                 hyp=data.get("p_hyp"),
                 administracion=data.get("p_administracion"),
                 factura=factura

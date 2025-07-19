@@ -7,6 +7,11 @@ from ttkbootstrap.constants import *
 from typing import Dict, List, Callable, Optional
 from decimal import Decimal
 
+import sys
+import os
+# Agregar el directorio solicitudapp al path
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from solicitudapp.config.app_config import AppConfig
 from solicitudapp.services.validation import ValidationService
 

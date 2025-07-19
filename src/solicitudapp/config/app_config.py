@@ -50,7 +50,7 @@ class AppConfig:
     # Valores por defecto
     DEFAULT_VALUES: Dict[str, str] = {
         "departamento": "ADMINISTRACIÓN",
-        "tipo_solicitud": ""
+        "tipo_solicitud": "VC - VALE DE CONTROL"  # Valor por defecto del diccionario TIPO_VALE
     }
 
     # Diccionario: abreviatura -> tipo de vale

@@ -3,7 +3,7 @@ from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, Fo
 db = SqliteDatabase("facturas.db")
 
 class Proveedor(Model):
-    id = AutoField()  # Autoincremental
+    id = IntegerField(primary_key=True)  # Primary key autoincremental
     nombre = CharField()
     rfc = CharField(unique=True)
     telefono = CharField(null=True)
@@ -16,7 +16,7 @@ class Proveedor(Model):
 
 
 class Layout(Model):
-    id = AutoField()
+    id = IntegerField(primary_key=True)
     nombre = CharField()
     fecha = DateField()
 
@@ -25,10 +25,11 @@ class Layout(Model):
 
 
 class Factura(Model):
-    folio_interno = AutoField(primary_key=True)
+    folio_interno = IntegerField(primary_key=True)
     serie = IntegerField()
     folio = IntegerField()
     fecha = DateField()
+    tipo = CharField()
     nombre_emisor = CharField()
     rfc_emisor = CharField()
     nombre_receptor = CharField()
@@ -50,7 +51,7 @@ class Factura(Model):
 
 
 class Concepto(Model):
-    id = AutoField()
+    id = IntegerField(primary_key=True)
     descripcion = CharField()
     cantidad = DecimalField()
     precio_unitario = DecimalField()
@@ -61,11 +62,12 @@ class Concepto(Model):
         database = db
 
 class Reparto(Model):
-    id = AutoField()
+    id = IntegerField(primary_key=True)
     comercial = DecimalField(null=True)
     fleet = DecimalField(null=True)
     seminuevos = DecimalField(null=True)
     refacciones = DecimalField(null=True)
+    servicio = DecimalField(null=True)
     hyp = DecimalField(null=True)
     administracion = DecimalField(null=True)
     factura = ForeignKeyField(Factura, backref='repartos')
@@ -94,7 +96,7 @@ class Vale(Model):
         database = db
 
 class OrdenCompra(Model):
-    id = AutoField()
+    id = IntegerField(primary_key=True)
     factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True)
     cuenta =IntegerField()
     nombre = IntegerField()
@@ -111,7 +113,7 @@ class OrdenCompra(Model):
         database = db
 
 class Banco(Model):
-    id = AutoField()
+    id = IntegerField(primary_key=True)
     nombre = CharField()
     cuenta = CharField(unique=True)
     codigo = CharField(unique=True)

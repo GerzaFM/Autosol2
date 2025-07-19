@@ -58,7 +58,7 @@ class Solicitud:
     # Datos de la solicitud
     fecha: date = field(default_factory=date.today)
     clase: str = ""
-    tipo: str = "Compra"  # "Compra" o "Servicio"
+    tipo: str = ""
     departamento: str = "Administracion"
     folio: str = ""
     
