@@ -18,6 +18,11 @@ else:
     # Cuando se ejecuta desde main.py, usar rutas relativas al src
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
+# Agregar el directorio raíz para acceder a las utilidades
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
 from solicitudapp.models.solicitud import Solicitud, Proveedor, Concepto, Totales
 from solicitudapp.services.validation import ValidationService
 from solicitudapp.config.app_config import AppConfig
@@ -26,6 +31,15 @@ from solicitudapp.logic_solicitud import SolicitudLogica
 from solicitudapp.form_control import FormPDF
 from bd.models import Factura, Proveedor, Reparto
 from bd.bd_control import DBManager
+
+# Importar utilidades seguras si están disponibles
+try:
+    from app.utils.ui_helpers import safe_set_geometry, get_safe_window_size, center_window_on_parent
+    from config.settings import WINDOW_SIZES
+    UI_HELPERS_AVAILABLE = True
+except ImportError:
+    UI_HELPERS_AVAILABLE = False
+    logging.warning("Utilidades de UI no disponibles, usando métodos básicos")
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -832,16 +846,32 @@ class SolicitudApp(tb.Frame):
         """Muestra popup para guardar favorito con diseño horizontal usando ttkbootstrap."""
         popup = tb.Toplevel(self)
         popup.title("Guardar Favorito")
-        popup.geometry("600x280")
+        
+        # Usar utilidades seguras si están disponibles
+        if UI_HELPERS_AVAILABLE:
+            geometry = get_safe_window_size("popup_favoritos")
+            safe_set_geometry(popup, geometry, "600x280")
+        else:
+            popup.geometry("600x280")
+            
         popup.resizable(False, False)
         popup.grab_set()  # Modal
         
-        # Centrar el popup
+        # Centrar el popup de forma segura
         popup.transient(self)
-        popup.geometry("+%d+%d" % (
-            self.winfo_rootx() + 50,
-            self.winfo_rooty() + 50
-        ))
+        if UI_HELPERS_AVAILABLE:
+            center_window_on_parent(popup, self, offset_x=50, offset_y=50)
+        else:
+            # Método básico de centrado
+            try:
+                popup.geometry("+%d+%d" % (
+                    self.winfo_rootx() + 50,
+                    self.winfo_rooty() + 50
+                ))
+            except Exception as e:
+                logger.warning(f"Error al centrar popup: {e}")
+                # Usar posición por defecto si falla
+                popup.geometry("+100+100")
         
         # Frame principal
         main_frame = tb.Frame(popup)
