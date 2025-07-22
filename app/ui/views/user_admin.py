@@ -182,64 +182,10 @@ class AdministradorUsuarios(tb.Frame):
             padding=15
         )
         
-        # Crear Labels para el formulario
-        self.lbl_username = tb.Label(self.form_frame, text="Username:")
-        self.lbl_nombre = tb.Label(self.form_frame, text="Nombre Completo:")
-        self.lbl_email = tb.Label(self.form_frame, text="Email:")
-        self.lbl_password = tb.Label(self.form_frame, text="Contraseña:")
-        self.lbl_empresa = tb.Label(self.form_frame, text="Código Empresa:")
-        self.lbl_centro = tb.Label(self.form_frame, text="Centro:")
-        self.lbl_sucursal = tb.Label(self.form_frame, text="Sucursal:")
-        self.lbl_marca = tb.Label(self.form_frame, text="Marca:")
-        self.lbl_permisos = tb.Label(self.form_frame, text="Permisos:")
-        self.lbl_estado = tb.Label(self.form_frame, text="Estado:")
+        # Los widgets se crearán durante _setup_layout para evitar conflictos
         
-        # Crear Entry widgets para el formulario
-        self.entry_username = tb.Entry(self.form_frame, width=20)
-        self.entry_nombre = tb.Entry(self.form_frame, width=25)
-        self.entry_email = tb.Entry(self.form_frame, width=25)
-        self.entry_password = tb.Entry(self.form_frame, width=15, show="*")
-        self.entry_empresa = tb.Entry(self.form_frame, width=15)
-        self.entry_centro = tb.Entry(self.form_frame, width=15)
-        self.entry_sucursal = tb.Entry(self.form_frame, width=15)
-        self.entry_marca = tb.Entry(self.form_frame, width=15)
-        
-        # Crear Combobox widgets
-        self.combo_permisos = tb.Combobox(
-            self.form_frame,
-            values=self.roles_disponibles,
-            state="readonly",
-            width=18
-        )
-        self.combo_estado = tb.Combobox(
-            self.form_frame,
-            values=self.estados_disponibles,
-            state="readonly",
-            width=18
-        )
-        
-        # Botón para mostrar/ocultar contraseña
-        self.btn_mostrar_pass = tb.Button(
-            self.form_frame,
-            text="👁️",
-            width=3,
-            command=self._toggle_password_visibility
-        )
-        
-        # Frame para botones del formulario
-        self.btn_guardar = tb.Button(
-            self.form_frame,
-            text="💾 Guardar Usuario",
-            bootstyle="success",
-            command=self._guardar_usuario
-        )
-        
-        self.btn_cancelar = tb.Button(
-            self.form_frame,
-            text="❌ Cancelar",
-            bootstyle="secondary",
-            command=self._cancelar_edicion
-        )
+        # Botón para mostrar/ocultar contraseña (se creará en setup_layout)
+        # Frame para botones del formulario (se crearán en setup_layout)
         
         # Frame inferior para información
         self.info_frame = tb.Frame(self.main_frame)
@@ -284,99 +230,158 @@ class AdministradorUsuarios(tb.Frame):
         # Frame del formulario (parte inferior)
         self.form_frame.pack(fill=X, pady=(10, 0))
         
-        # Organizar campos del formulario en columnas para ahorrar espacio
-        # Primera fila: Username, Nombre, Email
-        primera_fila = tb.Frame(self.form_frame)
-        primera_fila.pack(fill=X, pady=(0, 10))
-        
-        # Columna 1: Username
-        col1_frame = tb.Frame(primera_fila)
-        col1_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_username.pack(in_=col1_frame, anchor=W)
-        self.entry_username.pack(in_=col1_frame, fill=X)
-        
-        # Columna 2: Nombre
-        col2_frame = tb.Frame(primera_fila)
-        col2_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_nombre.pack(in_=col2_frame, anchor=W)
-        self.entry_nombre.pack(in_=col2_frame, fill=X)
-        
-        # Columna 3: Email
-        col3_frame = tb.Frame(primera_fila)
-        col3_frame.pack(side=LEFT, fill=X, expand=True)
-        self.lbl_email.pack(in_=col3_frame, anchor=W)
-        self.entry_email.pack(in_=col3_frame, fill=X)
-        
-        # Segunda fila: Contraseña, Empresa, Centro, Sucursal
-        segunda_fila = tb.Frame(self.form_frame)
-        segunda_fila.pack(fill=X, pady=(0, 10))
-        
-        # Columna 1: Contraseña
-        col4_frame = tb.Frame(segunda_fila)
-        col4_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_password.pack(in_=col4_frame, anchor=W)
-        password_entry_frame = tb.Frame(col4_frame)
-        password_entry_frame.pack(fill=X)
-        self.entry_password.pack(in_=password_entry_frame, side=LEFT, fill=X, expand=True, padx=(0, 5))
-        self.btn_mostrar_pass.pack(in_=password_entry_frame, side=RIGHT)
-        
-        # Columna 2: Empresa
-        col5_frame = tb.Frame(segunda_fila)
-        col5_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_empresa.pack(in_=col5_frame, anchor=W)
-        self.entry_empresa.pack(in_=col5_frame, fill=X)
-        
-        # Columna 3: Centro
-        col6_frame = tb.Frame(segunda_fila)
-        col6_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_centro.pack(in_=col6_frame, anchor=W)
-        self.entry_centro.pack(in_=col6_frame, fill=X)
-        
-        # Columna 4: Sucursal
-        col7_frame = tb.Frame(segunda_fila)
-        col7_frame.pack(side=LEFT, fill=X, expand=True)
-        self.lbl_sucursal.pack(in_=col7_frame, anchor=W)
-        self.entry_sucursal.pack(in_=col7_frame, fill=X)
-        
-        # Tercera fila: Marca, Permisos, Estado, Botones
-        tercera_fila = tb.Frame(self.form_frame)
-        tercera_fila.pack(fill=X, pady=(0, 10))
-        
-        # Columna 1: Marca
-        col8_frame = tb.Frame(tercera_fila)
-        col8_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_marca.pack(in_=col8_frame, anchor=W)
-        self.entry_marca.pack(in_=col8_frame, fill=X)
-        
-        # Columna 2: Permisos
-        col9_frame = tb.Frame(tercera_fila)
-        col9_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_permisos.pack(in_=col9_frame, anchor=W)
-        self.combo_permisos.pack(in_=col9_frame, fill=X)
-        
-        # Columna 3: Estado
-        col10_frame = tb.Frame(tercera_fila)
-        col10_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
-        self.lbl_estado.pack(in_=col10_frame, anchor=W)
-        self.combo_estado.pack(in_=col10_frame, fill=X)
-        
-        # Columna 4: Botones
-        col11_frame = tb.Frame(tercera_fila)
-        col11_frame.pack(side=LEFT, fill=X, expand=True)
-        
-        # Espacio para alinear botones con los otros campos
-        tb.Label(col11_frame, text="").pack(anchor=W)
-        
-        # Frame para botones del formulario
-        buttons_frame = tb.Frame(col11_frame)
-        buttons_frame.pack(fill=X)
-        
-        self.btn_guardar.pack(in_=buttons_frame, side=LEFT, padx=(0, 5))
-        self.btn_cancelar.pack(in_=buttons_frame, side=LEFT)
+        # Crear formulario con layout simplificado que funciona
+        self._crear_formulario_simplificado()
         
         # Info inferior
         self.info_frame.pack(fill=X, pady=(20, 0))
         self.info_label.pack()
+    
+    def _crear_formulario_simplificado(self):
+        """Crea el formulario con un layout simplificado que funciona."""
+        # Limpiar frame si tiene contenido
+        for widget in self.form_frame.winfo_children():
+            widget.destroy()
+        
+        # Fila 1: Username, Nombre, Email
+        fila1 = tb.Frame(self.form_frame)
+        fila1.pack(fill=X, pady=5)
+        
+        # Username
+        username_frame = tb.Frame(fila1)
+        username_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_username = tb.Label(username_frame, text="Username:")
+        self.lbl_username.pack(anchor=W)
+        self.entry_username = tb.Entry(username_frame, width=20)
+        self.entry_username.pack(fill=X)
+        
+        # Nombre
+        nombre_frame = tb.Frame(fila1)
+        nombre_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_nombre = tb.Label(nombre_frame, text="Nombre Completo:")
+        self.lbl_nombre.pack(anchor=W)
+        self.entry_nombre = tb.Entry(nombre_frame, width=25)
+        self.entry_nombre.pack(fill=X)
+        
+        # Email
+        email_frame = tb.Frame(fila1)
+        email_frame.pack(side=LEFT, fill=X, expand=True)
+        self.lbl_email = tb.Label(email_frame, text="Email:")
+        self.lbl_email.pack(anchor=W)
+        self.entry_email = tb.Entry(email_frame, width=25)
+        self.entry_email.pack(fill=X)
+        
+        # Fila 2: Password, Empresa, Centro, Sucursal
+        fila2 = tb.Frame(self.form_frame)
+        fila2.pack(fill=X, pady=5)
+        
+        # Password
+        pass_frame = tb.Frame(fila2)
+        pass_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_password = tb.Label(pass_frame, text="Contraseña:")
+        self.lbl_password.pack(anchor=W)
+        pass_entry_frame = tb.Frame(pass_frame)
+        pass_entry_frame.pack(fill=X)
+        self.entry_password = tb.Entry(pass_entry_frame, width=15, show="*")
+        self.entry_password.pack(side=LEFT, fill=X, expand=True, padx=(0, 5))
+        self.btn_mostrar_pass = tb.Button(
+            pass_entry_frame,
+            text="👁️",
+            width=3,
+            command=self._toggle_password_visibility
+        )
+        self.btn_mostrar_pass.pack(side=RIGHT)
+        
+        # Empresa
+        empresa_frame = tb.Frame(fila2)
+        empresa_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_empresa = tb.Label(empresa_frame, text="Código Empresa:")
+        self.lbl_empresa.pack(anchor=W)
+        self.entry_empresa = tb.Entry(empresa_frame, width=15)
+        self.entry_empresa.pack(fill=X)
+        
+        # Centro
+        centro_frame = tb.Frame(fila2)
+        centro_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_centro = tb.Label(centro_frame, text="Centro:")
+        self.lbl_centro.pack(anchor=W)
+        self.entry_centro = tb.Entry(centro_frame, width=15)
+        self.entry_centro.pack(fill=X)
+        
+        # Sucursal
+        sucursal_frame = tb.Frame(fila2)
+        sucursal_frame.pack(side=LEFT, fill=X, expand=True)
+        self.lbl_sucursal = tb.Label(sucursal_frame, text="Sucursal:")
+        self.lbl_sucursal.pack(anchor=W)
+        self.entry_sucursal = tb.Entry(sucursal_frame, width=15)
+        self.entry_sucursal.pack(fill=X)
+        
+        # Fila 3: Marca, Permisos, Estado, Botones
+        fila3 = tb.Frame(self.form_frame)
+        fila3.pack(fill=X, pady=5)
+        
+        # Marca
+        marca_frame = tb.Frame(fila3)
+        marca_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_marca = tb.Label(marca_frame, text="Marca:")
+        self.lbl_marca.pack(anchor=W)
+        self.entry_marca = tb.Entry(marca_frame, width=15)
+        self.entry_marca.pack(fill=X)
+        
+        # Permisos
+        permisos_frame = tb.Frame(fila3)
+        permisos_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_permisos = tb.Label(permisos_frame, text="Permisos:")
+        self.lbl_permisos.pack(anchor=W)
+        self.combo_permisos = tb.Combobox(
+            permisos_frame,
+            values=self.roles_disponibles,
+            state="readonly",
+            width=18
+        )
+        self.combo_permisos.pack(fill=X)
+        
+        # Estado
+        estado_frame = tb.Frame(fila3)
+        estado_frame.pack(side=LEFT, fill=X, expand=True, padx=(0, 10))
+        self.lbl_estado = tb.Label(estado_frame, text="Estado:")
+        self.lbl_estado.pack(anchor=W)
+        self.combo_estado = tb.Combobox(
+            estado_frame,
+            values=self.estados_disponibles,
+            state="readonly",
+            width=18
+        )
+        self.combo_estado.pack(fill=X)
+        
+        # Botones
+        botones_frame = tb.Frame(fila3)
+        botones_frame.pack(side=LEFT, fill=X, expand=True)
+        
+        # Espacio
+        tb.Label(botones_frame, text="").pack(anchor=W)
+        
+        btn_container = tb.Frame(botones_frame)
+        btn_container.pack(fill=X)
+        
+        self.btn_guardar = tb.Button(
+            btn_container,
+            text="💾 Guardar Usuario",
+            bootstyle="success",
+            command=self._guardar_usuario
+        )
+        self.btn_guardar.pack(side=LEFT, padx=(0, 5))
+        
+        self.btn_cancelar = tb.Button(
+            btn_container,
+            text="❌ Cancelar",
+            bootstyle="secondary",
+            command=self._cancelar_edicion
+        )
+        self.btn_cancelar.pack(side=LEFT)
+        
+        # Configurar validaciones
+        self._configurar_validaciones()
     
     def _bind_events(self):
         """Vincula eventos a los widgets."""
@@ -385,15 +390,6 @@ class AdministradorUsuarios(tb.Frame):
         
         # Doble clic para editar
         self.tree.bind("<Double-1>", lambda e: self._editar_usuario())
-        
-        # Validación en tiempo real de email
-        self.entry_email.bind("<KeyRelease>", self._validar_email)
-        
-        # Validación numérica para campos organizacionales
-        self.entry_empresa.bind("<KeyRelease>", self._validar_numerico)
-        self.entry_centro.bind("<KeyRelease>", self._validar_numerico)
-        self.entry_sucursal.bind("<KeyRelease>", self._validar_numerico)
-        self.entry_marca.bind("<KeyRelease>", self._validar_numerico)
     
     def _validar_numerico(self, event):
         """Valida que el campo contenga solo números."""
@@ -1091,3 +1087,14 @@ class AdministradorUsuarios(tb.Frame):
             'por_permisos': permisos,
             'db_conectada': self.db_disponible
         }
+    
+    def _configurar_validaciones(self):
+        """Configura las validaciones en tiempo real de los campos."""
+        # Validación en tiempo real de email
+        self.entry_email.bind("<KeyRelease>", self._validar_email)
+        
+        # Validación numérica para campos organizacionales
+        self.entry_empresa.bind("<KeyRelease>", self._validar_numerico)
+        self.entry_centro.bind("<KeyRelease>", self._validar_numerico)
+        self.entry_sucursal.bind("<KeyRelease>", self._validar_numerico)
+        self.entry_marca.bind("<KeyRelease>", self._validar_numerico)

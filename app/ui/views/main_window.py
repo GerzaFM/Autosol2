@@ -222,6 +222,9 @@ class MainWindow(tb.Window):
     def _show_solicitud_view(self):
         """Muestra la vista de nueva solicitud."""
         try:
+            # Limpiar contenido anterior
+            self._clear_content()
+            
             solicitud_view = SolicitudView(self.content_frame, self.db_manager)
             solicitud_view.pack(fill=BOTH, expand=True)
             self.current_view = solicitud_view
@@ -233,6 +236,9 @@ class MainWindow(tb.Window):
     def _show_nueva_vista(self):
         """Muestra el administrador de usuarios."""
         try:
+            # Limpiar contenido anterior
+            self._clear_content()
+            
             # Crear el administrador de usuarios
             admin_usuarios = AdministradorUsuarios(self.content_frame, self.db_manager)
             admin_usuarios.pack(fill=BOTH, expand=True)
