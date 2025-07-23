@@ -102,8 +102,8 @@ class SolicitudApp(tb.Frame):
         frame_sup = tb.Frame(self)
         frame_sup.pack(fill=X, padx=15, pady=10)
         
-        # Frame de proveedor
-        self.proveedor_frame = ProveedorFrame(frame_sup)
+        # Frame de proveedor (ahora con db_manager)
+        self.proveedor_frame = ProveedorFrame(frame_sup, db_manager=self.db_manager)
         self.proveedor_frame.pack(side=LEFT, fill=Y, expand=False, padx=(0, 10), pady=0)
         
         # Frame de solicitud
@@ -363,6 +363,23 @@ class SolicitudApp(tb.Frame):
         
         # Si no está en ese formato, asumir que ya es la clave
         return tipo_completo.strip()
+    
+    def _get_tipo_value_from_solicitud_frame(self) -> str:
+        """Obtiene el valor del tipo de vale desde el frame de solicitud."""
+        try:
+            if hasattr(self.solicitud_frame, 'tipo_search') and self.solicitud_frame.tipo_search:
+                # Si usa SearchEntry
+                selected_item = self.solicitud_frame.tipo_search.get_selected_item()
+                if selected_item:
+                    return selected_item.get('clave', 'VC')
+            else:
+                # Si usa Combobox tradicional
+                solicitud_data = self.solicitud_frame.get_data()
+                tipo_completo = solicitud_data.get("Tipo", "")
+                return self._extraer_clave_tipo(tipo_completo)
+        except:
+            pass
+        return "VC"  # Valor por defecto
 
     # Métodos de negocio
     
@@ -612,9 +629,18 @@ class SolicitudApp(tb.Frame):
                 logger.info(f"Sin tipo en factura, usando por defecto: {tipo_sugerido}")
             
             # Actualizar el tipo en la interfaz
-            solicitud_data = self.solicitud_frame.get_data()
-            solicitud_data["Tipo"] = tipo_sugerido
-            self.solicitud_frame.set_data(solicitud_data)
+            if hasattr(self.solicitud_frame, 'tipo_search') and self.solicitud_frame.tipo_search:
+                # Si usa SearchEntry, buscar el item correspondiente
+                for item in self.solicitud_frame.tipo_search.items:
+                    if item.get('clave') == clave_tipo:
+                        self.solicitud_frame.tipo_search.set_selection(item)
+                        break
+            else:
+                # Si usa Combobox tradicional
+                solicitud_data = self.solicitud_frame.get_data()
+                solicitud_data["Tipo"] = tipo_sugerido
+                self.solicitud_frame.set_data(solicitud_data)
+            
             logger.info(f"Tipo de solicitud establecido como: {tipo_sugerido}")
             
         except Exception as e:
@@ -1118,7 +1144,7 @@ class SolicitudApp(tb.Frame):
                         "serie": getattr(self.control.get_solicitud(), "serie", "A") if self.control.get_solicitud() else "A",
                         "folio": solicitud_data.get("Folio", "001"),
                         "fecha": solicitud_data.get("Fecha", ""),
-                        "tipo": self._extraer_clave_tipo(solicitud_data.get("Tipo", "")),  # Extraer solo la clave
+                        "tipo": self._get_tipo_value_from_solicitud_frame(),  # Usar método mejorado
                         "nombre_receptor": "TCM MATEHUALA",  # Valor por defecto
                         "rfc_receptor": "TMM860630PH1"  # Valor por defecto
                     }

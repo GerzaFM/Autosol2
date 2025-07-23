@@ -32,6 +32,7 @@ class DBManager:
             folio=data.get("folio"),
             fecha=data.get("fecha"),
             tipo=data.get("tipo", "VC"),  # Agregar campo tipo con valor por defecto
+            clase=data.get("clase"),  # Agregar campo clase
             nombre_emisor=data.get("nombre_proveedor"),
             rfc_emisor=data.get("rfc_proveedor"),
             nombre_receptor=data.get("nombre_receptor"),
@@ -115,3 +116,44 @@ class DBManager:
             (RepartoFavorito.usuario == usuario_id) & 
             (RepartoFavorito.posicion == posicion)
         )
+    
+    def eliminar_factura(self, factura_id):
+        """
+        Elimina una factura y todos sus registros relacionados.
+        
+        Args:
+            factura_id: folio_interno de la factura a eliminar
+            
+        Returns:
+            bool: True si se eliminó correctamente, False en caso contrario
+        """
+        try:
+            # Buscar la factura
+            factura = Factura.get_or_none(Factura.folio_interno == factura_id)
+            if not factura:
+                raise ValueError(f"No se encontró la factura con folio_interno {factura_id}")
+            
+            # Eliminar conceptos relacionados
+            conceptos_eliminados = Concepto.delete().where(Concepto.factura == factura).execute()
+            
+            # Eliminar repartos relacionados (si existen)
+            repartos_eliminados = Reparto.delete().where(Reparto.factura == factura).execute()
+            
+            # Eliminar vales relacionados (si existen)
+            vales_eliminados = Vale.delete().where(Vale.factura == factura).execute()
+            
+            # Finalmente eliminar la factura
+            factura.delete_instance()
+            
+            print(f"Factura {factura_id} eliminada correctamente:")
+            print(f"  - Conceptos eliminados: {conceptos_eliminados}")
+            print(f"  - Repartos eliminados: {repartos_eliminados}")
+            print(f"  - Vales eliminados: {vales_eliminados}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error al eliminar factura {factura_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            return False

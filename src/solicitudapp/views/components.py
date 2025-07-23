@@ -15,6 +15,14 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from solicitudapp.config.app_config import AppConfig
 from solicitudapp.services.validation import ValidationService
 
+# Importar componentes de búsqueda
+try:
+    from solicitudapp.search_components import SearchEntry
+    SEARCH_COMPONENTS_AVAILABLE = True
+except ImportError:
+    SEARCH_COMPONENTS_AVAILABLE = False
+    SearchEntry = None
+
 
 class BaseFrame(tb.Labelframe):
     """Frame base con funcionalidades comunes."""
@@ -35,17 +43,21 @@ class BaseFrame(tb.Labelframe):
             widget.delete("1.0", "end")
         elif isinstance(widget, tb.Combobox):
             widget.set("")
+        elif hasattr(widget, 'clear_selection'):  # SearchEntry
+            widget.clear_selection()
         
         for child in widget.winfo_children():
             self._clear_widget_recursive(child)
 
 
 class ProveedorFrame(BaseFrame):
-    """Frame para datos del proveedor."""
+    """Frame para datos del proveedor con búsqueda avanzada."""
     
-    def __init__(self, master=None):
+    def __init__(self, master=None, db_manager=None):
         super().__init__(master)
+        self.db_manager = db_manager
         self.entries: Dict[str, tb.Entry] = {}
+        self.proveedor_search = None  # SearchEntry component
         self._build_ui()
     
     def _build_ui(self):
@@ -53,15 +65,98 @@ class ProveedorFrame(BaseFrame):
         self.configure(text="Datos de proveedor", width=350)
         self.pack_propagate(False)
         
+        # Si está disponible el componente de búsqueda, agregarlo primero
+        if SEARCH_COMPONENTS_AVAILABLE and self.db_manager:
+            self._create_search_component()
+        
+        # Campos del proveedor
         campos = ["Nombre", "RFC", "Teléfono", "Correo", "Contacto"]
+        start_row = 1 if SEARCH_COMPONENTS_AVAILABLE and self.db_manager else 0
         
         for i, campo in enumerate(campos):
             tb.Label(self, text=f"{campo}:").grid(
-                row=i, column=0, sticky=E, padx=5, pady=4
+                row=start_row + i, column=0, sticky=E, padx=5, pady=4
             )
             entry = tb.Entry(self, width=56, bootstyle="dark")
-            entry.grid(row=i, column=1, padx=5, pady=4)
+            entry.grid(row=start_row + i, column=1, padx=5, pady=4)
             self.entries[campo] = entry
+    
+    def _create_search_component(self):
+        """Crea el componente de búsqueda de proveedores."""
+        try:
+            # Obtener proveedores de la base de datos
+            proveedores_data = self._get_proveedores_data()
+            
+            if proveedores_data:
+                # Label para búsqueda
+                tb.Label(self, text="Buscar:").grid(
+                    row=0, column=0, sticky=E, padx=5, pady=4
+                )
+                
+                # Componente de búsqueda
+                self.proveedor_search = SearchEntry(
+                    parent=self,
+                    items=proveedores_data,
+                    search_fields=['nombre', 'rfc'],
+                    display_columns=[
+                        {'name': 'nombre', 'text': 'Nombre', 'width': 250},
+                        {'name': 'rfc', 'text': 'RFC', 'width': 130},
+                        {'name': 'telefono', 'text': 'Teléfono', 'width': 100},
+                        {'name': 'email', 'text': 'Email', 'width': 200}
+                    ],
+                    entity_type="Proveedor",
+                    placeholder_text="Buscar proveedor...",
+                    width=40,
+                    on_selection_change=self._on_proveedor_selected
+                )
+                self.proveedor_search.grid(row=0, column=1, padx=5, pady=4, sticky="ew")
+                
+        except Exception as e:
+            print(f"Error creando componente de búsqueda: {e}")
+    
+    def _get_proveedores_data(self) -> List[Dict[str, str]]:
+        """Obtiene la lista de proveedores desde la base de datos."""
+        try:
+            if not self.db_manager:
+                return []
+            
+            # Importar Proveedor aquí para evitar dependencias circulares
+            from bd.models import Proveedor
+            
+            proveedores = Proveedor.select()
+            proveedores_data = []
+            
+            for proveedor in proveedores:
+                proveedores_data.append({
+                    'id': proveedor.id,
+                    'nombre': proveedor.nombre or '',
+                    'rfc': proveedor.rfc or '',
+                    'telefono': proveedor.telefono or '',
+                    'email': proveedor.email or '',
+                    'nombre_contacto': getattr(proveedor, 'nombre_contacto', '') or ''
+                })
+            
+            return proveedores_data
+            
+        except Exception as e:
+            print(f"Error obteniendo proveedores: {e}")
+            return []
+    
+    def _on_proveedor_selected(self, proveedor_data: Dict[str, str]):
+        """Callback cuando se selecciona un proveedor."""
+        try:
+            # Rellenar automáticamente los campos con los datos del proveedor
+            data = {
+                "Nombre": proveedor_data.get('nombre', ''),
+                "RFC": proveedor_data.get('rfc', ''),
+                "Teléfono": proveedor_data.get('telefono', ''),
+                "Correo": proveedor_data.get('email', ''),
+                "Contacto": proveedor_data.get('nombre_contacto', '')
+            }
+            self.set_data(data)
+            
+        except Exception as e:
+            print(f"Error al seleccionar proveedor: {e}")
     
     def get_data(self) -> Dict[str, str]:
         """Obtiene los datos del proveedor."""
@@ -91,6 +186,8 @@ class ProveedorFrame(BaseFrame):
             if not valido:
                 errores.append(mensaje)
         
+        return len(errores) == 0, errores
+        
         # Validar email
         if data["Correo"]:
             valido, mensaje = self.validation_service.validar_email(data["Correo"])
@@ -107,11 +204,12 @@ class ProveedorFrame(BaseFrame):
 
 
 class SolicitudFrame(BaseFrame):
-    """Frame para datos de la solicitud."""
+    """Frame para datos de la solicitud con búsqueda avanzada."""
     
     def __init__(self, master=None):
         super().__init__(master)
         self.entries: Dict[str, tb.Widget] = {}
+        self.tipo_search = None  # SearchEntry component for tipo de vale
         self._build_ui()
     
     def _build_ui(self):
@@ -126,24 +224,41 @@ class SolicitudFrame(BaseFrame):
             )
             
             if campo == "Tipo":
-                # Generar la lista "key - value" para el Combobox
-                tipo_vales_list = [f"{k} - {v}" for k, v in AppConfig.TIPO_VALE.items()]
-                widget = tb.Combobox(
-                    self, 
-                    values=tipo_vales_list, 
-                    width=22, 
-                    bootstyle="dark"
-                )
-                widget.set(tipo_vales_list[0] if tipo_vales_list else "")
-                widget.bind("<FocusOut>", self._validar_tipo_vale)
-                widget.bind("<Return>", self._validar_tipo_vale)
+                if SEARCH_COMPONENTS_AVAILABLE:
+                    # Usar componente de búsqueda para tipos de vale
+                    tipos_data = self._get_tipos_vale_data()
+                    self.tipo_search = SearchEntry(
+                        parent=self,
+                        items=tipos_data,
+                        search_fields=['clave', 'descripcion'],
+                        display_columns=[
+                            {'name': 'clave', 'text': 'Clave', 'width': 80},
+                            {'name': 'descripcion', 'text': 'Descripción', 'width': 200}
+                        ],
+                        entity_type="Tipo de Vale",
+                        placeholder_text="Seleccionar tipo...",
+                        width=20
+                    )
+                    widget = self.tipo_search
+                else:
+                    # Fallback a Combobox tradicional
+                    tipo_vales_list = [f"{k} - {v}" for k, v in AppConfig.TIPO_VALE.items()]
+                    widget = tb.Combobox(
+                        self, 
+                        values=tipo_vales_list, 
+                        width=22, 
+                        bootstyle="dark"
+                    )
+                    widget.set(tipo_vales_list[0] if tipo_vales_list else "")
+                    widget.bind("<FocusOut>", self._validar_tipo_vale)
+                    widget.bind("<Return>", self._validar_tipo_vale)
             elif campo == "Depa":
                 widget = tb.Combobox(
                     self, 
                     values=AppConfig.DEPARTAMENTOS, 
                     width=22, 
                     bootstyle="dark",
-                    state="readonly"  # <-- Esto evita que el usuario escriba
+                    state="readonly"
                 )
                 widget.set(AppConfig.DEFAULT_VALUES["departamento"])
             elif campo == "Fecha":
@@ -155,14 +270,32 @@ class SolicitudFrame(BaseFrame):
             else:
                 widget = tb.Entry(self, width=24, bootstyle="dark")
             
-            widget.grid(row=i, column=1, padx=5, pady=4, sticky=E)
+            widget.grid(row=i, column=1, padx=5, pady=4)
             self.entries[campo] = widget
+    
+    def _get_tipos_vale_data(self) -> List[Dict[str, str]]:
+        """Obtiene la lista de tipos de vale desde la configuración."""
+        tipos_data = []
+        for clave, descripcion in AppConfig.TIPO_VALE.items():
+            tipos_data.append({
+                'clave': clave,
+                'descripcion': descripcion,
+                'display': f"{clave} - {descripcion}"
+            })
+        return tipos_data
     
     def get_data(self) -> Dict[str, str]:
         """Obtiene los datos de la solicitud."""
         data = {}
         for campo, widget in self.entries.items():
-            if campo == "Fecha":
+            if campo == "Tipo" and self.tipo_search:
+                # Para SearchEntry, obtener el valor seleccionado
+                selected_item = self.tipo_search.get_selected_item()
+                if selected_item:
+                    data[campo] = selected_item.get('display', '')
+                else:
+                    data[campo] = ''
+            elif campo == "Fecha":
                 data[campo] = widget.entry.get()
             else:
                 data[campo] = widget.get()
@@ -173,7 +306,13 @@ class SolicitudFrame(BaseFrame):
         for campo, valor in data.items():
             if campo in self.entries:
                 widget = self.entries[campo]
-                if campo == "Fecha":
+                if campo == "Tipo" and self.tipo_search:
+                    # Para SearchEntry, buscar el item correspondiente
+                    for item in self.tipo_search.items:
+                        if item.get('display') == valor or item.get('clave') in valor:
+                            self.tipo_search.set_selection(item)
+                            break
+                elif campo == "Fecha":
                     widget.entry.delete(0, 'end')
                     widget.entry.insert(0, valor)
                 elif isinstance(widget, tb.Combobox):
@@ -181,6 +320,18 @@ class SolicitudFrame(BaseFrame):
                 else:
                     widget.delete(0, 'end')
                     widget.insert(0, valor)
+    
+    def clear_entries(self):
+        """Limpia todos los campos del frame de solicitud."""
+        for campo, widget in self.entries.items():
+            if campo == "Tipo" and self.tipo_search:
+                self.tipo_search.clear_selection()
+            elif campo == "Fecha":
+                widget.entry.delete(0, 'end')
+            elif hasattr(widget, 'delete'):
+                widget.delete(0, 'end')
+            elif hasattr(widget, 'set'):
+                widget.set("")
     
     def _validar_tipo_vale(self, event=None):
         """

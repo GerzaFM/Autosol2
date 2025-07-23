@@ -10,6 +10,7 @@ from config.settings import config
 from app.ui.components.sidebar import SidebarComponent
 from app.ui.views.solicitud_view import SolicitudView
 from app.ui.views.user_admin import AdministradorUsuarios
+from app.ui.views.facturas_view import FacturasView
 from app.utils.logger import get_logger
 
 class MainWindow(tb.Window):
@@ -208,8 +209,10 @@ class MainWindow(tb.Window):
             # Mostrar la vista correspondiente
             if view_name == "nueva":
                 self._show_solicitud_view()
+            elif view_name == "buscar":
+                self._show_facturas_view()
             elif view_name == "nueva_vista":
-                self._show_nueva_vista()
+                self._administrador_usuarios()
             else:
                 self._show_placeholder_view(view_name)
             
@@ -233,7 +236,23 @@ class MainWindow(tb.Window):
             self.logger.error(f"Error al crear vista de solicitud: {e}")
             self._show_error_view(f"Error al cargar solicitud: {str(e)}")
     
-    def _show_nueva_vista(self):
+    def _show_facturas_view(self):
+        """Muestra la vista de facturas guardadas."""
+        try:
+            # Limpiar contenido anterior
+            self._clear_content()
+            
+            facturas_view = FacturasView(self.content_frame, self.db_manager)
+            facturas_view.pack(fill=BOTH, expand=True)
+            self.current_view = facturas_view
+            
+            self.logger.info("Vista de facturas mostrada exitosamente")
+            
+        except Exception as e:
+            self.logger.error(f"Error al crear vista de facturas: {e}")
+            self._show_error_view(f"Error al cargar facturas: {str(e)}")
+    
+    def _administrador_usuarios(self):
         """Muestra el administrador de usuarios."""
         try:
             # Limpiar contenido anterior

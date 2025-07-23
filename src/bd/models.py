@@ -1,4 +1,4 @@
-from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, ForeignKeyField, IntegerField, AutoField
+from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, ForeignKeyField, IntegerField, AutoField, BooleanField
 
 db = SqliteDatabase("facturas.db")
 
@@ -40,9 +40,12 @@ class Factura(Model):
     iva_trasladado = DecimalField(null=True)
     total = DecimalField()
     comentario = CharField(null=True)
+    clase = CharField(null=True)  # Campo opcional para la clase de factura
     proveedor = ForeignKeyField(Proveedor, backref='facturas')
     layout = ForeignKeyField(Layout, backref='facturas', null=True)
-
+    cargada = BooleanField(default=False)
+    pagada = BooleanField(default=False)
+    
     class Meta:
         database = db
         indexes = (
