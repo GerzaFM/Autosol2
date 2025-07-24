@@ -1235,7 +1235,13 @@ class SolicitudApp(tb.Frame):
             # Alternar estado del checkbox dividir
             if dividir_habilitado and dividir_marcado:
                 self.chb_dividir.config(state="disabled")
-                self.solicitud_frame.entries["Tipo"].set("VC - VALE DE CONTROL")
+                # Configurar el tipo de vale según el tipo de widget
+                tipo_widget = self.solicitud_frame.entries["Tipo"]
+                if hasattr(tipo_widget, 'insert'):  # SearchEntry
+                    tipo_widget.delete(0, 'end')
+                    tipo_widget.insert(0, "VC - VALE DE CONTROL")
+                elif hasattr(tipo_widget, 'set'):  # Combobox
+                    tipo_widget.set("VC - VALE DE CONTROL")
                 logger.info("Checkbox dividir deshabilitado y tipo de vale cambiado")
                 return
             else:
