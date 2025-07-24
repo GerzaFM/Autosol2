@@ -13,7 +13,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 try:
-    from bd.models import Factura, Proveedor, Layout, Concepto, Vale, db
+    from bd.models import Factura, Proveedor, Layout, Concepto, Vale, OrdenCompra, Banco, db
     from bd.bd_control import DBManager as BdControl
     from solicitudapp.config.app_config import AppConfig
     
@@ -81,9 +81,22 @@ class BuscarApp(tb.Frame):
         self.treeview: Optional[ttk.Treeview] = None
         self.status_label: Optional[tb.Label] = None
         
+        # Referencias a labels de paneles de información
+        self.proveedor_nombre_label = None
+        self.proveedor_codigo_label = None
+        self.vale_no_label = None
+        self.vale_tipo_label = None
+        self.vale_folio_label = None
+        self.orden_importe_label = None
+        self.orden_iva_label = None
+        self.orden_letras_label = None
+        self.orden_cuenta_label = None
+        self.orden_banco_label = None
+        
         self._initialize_db()
         self._create_layout()
-        self._load_facturas()
+        # Cargar datos automáticamente al iniciar
+        self._load_facturas()  # Cargar facturas al inicio
         self._load_proveedores()  # Cargar proveedores para el filtro
     
     def _initialize_db(self):
@@ -140,11 +153,23 @@ class BuscarApp(tb.Frame):
         
         self._create_table(table_frame)
         
+        # Frame debajo del tree
+        below_tree_frame = tb.Frame(main_frame)
+        below_tree_frame.pack(fill=X, pady=(0, 10))
+        
+        self._create_below_tree_controls(below_tree_frame)
+        
         # Frame inferior con botones y estado
         bottom_frame = tb.Frame(main_frame)
-        bottom_frame.pack(fill=X)
+        bottom_frame.pack(fill=X, pady=(0, 10))
         
         self._create_bottom_controls(bottom_frame)
+        
+        # Frame de información de factura seleccionada
+        info_frame = tb.Frame(main_frame)
+        info_frame.pack(fill=X, pady=(0, 10))
+        
+        self._create_info_panels(info_frame)
     
     def _create_search_controls(self, parent):
         """Crea los controles de búsqueda y filtros."""
@@ -301,13 +326,6 @@ class BuscarApp(tb.Frame):
             command=self._clear_filters
         ).pack(side=RIGHT, padx=(10, 0))
         
-        tb.Button(
-            row2_frame,
-            text="Actualizar",
-            bootstyle="info-outline",
-            command=self._load_facturas
-        ).pack(side=RIGHT, padx=(10, 0))
-        
         # Tercera fila - Búsqueda de texto
         row3_frame = tb.Frame(filters_main)
         row3_frame.pack(fill=X)
@@ -398,6 +416,45 @@ class BuscarApp(tb.Frame):
         self.treeview.bind('<Double-1>', self._on_double_click)
         self.treeview.bind('<ButtonRelease-1>', self._on_select)
     
+    def _create_below_tree_controls(self, parent):
+        """Crea los controles que van debajo del treeview."""
+        # Frame contenedor con padding
+        controls_frame = tb.Frame(parent, padding=10)
+        controls_frame.pack(fill=X)
+        
+        # Frame izquierdo para controles adicionales
+        left_controls = tb.Frame(controls_frame)
+        left_controls.pack(side=LEFT)
+        
+        # Ejemplo de controles que puedes agregar:
+        # Información de totales
+        self.totals_label = tb.Label(
+            left_controls,
+            text="Total registros: 0 | Total importe: $0.00",
+            font=("Segoe UI", 10),
+            bootstyle="inverse-info"
+        )
+        self.totals_label.pack(side=LEFT, padx=(0, 15))
+        
+        # Frame derecho para controles adicionales
+        right_controls = tb.Frame(controls_frame)
+        right_controls.pack(side=RIGHT)
+        
+        # Ejemplo de botones adicionales
+        tb.Button(
+            right_controls,
+            text="Seleccionar Todo",
+            bootstyle="secondary-outline",
+            command=self._select_all
+        ).pack(side=RIGHT, padx=(10, 0))
+        
+        tb.Button(
+            right_controls,
+            text="Deseleccionar",
+            bootstyle="secondary-outline", 
+            command=self._deselect_all
+        ).pack(side=RIGHT, padx=(10, 0))
+    
     def _create_bottom_controls(self, parent):
         """Crea los controles inferiores."""
         # Frame izquierdo con botones de acción
@@ -432,8 +489,19 @@ class BuscarApp(tb.Frame):
             command=self._delete_selected,
             state="disabled"
         )
-        delete_button.pack(side=LEFT)
+        delete_button.pack(side=LEFT, padx=(0, 10))
         self.delete_button = delete_button
+        
+        # Botón Cheque
+        cheque_button = tb.Button(
+            left_frame,
+            text="Cheque",
+            bootstyle="warning",
+            command=self._generate_cheque,
+            state="disabled"
+        )
+        cheque_button.pack(side=LEFT)
+        self.cheque_button = cheque_button
         
         # Frame derecho con información de estado
         right_frame = tb.Frame(parent)
@@ -441,7 +509,7 @@ class BuscarApp(tb.Frame):
         
         self.status_label = tb.Label(
             right_frame,
-            text="Especifique filtros para buscar facturas",
+            text="Especifique filtros y presione 'Buscar' para ver facturas",
             font=("Segoe UI", 10),
             bootstyle="inverse-secondary"
         )
@@ -453,13 +521,13 @@ class BuscarApp(tb.Frame):
             print("Cargando facturas desde la base de datos...")
             
             if not self.bd_control or Factura is None:
-                print("Base de datos no disponible, usando datos de ejemplo")
-                self.facturas_data = self._get_sample_data()
-                self.filtered_data = self.facturas_data.copy()  # Mostrar datos de ejemplo
-                self.using_sample_data = True  # Marcar que estamos usando datos de ejemplo
+                print("Base de datos no disponible")
+                self.facturas_data = []
+                self.filtered_data = []
+                self.using_sample_data = False
                 self._update_table()
-                self._update_status("Base de datos no disponible. Mostrando datos de ejemplo.")
-                # Deshabilitar botones de acción para datos de ejemplo
+                self._update_status("Base de datos no disponible. No hay facturas para mostrar.")
+                # Deshabilitar botones de acción cuando no hay datos
                 self._disable_action_buttons()
                 return
             else:
@@ -474,12 +542,10 @@ class BuscarApp(tb.Frame):
                     self._update_status("Base de datos conectada pero no hay facturas registradas.")
                     return
                 
-                # Consultar todas las facturas con información del proveedor, conceptos y vale
+                # Consultar todas las facturas con información del proveedor
                 facturas_query = (Factura
                                 .select()
                                 .join(Proveedor, on=(Factura.proveedor == Proveedor.id))
-                                .switch(Factura)
-                                .join(Vale, join_type='LEFT OUTER', on=(Factura.folio_interno == Vale.factura))
                                 .order_by(Factura.fecha.desc()))
                 
                 self.facturas_data = []
@@ -554,21 +620,22 @@ class BuscarApp(tb.Frame):
                     })
             
             self.using_sample_data = False  # Marcar que estamos usando datos reales
-            self.filtered_data = self.facturas_data.copy()  # Mostrar todas las facturas inicialmente
+            # No mostrar datos automáticamente, esperar a que el usuario haga búsqueda
+            self.filtered_data = []  # Iniciar con tabla vacía
             self._update_table()
-            self._update_status(f"Se cargaron {len(self.facturas_data)} facturas.")
+            self._update_status(f"Se cargaron {len(self.facturas_data)} facturas. Presione 'Buscar' para mostrarlas.")
             
         except Exception as e:
             print(f"Error al cargar facturas: {e}")
             import traceback
             traceback.print_exc()
             self._update_status("Error al cargar facturas")
-            # Usar datos de ejemplo en caso de error
-            self.facturas_data = self._get_sample_data()
-            self.filtered_data = self.facturas_data.copy()  # Mostrar datos de ejemplo en caso de error
-            self.using_sample_data = True  # Marcar que estamos usando datos de ejemplo
+            # En caso de error, no mostrar datos
+            self.facturas_data = []
+            self.filtered_data = []
+            self.using_sample_data = False
             self._update_table()
-            # Deshabilitar botones de acción para datos de ejemplo
+            # Deshabilitar botones de acción cuando no hay datos
             self._disable_action_buttons()
     
     def _load_proveedores(self):
@@ -664,6 +731,7 @@ class BuscarApp(tb.Frame):
             
             if not has_filters:
                 print("No hay filtros activos - mostrando todas las facturas")
+                # Mostrar todas las facturas
                 self.filtered_data = self.facturas_data.copy()
                 self._update_table()
                 self._update_status(f"Se muestran todas las facturas ({len(self.facturas_data)} total)")
@@ -806,58 +874,11 @@ class BuscarApp(tb.Frame):
         self.solo_pagado_var.set(False)
         self.search_var.set("")
         
-        # Mostrar todas las facturas después de limpiar
-        self.filtered_data = self.facturas_data.copy()
+        # Limpiar tabla después de quitar filtros
+        self.filtered_data = []
         self._update_table()
-        self._update_status(f"Filtros limpiados. Se muestran todas las facturas ({len(self.facturas_data)} total).")
-        print("Filtros limpiados - mostrando todas las facturas")
-    
-    def _get_sample_data(self) -> List[Dict[str, Any]]:
-        """Obtiene datos de ejemplo cuando la BD no está disponible."""
-        return [
-            {
-                "folio_interno": 1,
-                "serie": 1,
-                "folio": 1001,
-                "serie_folio": "1-1001",
-                "tipo": "I",
-                "no_vale": "V001",  # Ejemplo de número de vale
-                "clase": "Servicios",
-                "fecha": "2024-01-15",
-                "folio_xml": "1-1001",  # Folio del XML
-                "nombre_emisor": "Proveedor ABC S.A. de C.V.",
-                "nombre_receptor": "Mi Empresa S.A.",
-                "conceptos": "Servicio de consultoría / Capacitación técnica",
-                "total": "$1,250.00",
-                "cargada": "Sí",
-                "pagada": "No",
-                "rfc_emisor": "ABC123456789",
-                "rfc_receptor": "EMP987654321",
-                "cargada_bool": True,
-                "pagada_bool": False
-            },
-            {
-                "folio_interno": 2,
-                "serie": 1,
-                "folio": 1002,
-                "serie_folio": "1-1002",
-                "tipo": "E",
-                "no_vale": "V002",  # Ejemplo de número de vale
-                "clase": "Materiales",
-                "fecha": "2024-01-16",
-                "folio_xml": "1-1002",  # Folio del XML
-                "nombre_emisor": "Servicios XYZ Corp.",
-                "nombre_receptor": "Mi Empresa S.A.",
-                "conceptos": "Materiales de oficina / Suministros de computación",
-                "total": "$2,340.50",
-                "cargada": "No",
-                "pagada": "Sí",
-                "rfc_emisor": "XYZ123456789",
-                "rfc_receptor": "EMP987654321",
-                "cargada_bool": False,
-                "pagada_bool": True
-            }
-        ]
+        self._update_status("Filtros limpiados. Especifique filtros para buscar facturas.")
+        print("Filtros limpiados - tabla vacía")
     
     def _search_facturas(self):
         """Realiza la búsqueda de facturas."""
@@ -866,6 +887,62 @@ class BuscarApp(tb.Frame):
     def _clear_search(self):
         """Limpia la búsqueda - ahora redirige a _clear_filters.""" 
         self._clear_filters()
+    
+    def _select_all(self):
+        """Selecciona todos los elementos en la tabla."""
+        for item in self.treeview.get_children():
+            self.treeview.selection_add(item)
+        self._update_selection_info()
+    
+    def _deselect_all(self):
+        """Deselecciona todos los elementos en la tabla."""
+        self.treeview.selection_set([])
+        self._update_selection_info()
+        # Deshabilitar botones cuando no hay selección
+        if hasattr(self, 'view_button'):
+            self.view_button.config(state="disabled")
+        if hasattr(self, 'export_button'):
+            self.export_button.config(state="disabled")
+        if hasattr(self, 'delete_button'):
+            self.delete_button.config(state="disabled")
+        if hasattr(self, 'cheque_button'):
+            self.cheque_button.config(state="disabled")
+    
+    def _update_selection_info(self):
+        """Actualiza la información de elementos seleccionados."""
+        selected_count = len(self.treeview.selection())
+        total_count = len(self.filtered_data)
+        
+        if selected_count > 0:
+            print(f"Seleccionados: {selected_count} de {total_count} elementos")
+        
+    def _update_totals_display(self):
+        """Actualiza la información de totales en el frame debajo del tree."""
+        try:
+            total_count = len(self.filtered_data)
+            total_amount = 0.0
+            
+            # Calcular el total de importes
+            for factura in self.filtered_data:
+                total_str = factura.get('total', '0')
+                # Remover símbolo de moneda y comas para convertir a float
+                if isinstance(total_str, str):
+                    clean_total = total_str.replace('$', '').replace(',', '')
+                    try:
+                        total_amount += float(clean_total)
+                    except ValueError:
+                        pass  # Ignorar valores que no se puedan convertir
+            
+            # Actualizar la etiqueta de totales
+            if hasattr(self, 'totals_label'):
+                self.totals_label.config(
+                    text=f"Total registros: {total_count} | Total importe: ${total_amount:,.2f}"
+                )
+                
+        except Exception as e:
+            print(f"Error actualizando totales: {e}")
+            if hasattr(self, 'totals_label'):
+                self.totals_label.config(text="Error calculando totales")
     
     def _update_table(self):
         """Actualiza la tabla con los datos filtrados."""
@@ -891,6 +968,9 @@ class BuscarApp(tb.Frame):
         
         # Actualizar contador de resultados
         self.results_label.config(text=f"{len(self.filtered_data)} resultados")
+        
+        # Actualizar información de totales
+        self._update_totals_display()
     
     def _on_select(self, event):
         """Maneja la selección de elementos en la tabla."""
@@ -900,15 +980,80 @@ class BuscarApp(tb.Frame):
         if selection and self.bd_control and not self.using_sample_data:
             # Solo habilitar si hay conexión a BD real Y no estamos usando datos de ejemplo
             self._enable_action_buttons_on_selection()
+            
+            # Actualizar paneles de información con la factura seleccionada
+            item = self.treeview.item(selection[0])
+            values = item['values']
+            if values:
+                folio_interno = values[0]
+                self._update_info_panels(folio_interno)
         else:
             # Deshabilitar si no hay selección, no hay BD real, o estamos usando datos de ejemplo
             self.view_button.config(state="disabled")
             self.export_button.config(state="disabled")
             self.delete_button.config(state="disabled")
+            # Limpiar paneles de información
+            self._clear_info_panels()
     
     def _on_double_click(self, event):
         """Maneja el doble click en la tabla."""
         self._view_details()
+    
+    def _enable_action_buttons_on_selection(self):
+        """Habilita los botones de acción cuando hay una selección válida."""
+        if hasattr(self, 'view_button'):
+            self.view_button.config(state="normal")
+        if hasattr(self, 'export_button'):
+            self.export_button.config(state="normal")
+        if hasattr(self, 'delete_button'):
+            self.delete_button.config(state="normal")
+        if hasattr(self, 'cheque_button'):
+            self.cheque_button.config(state="normal")
+    
+    def _disable_action_buttons(self):
+        """Deshabilita todos los botones de acción."""
+        if hasattr(self, 'view_button'):
+            self.view_button.config(state="disabled")
+        if hasattr(self, 'export_button'):
+            self.export_button.config(state="disabled")
+        if hasattr(self, 'delete_button'):
+            self.delete_button.config(state="disabled")
+        if hasattr(self, 'cheque_button'):
+            self.cheque_button.config(state="disabled")
+    
+    def _generate_cheque(self):
+        """Genera información para cheque de la factura seleccionada."""
+        selection = self.treeview.selection()
+        if not selection:
+            tb.dialogs.Messagebox.show_warning(
+                title="Sin selección",
+                message="Por favor seleccione una factura para generar cheque.",
+                parent=self
+            )
+            return
+        
+        # Verificar si hay conexión a BD real
+        if not self.bd_control or self.using_sample_data:
+            tb.dialogs.Messagebox.show_info(
+                title="Generar Cheque",
+                message="La generación de cheques solo está disponible con datos reales de la base de datos.",
+                parent=self
+            )
+            return
+
+        item = self.treeview.item(selection[0])
+        values = item['values']
+        folio_interno = values[0]
+        
+        # Actualizar paneles de información
+        self._update_info_panels(folio_interno)
+        
+        # Mensaje informativo
+        tb.dialogs.Messagebox.show_info(
+            title="Información de Cheque",
+            message=f"Se ha actualizado la información para la factura {folio_interno}.\nRevise los paneles de información debajo.",
+            parent=self
+        )
     
     def _view_details(self):
         """Muestra los detalles de la factura seleccionada."""
@@ -1171,25 +1316,200 @@ class BuscarApp(tb.Frame):
         if self.status_label:
             self.status_label.config(text=message)
     
-    def _disable_action_buttons(self):
-        """Deshabilita los botones de acción cuando se muestran datos de ejemplo."""
-        if hasattr(self, 'view_button'):
-            self.view_button.config(state="disabled")
-        if hasattr(self, 'export_button'):
-            self.export_button.config(state="disabled") 
-        if hasattr(self, 'delete_button'):
-            self.delete_button.config(state="disabled")
+    def _create_info_panels(self, parent):
+        """Crea los paneles de información para cheques."""
+        # Frame contenedor principal
+        main_info_frame = tb.Frame(parent, padding=10)
+        main_info_frame.pack(fill=X)
+        
+        # Crear tres LabelFrames horizontales
+        
+        # 1. Panel de Proveedor
+        proveedor_frame = tb.LabelFrame(
+            main_info_frame,
+            text="Datos Proveedor",
+            padding=10
+        )
+        proveedor_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 5))
+        
+        # Campos del proveedor
+        self.proveedor_nombre_label = tb.Label(
+            proveedor_frame,
+            text="Nombre: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.proveedor_nombre_label.pack(fill=X, pady=2)
+        
+        self.proveedor_codigo_label = tb.Label(
+            proveedor_frame,
+            text="Código Quiter: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.proveedor_codigo_label.pack(fill=X, pady=2)
+        
+        # 2. Panel de Vale
+        vale_frame = tb.LabelFrame(
+            main_info_frame,
+            text="Vale",
+            padding=10
+        )
+        vale_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
+        
+        # Campos del vale
+        self.vale_no_label = tb.Label(
+            vale_frame,
+            text="No Vale: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_no_label.pack(fill=X, pady=2)
+        
+        self.vale_tipo_label = tb.Label(
+            vale_frame,
+            text="Tipo: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_tipo_label.pack(fill=X, pady=2)
+        
+        self.vale_folio_label = tb.Label(
+            vale_frame,
+            text="Folio Factura: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_folio_label.pack(fill=X, pady=2)
+        
+        # 3. Panel de Orden de Compra
+        orden_frame = tb.LabelFrame(
+            main_info_frame,
+            text="Orden de Compra",
+            padding=10
+        )
+        orden_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=(5, 0))
+        
+        # Campos de la orden
+        self.orden_importe_label = tb.Label(
+            orden_frame,
+            text="Importe: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_importe_label.pack(fill=X, pady=2)
+        
+        self.orden_iva_label = tb.Label(
+            orden_frame,
+            text="IVA: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_iva_label.pack(fill=X, pady=2)
+        
+        self.orden_letras_label = tb.Label(
+            orden_frame,
+            text="Importe en Letras: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_letras_label.pack(fill=X, pady=2)
+        
+        self.orden_cuenta_label = tb.Label(
+            orden_frame,
+            text="Cuenta Mayor: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_cuenta_label.pack(fill=X, pady=2)
+        
+        self.orden_banco_label = tb.Label(
+            orden_frame,
+            text="Banco Código: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_banco_label.pack(fill=X, pady=2)
     
-    def _enable_action_buttons_on_selection(self):
-        """Habilita los botones de acción cuando hay datos reales y hay selección."""
-        if hasattr(self, 'view_button') and self.bd_control and not self.using_sample_data:
-            self.view_button.config(state="normal")
-        if hasattr(self, 'export_button') and self.bd_control and not self.using_sample_data:
-            self.export_button.config(state="normal")
-        if hasattr(self, 'delete_button') and self.bd_control and not self.using_sample_data:
-            self.delete_button.config(state="normal")
+    def _update_info_panels(self, folio_interno):
+        """Actualiza los paneles de información con datos de la factura."""
+        try:
+            if not self.bd_control:
+                return
+            
+            # Obtener la factura
+            factura = Factura.get_or_none(Factura.folio_interno == folio_interno)
+            if not factura:
+                self._clear_info_panels()
+                return
+            
+            # 1. Actualizar datos del proveedor
+            if factura.proveedor:
+                proveedor = factura.proveedor
+                self.proveedor_nombre_label.config(text=f"Nombre: {proveedor.nombre}")
+                codigo_quiter = proveedor.codigo_quiter if proveedor.codigo_quiter else "N/A"
+                self.proveedor_codigo_label.config(text=f"Código Quiter: {codigo_quiter}")
+            else:
+                self.proveedor_nombre_label.config(text="Nombre: Sin proveedor")
+                self.proveedor_codigo_label.config(text="Código Quiter: -")
+            
+            # 2. Actualizar datos del vale
+            vale = Vale.get_or_none(Vale.factura == factura.folio_interno)
+            if vale:
+                self.vale_no_label.config(text=f"No Vale: {vale.noVale}")
+                self.vale_tipo_label.config(text=f"Tipo: {vale.tipo}")
+                self.vale_folio_label.config(text=f"Folio Factura: {factura.serie}-{factura.folio}")
+            else:
+                self.vale_no_label.config(text="No Vale: Sin vale")
+                self.vale_tipo_label.config(text="Tipo: -")
+                self.vale_folio_label.config(text=f"Folio Factura: {factura.serie}-{factura.folio}")
+            
+            # 3. Actualizar datos de orden de compra
+            orden = OrdenCompra.get_or_none(OrdenCompra.factura == factura.folio_interno)
+            if orden:
+                self.orden_importe_label.config(text=f"Importe: ${orden.importe:,.2f}")
+                iva_text = f"${orden.iva:,.2f}" if orden.iva else "N/A"
+                self.orden_iva_label.config(text=f"IVA: {iva_text}")
+                self.orden_letras_label.config(text=f"Importe en Letras: {orden.importe_en_letras}")
+                cuenta_mayor = orden.cuenta_mayor if orden.cuenta_mayor else "N/A"
+                self.orden_cuenta_label.config(text=f"Cuenta Mayor: {cuenta_mayor}")
+                
+                # Buscar banco por cuenta
+                banco = Banco.get_or_none(Banco.cuenta == str(orden.cuenta))
+                if banco:
+                    self.orden_banco_label.config(text=f"Banco Código: {banco.codigo}")
+                else:
+                    self.orden_banco_label.config(text="Banco Código: N/A")
+            else:
+                self.orden_importe_label.config(text="Importe: Sin orden")
+                self.orden_iva_label.config(text="IVA: -")
+                self.orden_letras_label.config(text="Importe en Letras: -")
+                self.orden_cuenta_label.config(text="Cuenta Mayor: -")
+                self.orden_banco_label.config(text="Banco Código: -")
+                
+        except Exception as e:
+            print(f"Error actualizando paneles de información: {e}")
+            import traceback
+            traceback.print_exc()
+            self._clear_info_panels()
+    
+    def _clear_info_panels(self):
+        """Limpia los paneles de información."""
+        if hasattr(self, 'proveedor_nombre_label'):
+            self.proveedor_nombre_label.config(text="Nombre: -")
+            self.proveedor_codigo_label.config(text="Código Quiter: -")
+            
+            self.vale_no_label.config(text="No Vale: -")
+            self.vale_tipo_label.config(text="Tipo: -")
+            self.vale_folio_label.config(text="Folio Factura: -")
+            
+            self.orden_importe_label.config(text="Importe: -")
+            self.orden_iva_label.config(text="IVA: -")
+            self.orden_letras_label.config(text="Importe en Letras: -")
+            self.orden_cuenta_label.config(text="Cuenta Mayor: -")
+            self.orden_banco_label.config(text="Banco Código: -")
 
-
+    # ...existing code...
 def main():
     """Función principal para ejecutar la aplicación independientemente."""
     try:

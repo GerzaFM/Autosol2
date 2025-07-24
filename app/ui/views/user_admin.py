@@ -645,8 +645,9 @@ class AdministradorUsuarios(tb.Frame):
             self._cargar_usuarios_desde_bd()
             self.info_label.config(text="Lista de usuarios actualizada desde la base de datos")
         else:
-            self._cargar_usuarios_ejemplo()
-            self.info_label.config(text="Lista de usuarios actualizada (modo demo)")
+            self.usuarios_data.clear()
+            self._actualizar_vista_usuarios()
+            self.info_label.config(text="Base de datos no disponible - No hay usuarios para mostrar")
     
     def _on_tree_select(self, event):
         """Maneja la selección en el Treeview."""
@@ -734,8 +735,9 @@ class AdministradorUsuarios(tb.Frame):
     def _cargar_usuarios_desde_bd(self):
         """Carga usuarios desde la base de datos real."""
         if not self.db_disponible:
-            self.logger.warning("Base de datos no disponible, cargando usuarios de ejemplo")
-            self._cargar_usuarios_ejemplo()
+            self.logger.warning("Base de datos no disponible")
+            self.usuarios_data.clear()
+            self._actualizar_vista_usuarios()
             return
         
         try:
@@ -766,87 +768,9 @@ class AdministradorUsuarios(tb.Frame):
             
         except Exception as e:
             self.logger.error(f"Error al cargar usuarios desde BD: {e}")
-            # Fallback a usuarios de ejemplo
-            self._cargar_usuarios_ejemplo()
-    
-    def _cargar_usuarios_ejemplo(self):
-        """Carga usuarios de ejemplo compatibles con el modelo Usuario."""
-        # Limpiar datos existentes
-        self.usuarios_data.clear()
-        
-        # Usuarios de ejemplo basados en el modelo real
-        usuarios_ejemplo = [
-            {
-                'codigo': 1,
-                'username': 'admin',
-                'nombre': 'Administrador Sistema',
-                'email': 'admin@tcm-matehuala.com',
-                'password_hash': self._generar_hash_password('admin123'),
-                'empresa': 1,
-                'centro': 1,
-                'sucursal': 1,
-                'marca': 1,
-                'permisos': 'Administrador',
-                'estado': 'Activo'
-            },
-            {
-                'codigo': 2,
-                'username': 'juan.perez',
-                'nombre': 'Juan Pérez Martínez',
-                'email': 'juan.perez@tcm-matehuala.com',
-                'password_hash': self._generar_hash_password('usuario123'),
-                'empresa': 1,
-                'centro': 1,
-                'sucursal': 1,
-                'marca': 2,
-                'permisos': 'Usuario',
-                'estado': 'Activo'
-            },
-            {
-                'codigo': 3,
-                'username': 'maria.lopez',
-                'nombre': 'María López García',
-                'email': 'maria.lopez@tcm-matehuala.com',
-                'password_hash': self._generar_hash_password('supervisor123'),
-                'empresa': 1,
-                'centro': 1,
-                'sucursal': 2,
-                'marca': 1,
-                'permisos': 'Supervisor',
-                'estado': 'Activo'
-            },
-            {
-                'codigo': 4,
-                'username': 'carlos.ruiz',
-                'nombre': 'Carlos Ruiz Sánchez',
-                'email': 'carlos.ruiz@tcm-matehuala.com',
-                'password_hash': self._generar_hash_password('contador123'),
-                'empresa': 1,
-                'centro': 2,
-                'sucursal': 1,
-                'marca': 1,
-                'permisos': 'Contador',
-                'estado': 'Inactivo'
-            },
-            {
-                'codigo': 5,
-                'username': 'ana.gonzalez',
-                'nombre': 'Ana González Morales',
-                'email': 'ana.gonzalez@tcm-matehuala.com',
-                'password_hash': self._generar_hash_password('gerente123'),
-                'empresa': 1,
-                'centro': 1,
-                'sucursal': 1,
-                'marca': 3,
-                'permisos': 'Gerente',
-                'estado': 'Suspendido'
-            }
-        ]
-        
-        self.usuarios_data = usuarios_ejemplo
-        self._actualizar_vista_usuarios()
-        
-        self.logger.info("Usuarios de ejemplo cargados (compatibles con modelo Usuario)")
+            # En caso de error, mostrar lista vacía
+            self.usuarios_data.clear()
+            self._actualizar_vista_usuarios()
     
     def _guardar_usuario(self):
         """Guarda el usuario actual (nuevo o editado)."""
@@ -1063,9 +987,9 @@ class AdministradorUsuarios(tb.Frame):
             total_usuarios = len(self.usuarios_data)
             self.info_label.config(text=f"Conectado a BD - Total: {total_usuarios} usuarios")
         else:
-            self._cargar_usuarios_ejemplo()
-            total_usuarios = len(self.usuarios_data)
-            self.info_label.config(text=f"Modo Demo - Total: {total_usuarios} usuarios de ejemplo")
+            self.usuarios_data.clear()
+            self._actualizar_vista_usuarios()
+            self.info_label.config(text="Base de datos no disponible - No hay usuarios para mostrar")
     
     def obtener_estadisticas(self) -> Dict:
         """Obtiene estadísticas de usuarios."""
