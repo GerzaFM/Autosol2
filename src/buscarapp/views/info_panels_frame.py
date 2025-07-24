@@ -1,0 +1,318 @@
+"""
+Vista para los paneles de información
+"""
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+from ttkbootstrap.scrolled import ScrolledText
+from typing import Dict, Any, Optional, List
+import logging
+
+
+class InfoPanelsFrame:
+    """Frame que contiene los paneles de información adicional"""
+    
+    def __init__(self, parent):
+        self.parent = parent
+        self.logger = logging.getLogger(__name__)
+        
+        # Crear frame principal sin LabelFrame
+        self.main_frame = ttk.Frame(parent)
+        self.main_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        self._create_widgets()
+    
+    def _create_widgets(self):
+        """Crea todos los widgets del frame de información"""
+        
+        # Frame contenedor principal (sin notebook, solo los 3 paneles)
+        main_info_frame = ttk.Frame(self.main_frame, padding=10)
+        main_info_frame.pack(fill="x")
+        
+        # Crear tres LabelFrames horizontales como en el original
+        
+        # 1. Panel de Datos Proveedor
+        self._create_proveedor_panel(main_info_frame)
+        
+        # 2. Panel de Vale
+        self._create_vale_panel(main_info_frame)
+        
+        # 3. Panel de Orden de Compra
+        self._create_orden_compra_panel(main_info_frame)
+    
+    def _create_proveedor_panel(self, parent):
+        """Crea el panel de datos del proveedor"""
+        proveedor_frame = ttk.LabelFrame(
+            parent,
+            text="Datos Proveedor",
+            padding=10
+        )
+        proveedor_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        
+        # Campos del proveedor
+        self.proveedor_codigo_label = ttk.Label(
+            proveedor_frame,
+            text="Código: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.proveedor_codigo_label.pack(fill="x", pady=2)
+        
+        self.proveedor_nombre_label = ttk.Label(
+            proveedor_frame,
+            text="Nombre: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.proveedor_nombre_label.pack(fill="x", pady=2)
+        
+        self.proveedor_rfc_label = ttk.Label(
+            proveedor_frame,
+            text="RFC: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.proveedor_rfc_label.pack(fill="x", pady=2)
+        
+        self.proveedor_email_label = ttk.Label(
+            proveedor_frame,
+            text="Email: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.proveedor_email_label.pack(fill="x", pady=2)
+    
+    def _create_vale_panel(self, parent):
+        """Crea el panel de información del vale"""
+        vale_frame = ttk.LabelFrame(
+            parent,
+            text="Vale",
+            padding=10
+        )
+        vale_frame.pack(side="left", fill="both", expand=True, padx=5)
+        
+        # Campos del vale
+        self.vale_no_label = ttk.Label(
+            vale_frame,
+            text="No Vale: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_no_label.pack(fill="x", pady=2)
+        
+        self.vale_tipo_label = ttk.Label(
+            vale_frame,
+            text="Tipo: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_tipo_label.pack(fill="x", pady=2)
+        
+        self.vale_folio_label = ttk.Label(
+            vale_frame,
+            text="Folio Factura: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_folio_label.pack(fill="x", pady=2)
+    
+    def _create_orden_compra_panel(self, parent):
+        """Crea el panel de orden de compra"""
+        orden_frame = ttk.LabelFrame(
+            parent,
+            text="Orden de Compra",
+            padding=10
+        )
+        orden_frame.pack(side="left", fill="both", expand=True, padx=(5, 0))
+        
+        # Campos de la orden
+        self.orden_importe_label = ttk.Label(
+            orden_frame,
+            text="Importe: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_importe_label.pack(fill="x", pady=2)
+        
+        self.orden_iva_label = ttk.Label(
+            orden_frame,
+            text="IVA: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_iva_label.pack(fill="x", pady=2)
+        
+        self.orden_letras_label = ttk.Label(
+            orden_frame,
+            text="Importe en Letras: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_letras_label.pack(fill="x", pady=2)
+        
+        self.orden_cuenta_label = ttk.Label(
+            orden_frame,
+            text="Cuenta Mayor: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_cuenta_label.pack(fill="x", pady=2)
+        
+        self.orden_banco_label = ttk.Label(
+            orden_frame,
+            text="Banco Código: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.orden_banco_label.pack(fill="x", pady=2)
+    
+    def update_proveedor_info(self, proveedor_data: Dict[str, Any]):
+        """
+        Actualiza la información del proveedor
+        
+        Args:
+            proveedor_data: Diccionario con los datos del proveedor
+        """
+        try:
+            codigo = proveedor_data.get('codigo', '-')
+            nombre = proveedor_data.get('nombre', '-')
+            rfc = proveedor_data.get('rfc', '-')
+            email = proveedor_data.get('email', '-')
+            
+            self.proveedor_codigo_label.config(text=f"Código: {codigo}")
+            self.proveedor_nombre_label.config(text=f"Nombre: {nombre}")
+            self.proveedor_rfc_label.config(text=f"RFC: {rfc}")
+            self.proveedor_email_label.config(text=f"Email: {email}")
+            
+        except Exception as e:
+            self.logger.error(f"Error actualizando información de proveedor: {e}")
+    
+    def update_vale_info(self, vale_data: Dict[str, Any]):
+        """
+        Actualiza la información del vale
+        
+        Args:
+            vale_data: Diccionario con los datos del vale
+        """
+        try:
+            no_vale = vale_data.get('no_vale', '-')
+            tipo = vale_data.get('tipo', '-')
+            folio_factura = vale_data.get('folio_factura', '-')
+            
+            self.vale_no_label.config(text=f"No Vale: {no_vale}")
+            self.vale_tipo_label.config(text=f"Tipo: {tipo}")
+            self.vale_folio_label.config(text=f"Folio Factura: {folio_factura}")
+            
+        except Exception as e:
+            self.logger.error(f"Error actualizando información de vale: {e}")
+    
+    def update_orden_compra_info(self, orden_data: Dict[str, Any]):
+        """
+        Actualiza la información de la orden de compra
+        
+        Args:
+            orden_data: Diccionario con los datos de la orden de compra
+        """
+        try:
+            importe = orden_data.get('importe', '-')
+            iva = orden_data.get('iva', '-')
+            importe_letras = orden_data.get('importe_letras', '-')
+            cuenta_mayor = orden_data.get('cuenta_mayor', '-')
+            banco_codigo = orden_data.get('banco_codigo', '-')
+            
+            # Formatear importes si son numéricos
+            if isinstance(importe, (int, float)):
+                importe = f"${importe:,.2f}"
+            if isinstance(iva, (int, float)):
+                iva = f"${iva:,.2f}"
+            
+            self.orden_importe_label.config(text=f"Importe: {importe}")
+            self.orden_iva_label.config(text=f"IVA: {iva}")
+            self.orden_letras_label.config(text=f"Importe en Letras: {importe_letras}")
+            self.orden_cuenta_label.config(text=f"Cuenta Mayor: {cuenta_mayor}")
+            self.orden_banco_label.config(text=f"Banco Código: {banco_codigo}")
+            
+        except Exception as e:
+            self.logger.error(f"Error actualizando información de orden de compra: {e}")
+    
+    def update_factura_info(self, factura_data: Dict[str, Any]):
+        """
+        Actualiza la información básica de la factura en los paneles disponibles
+        
+        Args:
+            factura_data: Diccionario con los datos de la factura
+        """
+        try:
+            # Actualizar información en el panel de vale si hay datos
+            vale_info = {
+                'no_vale': factura_data.get('no_vale', '-'),
+                'tipo': factura_data.get('tipo', '-'),
+                'folio_factura': factura_data.get('folio', '-')
+            }
+            self.update_vale_info(vale_info)
+            
+            # Actualizar información de orden de compra si hay datos
+            orden_info = {
+                'importe': factura_data.get('total', '-'),
+                'iva': factura_data.get('iva_trasladado', '-'),
+                'importe_letras': '-',
+                'cuenta_mayor': '-',
+                'banco_codigo': '-'
+            }
+            self.update_orden_compra_info(orden_info)
+            
+        except Exception as e:
+            self.logger.error(f"Error actualizando información de factura: {e}")
+    
+    def update_conceptos_info(self, conceptos_data: List[Dict[str, Any]]):
+        """
+        Actualiza la información de conceptos (no se muestra en los 3 paneles actuales)
+        Mantener compatibilidad con la interfaz existente
+        
+        Args:
+            conceptos_data: Lista de diccionarios con los conceptos
+        """
+        # Los conceptos no se muestran en estos 3 paneles básicos
+        # Se mantiene el método para compatibilidad pero no hace nada
+        pass
+    
+    def update_estadisticas(self, all_facturas: List[Dict[str, Any]], filtered_facturas: List[Dict[str, Any]]):
+        """
+        Actualiza las estadísticas (no se muestran en los 3 paneles actuales)
+        Mantener compatibilidad con la interfaz existente
+        
+        Args:
+            all_facturas: Lista de todas las facturas
+            filtered_facturas: Lista de facturas filtradas
+        """
+        # Las estadísticas no se muestran en estos 3 paneles básicos
+        # Se mantiene el método para compatibilidad pero no hace nada
+        pass
+    
+    def clear_all_info(self):
+        """Limpia toda la información de los paneles"""
+        try:
+            # Limpiar panel de proveedor
+            self.proveedor_codigo_label.config(text="Código: -")
+            self.proveedor_nombre_label.config(text="Nombre: -")
+            self.proveedor_rfc_label.config(text="RFC: -")
+            self.proveedor_email_label.config(text="Email: -")
+            
+            # Limpiar panel de vale
+            self.vale_no_label.config(text="No Vale: -")
+            self.vale_tipo_label.config(text="Tipo: -")
+            self.vale_folio_label.config(text="Folio Factura: -")
+            
+            # Limpiar panel de orden de compra
+            self.orden_importe_label.config(text="Importe: -")
+            self.orden_iva_label.config(text="IVA: -")
+            self.orden_letras_label.config(text="Importe en Letras: -")
+            self.orden_cuenta_label.config(text="Cuenta Mayor: -")
+            self.orden_banco_label.config(text="Banco Código: -")
+            
+        except Exception as e:
+            self.logger.error(f"Error limpiando información de paneles: {e}")
+    
+    def update_display(self):
+        """Actualiza la visualización del frame"""
+        # Método para futuras actualizaciones si es necesario
+        pass

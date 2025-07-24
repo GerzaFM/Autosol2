@@ -1,0 +1,630 @@
+"""
+Aplicación principal refactorizada de búsqueda de facturas usando arquitectura MVC
+"""
+import sys
+import os
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+import logging
+from typing import Optional, Dict, Any
+
+# Agregar paths necesarios
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+sys.path.insert(0, current_dir)
+
+# Intentar imports relativos primero, luego absolutos
+try:
+    # Imports relativos (cuando se ejecuta como módulo)
+    from .controllers import SearchController, InvoiceController, ExportController
+    from .views.search_frame import SearchFrame
+    from .views.table_frame import TableFrame
+    from .views.action_buttons_frame import ActionButtonsFrame
+    from .views.info_panels_frame import InfoPanelsFrame
+    from .models.search_models import SearchFilters
+    from .utils.dialog_utils import DialogUtils
+except ImportError:
+    # Imports absolutos (cuando se ejecuta directamente)
+    from controllers import SearchController, InvoiceController, ExportController
+    from views.search_frame import SearchFrame
+    from views.table_frame import TableFrame
+    from views.action_buttons_frame import ActionButtonsFrame
+    from views.info_panels_frame import InfoPanelsFrame
+    from models.search_models import SearchFilters
+    from utils.dialog_utils import DialogUtils
+
+# Intentar importar base de datos
+try:
+    from bd.bd_control import BDControl
+    from bd.models import Factura, Proveedor, Concepto, Vale, Reparto
+    BD_AVAILABLE = True
+except ImportError as e:
+    print(f"Advertencia: No se pudo importar base de datos: {e}")
+    BD_AVAILABLE = False
+    BDControl = None
+    Factura = Proveedor = Concepto = Vale = Reparto = None
+
+
+class BuscarAppRefactored(ttk.Frame):
+    """
+    Aplicación principal de búsqueda de facturas refactorizada con arquitectura MVC
+    """
+    
+    def __init__(self, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        
+        # Configurar logging
+        self.logger = logging.getLogger(__name__)
+        
+        # Inicializar utilidades
+        self.dialog_utils = DialogUtils(self)
+        
+        # Inicializar base de datos
+        self.bd_control = None
+        self._initialize_database()
+        
+        # Inicializar controladores
+        self.search_controller = SearchController(self.bd_control)
+        self.invoice_controller = InvoiceController(self.bd_control)
+        self.export_controller = ExportController()
+        
+        # Variables de estado
+        self.current_selection = None
+        
+        # Crear interfaz
+        self._create_layout()
+        
+        # Cargar datos iniciales
+        self._load_initial_data()
+    
+    def _initialize_database(self):
+        """Inicializa la conexión a la base de datos"""
+        try:
+            if BD_AVAILABLE:
+                self.bd_control = BDControl()
+                self.logger.info("Conexión a base de datos establecida")
+            else:
+                self.bd_control = None
+                self.logger.warning("Base de datos no disponible - usando datos de ejemplo")
+        except Exception as e:
+            self.logger.error(f"Error inicializando base de datos: {e}")
+            self.bd_control = None
+    
+    def _create_layout(self):
+        """Crea el layout principal de la aplicación"""
+        
+        # Frame principal con padding
+        main_container = ttk.Frame(self, padding=10)
+        main_container.pack(fill="both", expand=True)
+        
+        # Frame de búsqueda
+        self.search_frame = SearchFrame(
+            main_container,
+            on_search_callback=self._on_search,
+            on_clear_callback=self._on_clear_search
+        )
+        
+        # Frame de tabla
+        self.table_frame = TableFrame(
+            main_container,
+            on_selection_callback=self._on_table_selection,
+            on_double_click_callback=self._on_table_double_click
+        )
+        
+        # Frame de botones de acción
+        self.action_buttons_frame = ActionButtonsFrame(
+            main_container,
+            on_autocarga_callback=self._on_autocarga,
+            on_reimprimir_callback=self._on_reimprimir,
+            on_toggle_cargada_callback=self._on_toggle_cargada,
+            on_export_callback=self._on_export,
+            on_detalles_callback=self._on_detalles,
+            on_modificar_callback=self._on_modificar
+        )
+        
+        # Frame de paneles de información
+        self.info_panels_frame = InfoPanelsFrame(main_container)
+        
+        # Mensaje de estado inicial
+        if not self.bd_control:
+            self.dialog_utils.show_warning(
+                "Base de datos no disponible",
+                "La base de datos no está disponible. "
+                "Se mostrarán datos de ejemplo para demostración."
+            )
+    
+    def _load_initial_data(self):
+        """Carga los datos iniciales"""
+        try:
+            # Cargar facturas
+            success = self.search_controller.load_facturas()
+            if success:
+                self.logger.info("Datos de facturas cargados correctamente")
+            else:
+                self.logger.warning("No se pudieron cargar las facturas")
+            
+            # Cargar proveedores
+            self.search_controller.load_proveedores()
+            
+            # Actualizar estado inicial
+            self._update_status_message()
+            
+        except Exception as e:
+            self.logger.error(f"Error cargando datos iniciales: {e}")
+            self.dialog_utils.show_error("Error cargando datos", f"Error cargando datos: {str(e)}")
+    
+    def _on_search(self, filters_dict: Dict[str, Any]):
+        """Maneja el evento de búsqueda"""
+        try:
+            # Convertir diccionario a objeto SearchFilters
+            search_filters = SearchFilters(
+                fecha_inicial=filters_dict.get('fecha_inicial', ''),
+                fecha_final=filters_dict.get('fecha_final', ''),
+                tipo_filtro=filters_dict.get('tipo_filtro', ''),
+                proveedor_filtro=filters_dict.get('proveedor_filtro', ''),
+                no_vale_filtro=filters_dict.get('no_vale_filtro', ''),
+                solo_cargado=filters_dict.get('solo_cargado', False),
+                solo_pagado=filters_dict.get('solo_pagado', False),
+                texto_busqueda=filters_dict.get('texto_busqueda', '')
+            )
+            
+            # Actualizar estado de búsqueda
+            self.search_frame.set_status("Buscando...", "warning")
+            self.search_frame.enable_controls(False)
+            
+            # Aplicar filtros
+            filtered_results = self.search_controller.apply_filters(search_filters)
+            
+            # Actualizar tabla
+            self.table_frame.load_data(filtered_results)
+            
+            # Actualizar estadísticas
+            search_state = self.search_controller.get_state()
+            self.info_panels_frame.update_estadisticas(
+                search_state.all_facturas,
+                search_state.filtered_facturas
+            )
+            
+            # Actualizar mensaje de estado
+            result_count = len(filtered_results)
+            if result_count > 0:
+                self.search_frame.set_status(
+                    f"Búsqueda completada - {result_count} resultados encontrados",
+                    "success"
+                )
+            else:
+                self.search_frame.set_status(
+                    "Búsqueda completada - No se encontraron resultados",
+                    "warning"
+                )
+            
+            # Limpiar información de detalles
+            self.info_panels_frame.clear_all_info()
+            self.action_buttons_frame.update_selection(None)
+            
+            self.logger.info(f"Búsqueda completada - {result_count} resultados")
+            
+        except Exception as e:
+            self.logger.error(f"Error en búsqueda: {e}")
+            self.search_frame.set_status("Error en la búsqueda", "danger")
+            self.dialog_utils.show_error("Error en búsqueda", f"Error en la búsqueda: {str(e)}")
+        finally:
+            self.search_frame.enable_controls(True)
+    
+    def _on_clear_search(self):
+        """Maneja el evento de limpiar búsqueda"""
+        try:
+            # Limpiar controlador de búsqueda
+            self.search_controller.clear_filters()
+            
+            # Limpiar tabla
+            self.table_frame.clear_table()
+            
+            # Limpiar paneles de información
+            self.info_panels_frame.clear_all_info()
+            
+            # Actualizar botones de acción
+            self.action_buttons_frame.update_selection(None)
+            
+            # Actualizar mensaje de estado
+            self.search_frame.set_status("Filtros limpiados - Listo para nueva búsqueda")
+            
+            self.logger.info("Búsqueda y filtros limpiados")
+            
+        except Exception as e:
+            self.logger.error(f"Error limpiando búsqueda: {e}")
+    
+    def _on_table_selection(self, selected_data: Optional[Dict[str, Any]]):
+        """Maneja el evento de selección en la tabla"""
+        try:
+            self.current_selection = selected_data
+            
+            # Actualizar botones de acción
+            self.action_buttons_frame.update_selection(selected_data)
+            
+            if selected_data:
+                # Obtener detalles completos si hay base de datos
+                if self.bd_control:
+                    folio_interno = selected_data.get('folio_interno')
+                    if folio_interno:
+                        details = self.invoice_controller.get_invoice_details(folio_interno)
+                        if details:
+                            self._update_detail_panels(details)
+                        else:
+                            self.info_panels_frame.clear_all_info()
+                else:
+                    # Solo mostrar información básica para datos de ejemplo
+                    self.info_panels_frame.update_factura_info(selected_data)
+            else:
+                self.info_panels_frame.clear_all_info()
+                
+        except Exception as e:
+            self.logger.error(f"Error en selección de tabla: {e}")
+    
+    def _on_table_double_click(self, selected_data: Dict[str, Any]):
+        """Maneja el evento de doble click en la tabla"""
+        try:
+            if not selected_data:
+                return
+            
+            if not self.bd_control:
+                self.dialog_utils.show_info(
+                    "La vista de detalles completos solo está disponible con datos reales de la base de datos."
+                )
+                return
+            
+            # Mostrar ventana de detalles
+            self._show_details_window(selected_data)
+            
+        except Exception as e:
+            self.logger.error(f"Error en doble click: {e}")
+    
+    def _update_detail_panels(self, details: Dict[str, Any]):
+        """Actualiza los paneles de información con detalles completos"""
+        try:
+            # Actualizar información de factura
+            if 'factura' in details:
+                self.info_panels_frame.update_factura_info(details['factura'])
+            
+            # Actualizar información de proveedor
+            if 'proveedor' in details:
+                self.info_panels_frame.update_proveedor_info(details['proveedor'])
+            
+            # Actualizar conceptos
+            if 'conceptos' in details:
+                self.info_panels_frame.update_conceptos_info(details['conceptos'])
+            
+            # Actualizar vale
+            if 'vale' in details:
+                self.info_panels_frame.update_vale_info(details['vale'])
+            
+        except Exception as e:
+            self.logger.error(f"Error actualizando paneles de detalle: {e}")
+    
+    def _show_details_window(self, selected_data: Dict[str, Any]):
+        """Muestra una ventana con los detalles completos de la factura"""
+        try:
+            folio_interno = selected_data.get('folio_interno')
+            if not folio_interno:
+                return
+            
+            details = self.invoice_controller.get_invoice_details(folio_interno)
+            if not details:
+                self.dialog_utils.show_warning("No se pudieron obtener los detalles de la factura")
+                return
+            
+            # Crear ventana de detalles
+            details_window = ttk.Toplevel(self)
+            details_window.title(f"Detalles - Factura {folio_interno}")
+            details_window.geometry("600x500")
+            details_window.transient(self)
+            details_window.grab_set()
+            
+            # Frame principal con padding
+            main_frame = ttk.Frame(details_window, padding=20)
+            main_frame.pack(fill="both", expand=True)
+            
+            # Título
+            factura_info = details.get('factura', {})
+            serie = factura_info.get('serie', '')
+            folio = factura_info.get('folio', '')
+            titulo = f"Factura {serie} {folio}".strip() if serie or folio else f"Factura {folio_interno}"
+            
+            title_label = ttk.Label(
+                main_frame,
+                text=titulo,
+                font=("Segoe UI", 16, "bold"),
+                bootstyle="inverse-primary"
+            )
+            title_label.pack(pady=(0, 20))
+            
+            # Crear notebook para organizar la información
+            notebook = ttk.Notebook(main_frame)
+            notebook.pack(fill="both", expand=True)
+            
+            # Tab de información básica
+            basic_frame = ttk.Frame(notebook)
+            notebook.add(basic_frame, text="Información Básica")
+            
+            # Mostrar información básica
+            basic_info = [
+                ("Folio Interno:", factura_info.get('folio_interno', 'N/A')),
+                ("Tipo:", factura_info.get('tipo', 'N/A')),
+                ("Fecha:", factura_info.get('fecha', 'N/A')),
+                ("Emisor:", factura_info.get('nombre_emisor', 'N/A')),
+                ("RFC Emisor:", factura_info.get('rfc_emisor', 'N/A')),
+                ("Subtotal:", f"${factura_info.get('subtotal', 0):,.2f}"),
+                ("IVA:", f"${factura_info.get('iva_trasladado', 0):,.2f}"),
+                ("Total:", f"${factura_info.get('total', 0):,.2f}"),
+                ("Cargada:", "✓ Sí" if factura_info.get('cargada') else "✗ No"),
+                ("Pagada:", "✓ Sí" if factura_info.get('pagada') else "✗ No")
+            ]
+            
+            for i, (label_text, value) in enumerate(basic_info):
+                row_frame = ttk.Frame(basic_frame)
+                row_frame.pack(fill="x", padx=10, pady=5)
+                
+                ttk.Label(
+                    row_frame,
+                    text=label_text,
+                    font=("Segoe UI", 10, "bold"),
+                    width=15,
+                    anchor="w"
+                ).pack(side="left")
+                
+                ttk.Label(
+                    row_frame,
+                    text=str(value),
+                    font=("Segoe UI", 10),
+                    anchor="w"
+                ).pack(side="left", fill="x", expand=True)
+            
+            # Tab de conceptos si existen
+            conceptos = details.get('conceptos', [])
+            if conceptos:
+                conceptos_frame = ttk.Frame(notebook)
+                notebook.add(conceptos_frame, text=f"Conceptos ({len(conceptos)})")
+                
+                # Crear lista de conceptos
+                conceptos_text = ttk.Text(conceptos_frame, wrap="word", height=10)
+                scrollbar = ttk.Scrollbar(conceptos_frame, orient="vertical", command=conceptos_text.yview)
+                conceptos_text.configure(yscrollcommand=scrollbar.set)
+                
+                for i, concepto in enumerate(conceptos, 1):
+                    concepto_info = (
+                        f"{i}. {concepto.get('descripcion', 'Sin descripción')}\n"
+                        f"   Cantidad: {concepto.get('cantidad', 0):.2f} {concepto.get('unidad', '')}\n"
+                        f"   Precio: ${concepto.get('valor_unitario', 0):,.2f}\n"
+                        f"   Importe: ${concepto.get('importe', 0):,.2f}\n\n"
+                    )
+                    conceptos_text.insert("end", concepto_info)
+                
+                conceptos_text.config(state="disabled")
+                conceptos_text.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+                scrollbar.pack(side="right", fill="y", pady=5)
+            
+            # Botón cerrar
+            ttk.Button(
+                main_frame,
+                text="Cerrar",
+                bootstyle="secondary",
+                command=details_window.destroy
+            ).pack(pady=(20, 0))
+            
+        except Exception as e:
+            self.logger.error(f"Error mostrando ventana de detalles: {e}")
+            self.dialog_utils.show_error(f"Error mostrando detalles: {str(e)}")
+    
+    def _on_detalles(self, selected_data: Dict[str, Any]):
+        """Maneja el evento de ver detalles"""
+        try:
+            if not selected_data:
+                return
+            
+            # Usar el mismo método que el doble click
+            self._on_table_double_click(selected_data)
+            
+        except Exception as e:
+            self.logger.error(f"Error en detalles: {e}")
+    
+    def _on_modificar(self, selected_data: Dict[str, Any]):
+        """Maneja el evento de modificar"""
+        try:
+            if not selected_data:
+                return
+            
+            self.dialog_utils.show_info(
+                "Funcionalidad de Modificar",
+                "Esta funcionalidad estará disponible en una próxima actualización."
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error en modificar: {e}")
+    
+    def _on_autocarga(self):
+        """Maneja el evento de autocarga"""
+        self.dialog_utils.show_info(
+            "Funcionalidad de Autocarga",
+            "Esta funcionalidad estará disponible en una próxima actualización."
+        )
+    
+    def _on_reimprimir(self, selected_data: Dict[str, Any]):
+        """Maneja el evento de reimprimir"""
+        try:
+            if not self.bd_control:
+                self.dialog_utils.show_warning(
+                    "La reimpresión solo está disponible con datos reales de la base de datos."
+                )
+                return
+            
+            # Usar el controlador de facturas para reimprimir
+            success = self.invoice_controller.reimprimir_factura(selected_data)
+            
+            if success:
+                self.logger.info(f"Factura reimpresa: {selected_data.get('folio_interno')}")
+            
+        except Exception as e:
+            self.logger.error(f"Error en reimpresión: {e}")
+    
+    def _on_toggle_cargada(self, folio_interno: str):
+        """Maneja el cambio de estado 'cargada'"""
+        try:
+            if not self.bd_control:
+                self.dialog_utils.show_warning(
+                    "El cambio de estado solo está disponible con datos reales de la base de datos."
+                )
+                return
+            
+            # Confirmar cambio
+            if self.dialog_utils.ask_yes_no(
+                "Cambiar Estado",
+                f"¿Desea cambiar el estado de 'cargada' para la factura {folio_interno}?"
+            ):
+                success = self.invoice_controller.toggle_cargada_status(folio_interno)
+                
+                if success:
+                    # Actualizar tabla
+                    self.table_frame.update_row_status(folio_interno, cargada=None)
+                    # Refrescar búsqueda para mostrar cambios
+                    self._refresh_current_search()
+                    self.logger.info(f"Estado 'cargada' cambiado para factura {folio_interno}")
+                
+        except Exception as e:
+            self.logger.error(f"Error cambiando estado 'cargada': {e}")
+    
+    def _on_toggle_pagada(self, folio_interno: str):
+        """Maneja el cambio de estado 'pagada'"""
+        try:
+            if not self.bd_control:
+                self.dialog_utils.show_warning(
+                    "El cambio de estado solo está disponible con datos reales de la base de datos."
+                )
+                return
+            
+            # Confirmar cambio
+            if self.dialog_utils.ask_yes_no(
+                "Cambiar Estado",
+                f"¿Desea cambiar el estado de 'pagada' para la factura {folio_interno}?"
+            ):
+                success = self.invoice_controller.toggle_pagada_status(folio_interno)
+                
+                if success:
+                    # Actualizar tabla
+                    self.table_frame.update_row_status(folio_interno, pagada=None)
+                    # Refrescar búsqueda para mostrar cambios
+                    self._refresh_current_search()
+                    self.logger.info(f"Estado 'pagada' cambiado para factura {folio_interno}")
+                
+        except Exception as e:
+            self.logger.error(f"Error cambiando estado 'pagada': {e}")
+    
+    def _on_abrir_xml(self, xml_path: str):
+        """Maneja la apertura de archivo XML"""
+        success = self.invoice_controller.abrir_archivo(xml_path)
+        if success:
+            self.logger.info(f"Archivo XML abierto: {xml_path}")
+    
+    def _on_abrir_pdf(self, pdf_path: str):
+        """Maneja la apertura de archivo PDF"""
+        success = self.invoice_controller.abrir_archivo(pdf_path)
+        if success:
+            self.logger.info(f"Archivo PDF abierto: {pdf_path}")
+    
+    def _on_export(self):
+        """Maneja el evento de exportación"""
+        try:
+            # Obtener datos actuales de la tabla
+            current_data = self.table_frame.get_all_data()
+            
+            if not current_data:
+                self.dialog_utils.show_warning("No hay datos para exportar")
+                return
+            
+            # Mostrar opciones de exportación
+            export_formats = self.export_controller.get_export_formats()
+            
+            # Por simplicidad, usar CSV como formato por defecto
+            # En una implementación completa, se podría mostrar un diálogo de selección
+            success = self.export_controller.export_to_csv(current_data)
+            
+            if success:
+                self.logger.info(f"Datos exportados: {len(current_data)} registros")
+            
+        except Exception as e:
+            self.logger.error(f"Error en exportación: {e}")
+    
+    def _refresh_current_search(self):
+        """Refresca la búsqueda actual para mostrar cambios"""
+        try:
+            # Obtener filtros actuales
+            current_filters = self.search_frame.get_filters()
+            
+            # Recargar datos
+            self.search_controller.load_facturas()
+            
+            # Reaplicar filtros si hay alguno activo
+            if any(current_filters.values()):
+                self._on_search(current_filters)
+            
+        except Exception as e:
+            self.logger.error(f"Error refrescando búsqueda: {e}")
+    
+    def _update_status_message(self):
+        """Actualiza el mensaje de estado general"""
+        try:
+            search_state = self.search_controller.get_state()
+            
+            if search_state.database_available:
+                total_facturas = len(search_state.all_facturas)
+                self.search_frame.set_status(
+                    f"Base de datos conectada - {total_facturas} facturas disponibles"
+                )
+            else:
+                self.search_frame.set_status(
+                    "Usando datos de ejemplo - Base de datos no disponible", 
+                    "warning"
+                )
+                
+        except Exception as e:
+            self.logger.error(f"Error actualizando mensaje de estado: {e}")
+
+
+def main():
+    """Función principal para ejecutar la aplicación refactorizada"""
+    try:
+        # Configurar logging básico
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        
+        # Crear ventana principal
+        root = ttk.Window(themename="cosmo")
+        root.title("Búsqueda de Facturas - Versión Refactorizada")
+        root.geometry("1400x800")
+        root.minsize(1200, 700)
+        
+        # Crear aplicación
+        app = BuscarAppRefactored(root)
+        app.pack(fill="both", expand=True)
+        
+        # Centrar ventana
+        root.update_idletasks()
+        width = root.winfo_width()
+        height = root.winfo_height()
+        x = (root.winfo_screenwidth() // 2) - (width // 2)
+        y = (root.winfo_screenheight() // 2) - (height // 2)
+        root.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Ejecutar aplicación
+        root.mainloop()
+        
+    except Exception as e:
+        print(f"Error ejecutando aplicación refactorizada: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
