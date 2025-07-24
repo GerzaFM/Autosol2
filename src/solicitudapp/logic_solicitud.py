@@ -76,6 +76,13 @@ class SolicitudLogica:
 
     def guardar_solicitud(self, proveedor_data, solicitud_data, conceptos, totales, categorias, comentarios):
         dbm = DBManager()
+        
+        # Obtener la fecha de emisión del XML actual
+        fecha_emision = ""
+        solicitud_actual = self.get_solicitud()
+        if solicitud_actual:
+            fecha_emision = solicitud_actual.fecha_emision
+        
         # Construye el diccionario 'data' como lo haces
         data = {
             # Datos del proveedor
@@ -88,6 +95,7 @@ class SolicitudLogica:
             "serie": solicitud_data.get("serie"),
             "folio": solicitud_data.get("folio"),
             "fecha": solicitud_data.get("fecha"),
+            "fecha_emision": fecha_emision,
             "tipo": solicitud_data.get("tipo"),
             "nombre_receptor": solicitud_data.get("nombre_receptor"),
             "rfc_receptor": solicitud_data.get("rfc_receptor"),

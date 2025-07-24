@@ -29,6 +29,7 @@ class Factura(Model):
     serie = IntegerField()
     folio = IntegerField()
     fecha = DateField()
+    fecha_emision = DateField()
     tipo = CharField()
     nombre_emisor = CharField()
     rfc_emisor = CharField()

@@ -15,7 +15,7 @@ class XMLFactura:
         # Inicializar atributos
         self.serie = ""
         self.folio = ""
-        self.fecha = ""
+        self.fecha_emision = ""
         self.subtotal = ""
         self.total = ""
         self.nombre_emisor = ""
@@ -41,7 +41,7 @@ class XMLFactura:
         # Datos principales
         self.serie = self.root.attrib.get("Serie", "")
         self.folio = self.root.attrib.get("Folio", "")
-        self.fecha = self.root.attrib.get("Fecha", "")
+        self.fecha_emision = self.root.attrib.get("Fecha", "")
         self.subtotal = self.root.attrib.get("SubTotal", "")
         self.total = self.root.attrib.get("Total", "")
 
@@ -92,7 +92,7 @@ class XMLFactura:
         return {
             "serie": self.serie,
             "folio": self.folio,
-            "fecha": self.fecha,
+            "fecha_emision": self.fecha_emision,
             "subtotal": self.subtotal,
             "total": self.total,
             "nombre_emisor": self.nombre_emisor,
