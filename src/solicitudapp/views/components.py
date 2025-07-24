@@ -17,11 +17,12 @@ from solicitudapp.services.validation import ValidationService
 
 # Importar componentes de búsqueda
 try:
-    from solicitudapp.search_components import SearchEntry
+    from solicitudapp.search_components import SearchEntry, SearchDialog
     SEARCH_COMPONENTS_AVAILABLE = True
 except ImportError:
     SEARCH_COMPONENTS_AVAILABLE = False
     SearchEntry = None
+    SearchDialog = None
 
 
 class BaseFrame(tb.Labelframe):
@@ -65,55 +66,73 @@ class ProveedorFrame(BaseFrame):
         self.configure(text="Datos de proveedor", width=350)
         self.pack_propagate(False)
         
-        # Si está disponible el componente de búsqueda, agregarlo primero
-        if SEARCH_COMPONENTS_AVAILABLE and self.db_manager:
-            self._create_search_component()
-        
         # Campos del proveedor
         campos = ["Nombre", "RFC", "Teléfono", "Correo", "Contacto"]
-        start_row = 1 if SEARCH_COMPONENTS_AVAILABLE and self.db_manager else 0
         
         for i, campo in enumerate(campos):
             tb.Label(self, text=f"{campo}:").grid(
-                row=start_row + i, column=0, sticky=E, padx=5, pady=4
+                row=i, column=0, sticky=E, padx=5, pady=4
             )
-            entry = tb.Entry(self, width=56, bootstyle="dark")
-            entry.grid(row=start_row + i, column=1, padx=5, pady=4)
-            self.entries[campo] = entry
-    
-    def _create_search_component(self):
-        """Crea el componente de búsqueda de proveedores."""
-        try:
-            # Obtener proveedores de la base de datos
-            proveedores_data = self._get_proveedores_data()
             
-            if proveedores_data:
-                # Label para búsqueda
-                tb.Label(self, text="Buscar:").grid(
-                    row=0, column=0, sticky=E, padx=5, pady=4
-                )
+            if campo == "Nombre" and self.db_manager:
+                # Frame para Entry + Botón de búsqueda
+                frame_nombre = tb.Frame(self)
+                frame_nombre.grid(row=i, column=1, padx=5, pady=4, sticky="ew")
+                frame_nombre.grid_columnconfigure(0, weight=1)
                 
-                # Componente de búsqueda
-                self.proveedor_search = SearchEntry(
-                    parent=self,
-                    items=proveedores_data,
-                    search_fields=['nombre', 'rfc'],
-                    display_columns=[
-                        {'name': 'nombre', 'text': 'Nombre', 'width': 250},
-                        {'name': 'rfc', 'text': 'RFC', 'width': 130},
-                        {'name': 'telefono', 'text': 'Teléfono', 'width': 100},
-                        {'name': 'email', 'text': 'Email', 'width': 200}
-                    ],
-                    entity_type="Proveedor",
-                    placeholder_text="Buscar proveedor...",
-                    width=40,
-                    on_selection_change=self._on_proveedor_selected
+                # Entry normal para el nombre (editable)
+                entry = tb.Entry(frame_nombre, width=42, bootstyle="dark")
+                entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+                self.entries[campo] = entry
+                
+                # Botón de búsqueda
+                btn_buscar = tb.Button(
+                    frame_nombre,
+                    text="🔍",
+                    width=3,
+                    bootstyle="info",
+                    command=self._abrir_busqueda_proveedor
                 )
-                self.proveedor_search.grid(row=0, column=1, padx=5, pady=4, sticky="ew")
+                btn_buscar.grid(row=0, column=1)
+            else:
+                # Entry normal para otros campos
+                entry = tb.Entry(self, width=56, bootstyle="dark")
+                entry.grid(row=i, column=1, padx=5, pady=4)
+                self.entries[campo] = entry
+    
+    def _abrir_busqueda_proveedor(self):
+        """Abre el diálogo de búsqueda de proveedores."""
+        try:
+            if not SEARCH_COMPONENTS_AVAILABLE or not self.db_manager:
+                return
+            
+            # Obtener datos de proveedores
+            proveedores_data = self._get_proveedores_data()
+            if not proveedores_data:
+                return
+            
+            # Función callback para cuando se seleccione un proveedor
+            def on_proveedor_selected(proveedor_data):
+                self._on_proveedor_selected(proveedor_data)
+            
+            # Crear y mostrar el diálogo de búsqueda
+            dialog = SearchDialog(
+                parent=self,
+                title="Buscar Proveedor",
+                items=proveedores_data,
+                search_fields=['nombre', 'rfc'],
+                display_columns=[
+                    {'name': 'nombre', 'text': 'Nombre', 'width': 250},
+                    {'name': 'rfc', 'text': 'RFC', 'width': 130},
+                    {'name': 'telefono', 'text': 'Teléfono', 'width': 100},
+                    {'name': 'email', 'text': 'Email', 'width': 200}
+                ],
+                on_select=on_proveedor_selected
+            )
                 
         except Exception as e:
-            print(f"Error creando componente de búsqueda: {e}")
-    
+            print(f"Error al abrir búsqueda de proveedor: {e}")
+
     def _get_proveedores_data(self) -> List[Dict[str, str]]:
         """Obtiene la lista de proveedores desde la base de datos."""
         try:
@@ -186,8 +205,6 @@ class ProveedorFrame(BaseFrame):
             if not valido:
                 errores.append(mensaje)
         
-        return len(errores) == 0, errores
-        
         # Validar email
         if data["Correo"]:
             valido, mensaje = self.validation_service.validar_email(data["Correo"])
@@ -201,6 +218,13 @@ class ProveedorFrame(BaseFrame):
                 errores.append(mensaje)
         
         return len(errores) == 0, errores
+        
+        return len(errores) == 0, errores
+    
+    def clear_entries(self):
+        """Limpia todos los campos del frame de proveedor."""
+        for entry in self.entries.values():
+            entry.delete(0, 'end')
 
 
 class SolicitudFrame(BaseFrame):

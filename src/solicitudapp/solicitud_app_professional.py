@@ -815,19 +815,38 @@ class SolicitudApp(tb.Frame):
             self.proveedor_frame.clear_entries()
             self.solicitud_frame.clear_entries()
             
-            # Restablecer valores por defecto
-            self.solicitud_frame.entries["Tipo"].set(AppConfig.DEFAULT_VALUES["tipo_solicitud"])
-            self.solicitud_frame.entries["Depa"].set(AppConfig.DEFAULT_VALUES["departamento"])
+            # Restablecer valores por defecto de manera segura
+            try:
+                # Para el campo Tipo
+                if hasattr(self.solicitud_frame, 'tipo_search') and self.solicitud_frame.tipo_search:
+                    # Es SearchEntry, buscar el valor por defecto
+                    default_tipo = AppConfig.DEFAULT_VALUES["tipo_solicitud"]
+                    for item in self.solicitud_frame.tipo_search.items:
+                        if item.get('clave') in default_tipo or default_tipo in str(item):
+                            self.solicitud_frame.tipo_search.set_selection(item)
+                            break
+                else:
+                    # Es Combobox tradicional
+                    self.solicitud_frame.entries["Tipo"].set(AppConfig.DEFAULT_VALUES["tipo_solicitud"])
+                
+                # Para el campo Depa (siempre es Combobox)
+                self.solicitud_frame.entries["Depa"].set(AppConfig.DEFAULT_VALUES["departamento"])
+            except Exception as e:
+                logger.error(f"Error al restablecer valores por defecto: {e}")
+                # Continuar con la limpieza aunque falle el restablecimiento
             
             # Limpiar tabla de conceptos
             for item in self.tree.get_children():
                 self.tree.delete(item)
             
             # Limpiar totales
-            for entry in self.entries_totales.values():
+            logger.info("Limpiando campos de totales...")
+            for nombre, entry in self.entries_totales.items():
                 entry.delete(0, "end")
+                logger.debug(f"Total {nombre} limpiado")
             
             # Limpiar categorías
+            logger.info("Limpiando categorías...")
             self.limpiar_categorias()
             
             # Limpiar comentarios
@@ -840,8 +859,9 @@ class SolicitudApp(tb.Frame):
     
     def limpiar_categorias(self):
         """Limpia las categorías."""
-        for entry in self.entries_categorias.values():
+        for nombre, entry in self.entries_categorias.items():
             entry.delete(0, "end")
+            logger.debug(f"Categoría {nombre} limpiada")
     
     def guardar_categorias(self):
         """Guarda las categorías como favorito."""
@@ -1224,9 +1244,18 @@ class SolicitudApp(tb.Frame):
 
             # Limpiar formulario y actualizar solicitudes restantes
             self.control.delete_solicitud()
-            self.limpiar_todo()
-            self.rellenar_campos()
             self.actualizar_solicitudes_restantes()
+            solicitudes_restantes = self.control.get_solicitudes_restantes()
+            
+            # Siempre limpiar primero
+            self.limpiar_todo()
+            
+            # Solo rellenar campos si hay más solicitudes pendientes
+            if solicitudes_restantes > 0:
+                self.rellenar_campos()
+                logger.info(f"Rellenando campos para siguiente factura. Restantes: {solicitudes_restantes}")
+            else:
+                logger.info("No hay más facturas. Formulario limpio.")
 
         except Exception as e:
             logger.error(f"Error al generar documento: {e}")

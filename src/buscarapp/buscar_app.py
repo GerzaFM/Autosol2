@@ -13,7 +13,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 try:
-    from bd.models import Factura, Proveedor, Layout, Concepto, db
+    from bd.models import Factura, Proveedor, Layout, Concepto, Vale, db
     from bd.bd_control import DBManager as BdControl
     from solicitudapp.config.app_config import AppConfig
     
@@ -71,6 +71,7 @@ class BuscarApp(tb.Frame):
         self.filtered_data: List[Dict[str, Any]] = []
         self.proveedores_data: List[Dict[str, Any]] = []  # Datos de proveedores para búsqueda
         self.bd_control = None
+        self.using_sample_data = False  # Bandera para distinguir datos de ejemplo
         
         # Referencias a widgets
         self.search_var = tb.StringVar()
@@ -165,16 +166,6 @@ class BuscarApp(tb.Frame):
         fecha_inicial_entry.pack(side=LEFT, padx=(0, 15))
         self.fecha_inicial_entry = fecha_inicial_entry  # Guardar referencia
         
-        # Fecha Final
-        tb.Label(row1_frame, text="Fecha Final:", font=("Segoe UI", 10)).pack(side=LEFT, padx=(0, 5))
-        fecha_final_entry = tb.DateEntry(
-            row1_frame,
-            dateformat='%Y-%m-%d',
-            width=12
-        )
-        fecha_final_entry.pack(side=LEFT, padx=(0, 15))
-        self.fecha_final_entry = fecha_final_entry  # Guardar referencia
-        
         # Tipo de Vale
         tb.Label(row1_frame, text="Tipo:", font=("Segoe UI", 10)).pack(side=LEFT, padx=(0, 5))
         
@@ -217,6 +208,9 @@ class BuscarApp(tb.Frame):
             tipo_combo.pack(side=LEFT, padx=(0, 15))
         
         # Proveedor
+            tipo_combo.pack(side=LEFT, padx=(0, 15))
+        
+        # Proveedor
         tb.Label(row1_frame, text="Proveedor:", font=("Segoe UI", 10)).pack(side=LEFT, padx=(0, 5))
         
         # Widget de búsqueda de proveedor
@@ -245,9 +239,30 @@ class BuscarApp(tb.Frame):
             proveedor_combo.pack(side=LEFT, padx=(0, 15))
             self.proveedor_combo = proveedor_combo
         
-        # Segunda fila - Checkboxes y controles
+        # No Vale
+        tb.Label(row1_frame, text="No Vale:", font=("Segoe UI", 10)).pack(side=LEFT, padx=(0, 5))
+        self.no_vale_var = tb.StringVar()
+        no_vale_entry = tb.Entry(
+            row1_frame,
+            textvariable=self.no_vale_var,
+            font=("Segoe UI", 11),
+            width=15
+        )
+        no_vale_entry.pack(side=LEFT, padx=(0, 15))
+        
+        # Segunda fila - Fecha Final, Checkboxes y controles
         row2_frame = tb.Frame(filters_main)
         row2_frame.pack(fill=X, pady=(0, 10))
+        
+        # Fecha Final
+        tb.Label(row2_frame, text="Fecha Final:  ", font=("Segoe UI", 10)).pack(side=LEFT, padx=(0, 5))
+        fecha_final_entry = tb.DateEntry(
+            row2_frame,
+            dateformat='%Y-%m-%d',
+            width=12
+        )
+        fecha_final_entry.pack(side=LEFT, padx=(0, 15))
+        self.fecha_final_entry = fecha_final_entry  # Guardar referencia
         
         # Solo Cargado
         solo_cargado_check = tb.Checkbutton(
@@ -323,11 +338,13 @@ class BuscarApp(tb.Frame):
         table_container.pack(fill=BOTH, expand=True)
         
         # Definir columnas
-        columns = ("folio_interno", "tipo", "fecha", "nombre_emisor", "conceptos", "total", "clase", "cargada", "pagada")
+        columns = ("folio_interno", "tipo", "no_vale", "fecha", "folio_xml", "nombre_emisor", "conceptos", "total", "clase", "cargada", "pagada")
         column_widths = {
             "folio_interno": 80, 
-            "tipo": 60, 
-            "fecha": 100, 
+            "tipo": 60,
+            "no_vale": 80,
+            "fecha": 100,
+            "folio_xml": 100,
             "nombre_emisor": 160, 
             "conceptos": 300, 
             "total": 100,
@@ -338,7 +355,9 @@ class BuscarApp(tb.Frame):
         column_names = {
             "folio_interno": "ID",
             "tipo": "Tipo",
+            "no_vale": "No Vale",
             "fecha": "Fecha",
+            "folio_xml": "Folio",
             "nombre_emisor": "Emisor",
             "conceptos": "Conceptos",
             "total": "Total",
@@ -436,15 +455,31 @@ class BuscarApp(tb.Frame):
             if not self.bd_control or Factura is None:
                 print("Base de datos no disponible, usando datos de ejemplo")
                 self.facturas_data = self._get_sample_data()
-                self.filtered_data = []  # Empezar con lista vacía
+                self.filtered_data = self.facturas_data.copy()  # Mostrar datos de ejemplo
+                self.using_sample_data = True  # Marcar que estamos usando datos de ejemplo
                 self._update_table()
-                self._update_status("Base de datos no disponible. Use los filtros para buscar.")
+                self._update_status("Base de datos no disponible. Mostrando datos de ejemplo.")
+                # Deshabilitar botones de acción para datos de ejemplo
+                self._disable_action_buttons()
                 return
             else:
-                # Consultar todas las facturas con información del proveedor y conceptos
+                # Verificar primero si hay facturas en la base de datos
+                facturas_count = Factura.select().count()
+                if facturas_count == 0:
+                    print("No hay facturas en la base de datos")
+                    self.facturas_data = []
+                    self.using_sample_data = False  # No son datos de ejemplo, es BD real vacía
+                    self.filtered_data = self.facturas_data.copy()
+                    self._update_table()
+                    self._update_status("Base de datos conectada pero no hay facturas registradas.")
+                    return
+                
+                # Consultar todas las facturas con información del proveedor, conceptos y vale
                 facturas_query = (Factura
                                 .select()
                                 .join(Proveedor, on=(Factura.proveedor == Proveedor.id))
+                                .switch(Factura)
+                                .join(Vale, join_type='LEFT OUTER', on=(Factura.folio_interno == Vale.factura))
                                 .order_by(Factura.fecha.desc()))
                 
                 self.facturas_data = []
@@ -460,6 +495,20 @@ class BuscarApp(tb.Frame):
                     else:
                         # Fallback
                         fecha_str = str(factura.fecha)
+                    
+                    # Obtener el número de vale si existe
+                    no_vale_str = ""
+                    try:
+                        if hasattr(factura, 'vale') and factura.vale:
+                            no_vale_str = factura.vale.noVale
+                        else:
+                            # Si no hay vale asociado, intentar obtenerlo directamente
+                            vale_asociado = Vale.select().where(Vale.factura == factura.folio_interno).first()
+                            if vale_asociado:
+                                no_vale_str = vale_asociado.noVale
+                    except Exception as e:
+                        print(f"Error al obtener vale para factura {factura.folio_interno}: {e}")
+                        no_vale_str = ""
                     
                     # Obtener conceptos de la factura
                     conceptos_list = []
@@ -486,8 +535,10 @@ class BuscarApp(tb.Frame):
                         'folio': factura.folio,
                         'serie_folio': f"{factura.serie}-{factura.folio}",
                         'tipo': factura.tipo,
+                        'no_vale': no_vale_str,  # Usar el noVale del vale asociado
                         'clase': factura.clase or "",  # Agregar campo clase con valor por defecto
                         'fecha': fecha_str,
+                        'folio_xml': f"{factura.serie}-{factura.folio}",  # Folio del XML (serie-folio)
                         'nombre_emisor': factura.nombre_emisor,
                         'nombre_receptor': factura.nombre_receptor,
                         'conceptos': conceptos_str,
@@ -502,9 +553,10 @@ class BuscarApp(tb.Frame):
                         'pagada_bool': factura.pagada     # Mantener el valor booleano original
                     })
             
-            self.filtered_data = []  # Empezar con lista vacía
+            self.using_sample_data = False  # Marcar que estamos usando datos reales
+            self.filtered_data = self.facturas_data.copy()  # Mostrar todas las facturas inicialmente
             self._update_table()
-            self._update_status(f"Se cargaron {len(self.facturas_data)} facturas. Use los filtros para buscar.")
+            self._update_status(f"Se cargaron {len(self.facturas_data)} facturas.")
             
         except Exception as e:
             print(f"Error al cargar facturas: {e}")
@@ -513,8 +565,11 @@ class BuscarApp(tb.Frame):
             self._update_status("Error al cargar facturas")
             # Usar datos de ejemplo en caso de error
             self.facturas_data = self._get_sample_data()
-            self.filtered_data = []  # Empezar con lista vacía incluso con datos de ejemplo
+            self.filtered_data = self.facturas_data.copy()  # Mostrar datos de ejemplo en caso de error
+            self.using_sample_data = True  # Marcar que estamos usando datos de ejemplo
             self._update_table()
+            # Deshabilitar botones de acción para datos de ejemplo
+            self._disable_action_buttons()
     
     def _load_proveedores(self):
         """Carga la lista de proveedores para el filtro."""
@@ -593,6 +648,9 @@ class BuscarApp(tb.Frame):
                     proveedor_filtro = selected_proveedor.get('nombre', '')
             elif hasattr(self, 'proveedor_combo') and hasattr(self, 'proveedor_var'):
                 proveedor_filtro = self.proveedor_var.get().strip()
+            
+            # Obtener número de vale
+            no_vale_filtro = self.no_vale_var.get().strip() if hasattr(self, 'no_vale_var') else ""
                 
             solo_cargado = self.solo_cargado_var.get()
             solo_pagado = self.solo_pagado_var.get()
@@ -600,15 +658,15 @@ class BuscarApp(tb.Frame):
             
             # Verificar si hay al menos un filtro activo
             has_filters = any([
-                fecha_inicial, fecha_final, tipo_filtro, proveedor_filtro, 
+                fecha_inicial, fecha_final, tipo_filtro, proveedor_filtro, no_vale_filtro,
                 solo_cargado, solo_pagado, texto_busqueda
             ])
             
             if not has_filters:
-                print("No hay filtros activos - no se mostrarán resultados")
-                self.filtered_data = []
+                print("No hay filtros activos - mostrando todas las facturas")
+                self.filtered_data = self.facturas_data.copy()
                 self._update_table()
-                self._update_status("Especifique al menos un filtro para buscar facturas")
+                self._update_status(f"Se muestran todas las facturas ({len(self.facturas_data)} total)")
                 return
             
             print(f"DEBUG - Aplicando filtros:")
@@ -616,6 +674,7 @@ class BuscarApp(tb.Frame):
             print(f"  Fecha final: '{fecha_final}'") 
             print(f"  Tipo: '{tipo_filtro}'")
             print(f"  Proveedor: '{proveedor_filtro}'")
+            print(f"  No Vale: '{no_vale_filtro}'")
             print(f"  Solo cargado: {solo_cargado}")
             print(f"  Solo pagado: {solo_pagado}")
             print(f"  Texto búsqueda: '{texto_busqueda}'")
@@ -654,6 +713,21 @@ class BuscarApp(tb.Frame):
                     if proveedor_filtro.lower() not in emisor:
                         include_factura = False
                         exclusion_reason = f"proveedor '{proveedor_filtro}' no encontrado en emisor '{emisor}'"
+                
+                # Filtro por número de vale - SOLO si se especifica número
+                if no_vale_filtro and include_factura:
+                    no_vale_factura = str(factura.get('no_vale', ''))
+                    folio_interno = str(factura.get('folio_interno', ''))
+                    serie_folio = str(factura.get('serie_folio', ''))
+                    folio = str(factura.get('folio', ''))
+                    
+                    # Buscar en no_vale, folio interno, serie-folio, o folio individual
+                    if (no_vale_filtro not in no_vale_factura and 
+                        no_vale_filtro not in folio_interno and 
+                        no_vale_filtro not in serie_folio and 
+                        no_vale_filtro not in folio):
+                        include_factura = False
+                        exclusion_reason = f"número de vale '{no_vale_filtro}' no encontrado en no_vale ({no_vale_factura}), folio_interno ({folio_interno}), serie_folio ({serie_folio}), o folio ({folio})"
                 
                 # Filtro Solo Cargado - SOLO si el checkbox está marcado
                 if solo_cargado and include_factura:
@@ -724,15 +798,19 @@ class BuscarApp(tb.Frame):
         elif hasattr(self, 'proveedor_combo') and hasattr(self, 'proveedor_var'):
             self.proveedor_var.set("")
         
+        # Limpiar No Vale
+        if hasattr(self, 'no_vale_var'):
+            self.no_vale_var.set("")
+        
         self.solo_cargado_var.set(False)
         self.solo_pagado_var.set(False)
         self.search_var.set("")
         
-        # Mantener lista vacía después de limpiar
-        self.filtered_data = []
+        # Mostrar todas las facturas después de limpiar
+        self.filtered_data = self.facturas_data.copy()
         self._update_table()
-        self._update_status("Filtros limpiados. Especifique filtros para buscar facturas.")
-        print("Filtros limpiados - lista vacía")
+        self._update_status(f"Filtros limpiados. Se muestran todas las facturas ({len(self.facturas_data)} total).")
+        print("Filtros limpiados - mostrando todas las facturas")
     
     def _get_sample_data(self) -> List[Dict[str, Any]]:
         """Obtiene datos de ejemplo cuando la BD no está disponible."""
@@ -743,8 +821,10 @@ class BuscarApp(tb.Frame):
                 "folio": 1001,
                 "serie_folio": "1-1001",
                 "tipo": "I",
+                "no_vale": "V001",  # Ejemplo de número de vale
                 "clase": "Servicios",
                 "fecha": "2024-01-15",
+                "folio_xml": "1-1001",  # Folio del XML
                 "nombre_emisor": "Proveedor ABC S.A. de C.V.",
                 "nombre_receptor": "Mi Empresa S.A.",
                 "conceptos": "Servicio de consultoría / Capacitación técnica",
@@ -762,8 +842,10 @@ class BuscarApp(tb.Frame):
                 "folio": 1002,
                 "serie_folio": "1-1002",
                 "tipo": "E",
+                "no_vale": "V002",  # Ejemplo de número de vale
                 "clase": "Materiales",
                 "fecha": "2024-01-16",
+                "folio_xml": "1-1002",  # Folio del XML
                 "nombre_emisor": "Servicios XYZ Corp.",
                 "nombre_receptor": "Mi Empresa S.A.",
                 "conceptos": "Materiales de oficina / Suministros de computación",
@@ -796,7 +878,9 @@ class BuscarApp(tb.Frame):
             self.treeview.insert('', END, values=(
                 factura.get("folio_interno", ""),
                 factura.get("tipo", ""),
+                factura.get("no_vale", ""),
                 factura.get("fecha", ""),
+                factura.get("folio_xml", ""),
                 factura.get("nombre_emisor", ""),
                 factura.get("conceptos", ""),
                 factura.get("total", ""),
@@ -812,12 +896,12 @@ class BuscarApp(tb.Frame):
         """Maneja la selección de elementos en la tabla."""
         selection = self.treeview.selection()
         
-        # Habilitar/deshabilitar botones según la selección
-        if selection:
-            self.view_button.config(state="normal")
-            self.export_button.config(state="normal")
-            self.delete_button.config(state="normal")
+        # Habilitar/deshabilitar botones según la selección y tipo de datos
+        if selection and self.bd_control and not self.using_sample_data:
+            # Solo habilitar si hay conexión a BD real Y no estamos usando datos de ejemplo
+            self._enable_action_buttons_on_selection()
         else:
+            # Deshabilitar si no hay selección, no hay BD real, o estamos usando datos de ejemplo
             self.view_button.config(state="disabled")
             self.export_button.config(state="disabled")
             self.delete_button.config(state="disabled")
@@ -832,6 +916,15 @@ class BuscarApp(tb.Frame):
         if not selection:
             return
         
+        # Verificar si hay conexión a BD real y no estamos usando datos de ejemplo
+        if not self.bd_control or self.using_sample_data:
+            tb.dialogs.Messagebox.show_info(
+                title="Vista de Detalles",
+                message="La vista de detalles solo está disponible con datos reales de la base de datos.\n\nActualmente se están mostrando datos de ejemplo.",
+                parent=self
+            )
+            return
+
         item = self.treeview.item(selection[0])
         values = item['values']
         
@@ -930,6 +1023,15 @@ class BuscarApp(tb.Frame):
         if not selection:
             return
         
+        # Verificar si hay conexión a BD real y no estamos usando datos de ejemplo
+        if not self.bd_control or self.using_sample_data:
+            tb.dialogs.Messagebox.show_info(
+                title="Exportación",
+                message="La exportación solo está disponible con datos reales de la base de datos.\n\nActualmente se están mostrando datos de ejemplo.",
+                parent=self
+            )
+            return
+
         item = self.treeview.item(selection[0])
         values = item['values']
         
@@ -958,6 +1060,15 @@ class BuscarApp(tb.Frame):
             tb.dialogs.Messagebox.show_warning(
                 title="Sin selección",
                 message="Por favor seleccione una factura para eliminar.",
+                parent=self
+            )
+            return
+        
+        # Verificar si hay conexión a BD real y no estamos usando datos de ejemplo
+        if not self.bd_control or self.using_sample_data:
+            tb.dialogs.Messagebox.show_info(
+                title="Eliminación",
+                message="La eliminación solo está disponible con datos reales de la base de datos.\n\nActualmente se están mostrando datos de ejemplo.",
                 parent=self
             )
             return
@@ -1059,6 +1170,24 @@ class BuscarApp(tb.Frame):
         """Actualiza el mensaje de estado."""
         if self.status_label:
             self.status_label.config(text=message)
+    
+    def _disable_action_buttons(self):
+        """Deshabilita los botones de acción cuando se muestran datos de ejemplo."""
+        if hasattr(self, 'view_button'):
+            self.view_button.config(state="disabled")
+        if hasattr(self, 'export_button'):
+            self.export_button.config(state="disabled") 
+        if hasattr(self, 'delete_button'):
+            self.delete_button.config(state="disabled")
+    
+    def _enable_action_buttons_on_selection(self):
+        """Habilita los botones de acción cuando hay datos reales y hay selección."""
+        if hasattr(self, 'view_button') and self.bd_control and not self.using_sample_data:
+            self.view_button.config(state="normal")
+        if hasattr(self, 'export_button') and self.bd_control and not self.using_sample_data:
+            self.export_button.config(state="normal")
+        if hasattr(self, 'delete_button') and self.bd_control and not self.using_sample_data:
+            self.delete_button.config(state="normal")
 
 
 def main():

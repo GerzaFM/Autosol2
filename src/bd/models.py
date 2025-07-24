@@ -79,7 +79,7 @@ class Reparto(Model):
         database = db
 
 class Vale(Model):
-    noVale = IntegerField(primary_key=True)
+    noVale = CharField(primary_key=True)
     tipo = CharField()
     noDocumento = CharField()
     descripcion = CharField()
@@ -93,7 +93,7 @@ class Vale(Model):
     responsable = IntegerField(null=True)
     proveedor = CharField(null=True)
 
-    factura = ForeignKeyField(Factura, backref='vales', null=True)
+    factura = ForeignKeyField(Factura, backref='vale', unique=True, null=True)  # Relación uno a uno
 
     class Meta:
         database = db
