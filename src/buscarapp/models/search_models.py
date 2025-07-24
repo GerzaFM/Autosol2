@@ -90,7 +90,10 @@ class FacturaData:
     @property
     def serie_folio(self) -> str:
         """Obtiene el folio formateado con serie"""
-        from ..utils.format_utils import format_folio
+        try:
+            from utils.format_utils import format_folio
+        except ImportError:
+            from buscarapp.utils.format_utils import format_folio
         return format_folio(self.serie, self.folio)
     
     @property

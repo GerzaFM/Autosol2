@@ -1,7 +1,17 @@
 from bd.models import db, Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario, RepartoFavorito
+import os
 
 class DBManager:
     def __init__(self):
+        # Configurar la ruta absoluta a la base de datos
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        db_path = os.path.join(project_root, "facturas.db")
+        
+        # Reconectar con la ruta correcta
+        if db.is_closed():
+            db.init(db_path)
+        
         db.connect(reuse_if_open=True)
         db.create_tables([Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario, RepartoFavorito], safe=True)
 
@@ -157,3 +167,6 @@ class DBManager:
             import traceback
             traceback.print_exc()
             return False
+
+# Alias para compatibilidad con código existente
+BDControl = DBManager

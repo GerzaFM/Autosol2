@@ -126,6 +126,19 @@ class BuscarAppRefactored(ttk.Frame):
         # Frame de paneles de información
         self.info_panels_frame = InfoPanelsFrame(main_container)
         
+        # Frame de estado de BD en la parte inferior
+        self.status_bar_frame = ttk.Frame(self)
+        self.status_bar_frame.pack(side="bottom", fill="x", padx=5, pady=(0, 5))
+        
+        # Label de estado de BD en la esquina inferior derecha
+        self.db_status_label = ttk.Label(
+            self.status_bar_frame,
+            text="",
+            font=("Segoe UI", 9),
+            bootstyle="success"
+        )
+        self.db_status_label.pack(side="right", padx=(0, 10))
+        
         # Mensaje de estado inicial
         if not self.bd_control:
             self.dialog_utils.show_warning(
@@ -169,8 +182,7 @@ class BuscarAppRefactored(ttk.Frame):
                 texto_busqueda=filters_dict.get('texto_busqueda', '')
             )
             
-            # Actualizar estado de búsqueda
-            self.search_frame.set_status("Buscando...", "warning")
+            # Deshabilitar controles durante búsqueda
             self.search_frame.enable_controls(False)
             
             # Aplicar filtros
@@ -186,28 +198,15 @@ class BuscarAppRefactored(ttk.Frame):
                 search_state.filtered_facturas
             )
             
-            # Actualizar mensaje de estado
-            result_count = len(filtered_results)
-            if result_count > 0:
-                self.search_frame.set_status(
-                    f"Búsqueda completada - {result_count} resultados encontrados",
-                    "success"
-                )
-            else:
-                self.search_frame.set_status(
-                    "Búsqueda completada - No se encontraron resultados",
-                    "warning"
-                )
-            
             # Limpiar información de detalles
             self.info_panels_frame.clear_all_info()
             self.action_buttons_frame.update_selection(None)
             
+            result_count = len(filtered_results)
             self.logger.info(f"Búsqueda completada - {result_count} resultados")
             
         except Exception as e:
             self.logger.error(f"Error en búsqueda: {e}")
-            self.search_frame.set_status("Error en la búsqueda", "danger")
             self.dialog_utils.show_error("Error en búsqueda", f"Error en la búsqueda: {str(e)}")
         finally:
             self.search_frame.enable_controls(True)
@@ -226,9 +225,6 @@ class BuscarAppRefactored(ttk.Frame):
             
             # Actualizar botones de acción
             self.action_buttons_frame.update_selection(None)
-            
-            # Actualizar mensaje de estado
-            self.search_frame.set_status("Filtros limpiados - Listo para nueva búsqueda")
             
             self.logger.info("Búsqueda y filtros limpiados")
             
@@ -296,7 +292,7 @@ class BuscarAppRefactored(ttk.Frame):
                 self.info_panels_frame.update_conceptos_info(details['conceptos'])
             
             # Actualizar vale
-            if 'vale' in details:
+            if 'vale' in details and details['vale'] is not None:
                 self.info_panels_frame.update_vale_info(details['vale'])
             
         except Exception as e:
@@ -571,23 +567,27 @@ class BuscarAppRefactored(ttk.Frame):
             self.logger.error(f"Error refrescando búsqueda: {e}")
     
     def _update_status_message(self):
-        """Actualiza el mensaje de estado general"""
+        """Actualiza el mensaje de estado de la base de datos en la esquina inferior derecha"""
         try:
             search_state = self.search_controller.get_state()
             
             if search_state.database_available:
-                total_facturas = len(search_state.all_facturas)
-                self.search_frame.set_status(
-                    f"Base de datos conectada - {total_facturas} facturas disponibles"
+                self.db_status_label.config(
+                    text="BD Conectada",
+                    bootstyle="success"
                 )
             else:
-                self.search_frame.set_status(
-                    "Usando datos de ejemplo - Base de datos no disponible", 
-                    "warning"
+                self.db_status_label.config(
+                    text="BD Desconectada", 
+                    bootstyle="danger"
                 )
                 
         except Exception as e:
             self.logger.error(f"Error actualizando mensaje de estado: {e}")
+            self.db_status_label.config(
+                text="BD Error",
+                bootstyle="warning"
+            )
 
 
 def main():

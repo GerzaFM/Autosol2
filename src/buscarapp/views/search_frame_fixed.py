@@ -211,10 +211,10 @@ class SearchFrame:
         )
         self.texto_busqueda_entry.pack(side="left", padx=(0, 10))
         
-        # Label de estado (sin texto inicial)
+        # Label de estado
         self.status_label = ttk.Label(
             row3_frame,
-            text="",
+            text="Listo para buscar",
             font=("Segoe UI", 10),
             bootstyle="info"
         )

@@ -63,11 +63,19 @@ class SearchController:
             
             facturas_data = []
             for factura in facturas_query:
+                # Obtener el vale asociado si existe
+                vale_asociado = None
+                try:
+                    if hasattr(factura, 'vale') and factura.vale:
+                        vale_asociado = factura.vale[0] if factura.vale else None
+                except:
+                    vale_asociado = None
+                
                 factura_data = FacturaData(
                     folio_interno=str(factura.folio_interno),
                     tipo=factura.tipo,
-                    no_vale=str(factura.no_vale) if factura.no_vale else "",
-                    fecha=factura.fecha.strftime('%Y-%m-%d') if factura.fecha else "",
+                    no_vale=str(vale_asociado.noVale) if vale_asociado else "",
+                    fecha=self._format_date_for_display(factura.fecha),
                     folio_xml=f"{factura.serie or ''} {factura.folio or ''}".strip(),
                     serie=factura.serie,
                     folio=factura.folio,
@@ -192,14 +200,16 @@ class SearchController:
         """
         # Filtro por fecha inicial
         if filters.fecha_inicial:
-            fecha_factura = factura.get('fecha', '')
-            if fecha_factura < filters.fecha_inicial:
+            fecha_factura = self._normalize_date(factura.get('fecha', ''))
+            fecha_inicial_norm = self._normalize_date(filters.fecha_inicial)
+            if fecha_factura < fecha_inicial_norm:
                 return False
         
         # Filtro por fecha final
         if filters.fecha_final:
-            fecha_factura = factura.get('fecha', '')
-            if fecha_factura > filters.fecha_final:
+            fecha_factura = self._normalize_date(factura.get('fecha', ''))
+            fecha_final_norm = self._normalize_date(filters.fecha_final)
+            if fecha_factura > fecha_final_norm:
                 return False
         
         # Filtro por tipo
@@ -264,12 +274,23 @@ class SearchController:
             if not conceptos_list:
                 return ""
             
-            # Mostrar solo los primeros conceptos para evitar texto muy largo
-            if len(conceptos_list) == 1:
-                concepto = conceptos_list[0]
-                return f"{concepto.cantidad} - {concepto.descripcion}"
-            else:
-                return f"{len(conceptos_list)} conceptos"
+            # Extraer solo las descripciones de todos los conceptos
+            descripciones = []
+            for concepto in conceptos_list:
+                if concepto.descripcion:
+                    descripciones.append(concepto.descripcion.strip())
+            
+            if not descripciones:
+                return ""
+            
+            # Unir conceptos con "/"
+            conceptos_str = " / ".join(descripciones)
+            
+            # Limitar longitud para evitar texto muy largo
+            if len(conceptos_str) > 150:  # Limitar a 150 caracteres
+                conceptos_str = conceptos_str[:147] + "..."
+            
+            return conceptos_str
                 
         except Exception:
             return ""
@@ -281,3 +302,76 @@ class SearchController:
     def clear_filters(self) -> None:
         """Limpia los resultados filtrados"""
         self.state.clear_results()
+    
+    def _normalize_date(self, date_str: str) -> str:
+        """
+        Normaliza una fecha al formato YYYY-MM-DD para comparación
+        
+        Args:
+            date_str: Fecha como string en cualquier formato
+            
+        Returns:
+            str: Fecha en formato YYYY-MM-DD
+        """
+        if not date_str:
+            return ""
+        
+        try:
+            from datetime import datetime
+            
+            # Si ya está en formato YYYY-MM-DD, devolverlo tal como está
+            if len(date_str) == 10 and date_str.count('-') == 2:
+                parts = date_str.split('-')
+                if len(parts[0]) == 4:  # Año de 4 dígitos al inicio
+                    return date_str
+            
+            # Intentar parsear diferentes formatos de fecha
+            formats_to_try = [
+                '%Y-%m-%d',    # 2024-07-24
+                '%d/%m/%Y',    # 24/07/2024
+                '%m/%d/%Y',    # 07/24/2024
+                '%d-%m-%Y',    # 24-07-2024
+                '%m-%d-%Y',    # 07-24-2024
+                '%Y/%m/%d',    # 2024/07/24
+                '%Y.%m.%d',    # 2024.07.24
+                '%d.%m.%Y',    # 24.07.2024
+            ]
+            
+            for fmt in formats_to_try:
+                try:
+                    dt = datetime.strptime(date_str, fmt)
+                    return dt.strftime('%Y-%m-%d')
+                except ValueError:
+                    continue
+            
+            # Si no se puede parsear, devolver la fecha original
+            return date_str
+            
+        except Exception:
+            return date_str
+    
+    def _format_date_for_display(self, date_value) -> str:
+        """
+        Formatea una fecha de la base de datos para mostrar en formato YYYY-MM-DD
+        
+        Args:
+            date_value: Valor de fecha de la base de datos (puede ser datetime, date, o string)
+            
+        Returns:
+            str: Fecha en formato YYYY-MM-DD
+        """
+        if not date_value:
+            return ""
+        
+        try:
+            from datetime import datetime, date
+            
+            # Si es datetime o date, convertir a string
+            if hasattr(date_value, 'strftime'):
+                return date_value.strftime('%Y-%m-%d')
+            
+            # Si es string, normalizar
+            return self._normalize_date(str(date_value))
+            
+        except Exception:
+            return str(date_value) if date_value else ""

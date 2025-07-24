@@ -194,6 +194,10 @@ class InfoPanelsFrame:
             vale_data: Diccionario con los datos del vale
         """
         try:
+            # Verificar que vale_data no sea None
+            if not vale_data:
+                vale_data = {}
+            
             no_vale = vale_data.get('no_vale', '-')
             tipo = vale_data.get('tipo', '-')
             folio_factura = vale_data.get('folio_factura', '-')
@@ -242,6 +246,10 @@ class InfoPanelsFrame:
             factura_data: Diccionario con los datos de la factura
         """
         try:
+            # Verificar que factura_data no sea None
+            if not factura_data:
+                factura_data = {}
+                
             # Actualizar información en el panel de vale si hay datos
             vale_info = {
                 'no_vale': factura_data.get('no_vale', '-'),

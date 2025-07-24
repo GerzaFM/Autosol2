@@ -17,12 +17,8 @@ class TableFrame:
         self.on_double_click_callback = on_double_click_callback
         self.logger = logging.getLogger(__name__)
         
-        # Crear frame principal
-        self.main_frame = ttk.LabelFrame(
-            parent,
-            text="📋 Resultados",
-            bootstyle="info"
-        )
+        # Crear frame principal (FRAME NORMAL, NO LABELFRAME)
+        self.main_frame = ttk.Frame(parent)
         self.main_frame.pack(fill="both", expand=True, padx=5, pady=5)
         
         self._create_widgets()
@@ -41,7 +37,7 @@ class TableFrame:
             "nombre_emisor", "conceptos", "total", "cargada", "pagada"
         ]
         
-        self.column_headers = {
+        self.column_names = {
             "folio_interno": "Folio Interno",
             "tipo": "Tipo",
             "no_vale": "No. Vale",
@@ -67,23 +63,27 @@ class TableFrame:
             "pagada": 80
         }
         
-        # Crear Treeview
+        # Crear Treeview (usar ttkbootstrap para mantener el estilo)
+        # Agregar columna oculta para índice original
+        all_columns = list(self.columns) + ["original_index"]
+        
         self.tree = ttk.Treeview(
             table_container,
-            columns=self.columns,
-            show="tree headings",
-            bootstyle="info"
+            columns=all_columns,
+            show="headings",
+            height=7
         )
         
         # Configurar columnas
-        self.tree.heading("#0", text="", anchor="w")
-        self.tree.column("#0", width=0, stretch=False)
-        
         for col in self.columns:
-            self.tree.heading(col, text=self.column_headers[col], anchor="w")
-            self.tree.column(col, width=self.column_widths[col], anchor="w")
+            self.tree.heading(col, text=self.column_names[col])
+            self.tree.column(col, width=self.column_widths.get(col, 100), minwidth=60)
         
-        # Scrollbars
+        # Configurar columna oculta para índice original
+        self.tree.heading("original_index", text="")
+        self.tree.column("original_index", width=0, minwidth=0, stretch=False)
+        
+        # Scrollbars (usar ttkbootstrap para mantener el estilo)
         v_scrollbar = ttk.Scrollbar(table_container, orient="vertical", command=self.tree.yview)
         h_scrollbar = ttk.Scrollbar(table_container, orient="horizontal", command=self.tree.xview)
         
@@ -98,36 +98,16 @@ class TableFrame:
         table_container.grid_rowconfigure(0, weight=1)
         table_container.grid_columnconfigure(0, weight=1)
         
-        # Frame para información de la tabla
-        info_frame = ttk.Frame(self.main_frame)
-        info_frame.pack(fill="x", padx=5, pady=(0, 5))
-        
-        # Label de información
-        self.info_label = ttk.Label(
-            info_frame,
-            text="Listo para mostrar resultados",
-            bootstyle="info"
-        )
-        self.info_label.pack(side="left")
-        
-        # Label de selección
-        self.selection_label = ttk.Label(
-            info_frame,
-            text="",
-            bootstyle="secondary"
-        )
-        self.selection_label.pack(side="right")
-        
         # Configurar eventos
         self.tree.bind("<<TreeviewSelect>>", self._on_selection_changed)
         self.tree.bind("<Double-1>", self._on_double_click)
         
-        # Configurar tags para colores alternados
-        self.tree.tag_configure("even", background="#f8f9fa")
-        self.tree.tag_configure("odd", background="#ffffff")
-        self.tree.tag_configure("cargada", background="#d4edda")
-        self.tree.tag_configure("pagada", background="#fff3cd")
-        self.tree.tag_configure("cargada_pagada", background="#b8e6b8")
+        # Configurar tags sin colores especiales (solo para uso interno)
+        self.tree.tag_configure("even", background="")
+        self.tree.tag_configure("odd", background="")
+        self.tree.tag_configure("cargada", background="")
+        self.tree.tag_configure("pagada", background="")
+        self.tree.tag_configure("cargada_pagada", background="")
     
     def load_data(self, data: List[Dict[str, Any]]):
         """
@@ -141,14 +121,13 @@ class TableFrame:
             self.clear_table()
             
             if not data:
-                self.info_label.config(text="No hay resultados para mostrar")
                 return
             
             self._current_data = data.copy()
             
             # Insertar datos
             for i, row in enumerate(data):
-                # Preparar valores para las columnas
+                # Preparar valores para las columnas (incluyendo índice original)
                 values = []
                 for col in self.columns:
                     value = row.get(col, "")
@@ -158,13 +137,11 @@ class TableFrame:
                         value = f"${value:,.2f}"
                     elif col in ["cargada", "pagada"]:
                         value = "✓" if row.get(f"{col}_bool", False) else ""
-                    elif col == "serie_folio":
-                        # Construir serie-folio
-                        serie = row.get("serie", "")
-                        folio = row.get("folio", "")
-                        value = f"{serie} {folio}".strip()
                     
                     values.append(str(value))
+                
+                # Agregar índice original al final
+                values.append(str(i))
                 
                 # Determinar tag para colores
                 tag = "even" if i % 2 == 0 else "odd"
@@ -182,26 +159,17 @@ class TableFrame:
                 
                 # Insertar fila
                 item_id = self.tree.insert("", "end", values=values, tags=(tag,))
-                
-                # Almacenar índice original en el item
-                self.tree.set(item_id, "original_index", i)
-            
-            # Actualizar información
-            self.info_label.config(text=f"Mostrando {len(data)} registros")
             
             self.logger.info(f"Tabla cargada con {len(data)} registros")
             
         except Exception as e:
             self.logger.error(f"Error cargando datos en tabla: {e}")
-            self.info_label.config(text="Error cargando datos")
     
     def clear_table(self):
         """Limpia todos los datos de la tabla"""
         for item in self.tree.get_children():
             self.tree.delete(item)
         self._current_data = []
-        self.info_label.config(text="Tabla vacía")
-        self.selection_label.config(text="")
     
     def get_selected_data(self) -> Optional[Dict[str, Any]]:
         """
@@ -277,12 +245,6 @@ class TableFrame:
             proveedor = selected_data.get("nombre_emisor", "")[:30]
             if len(selected_data.get("nombre_emisor", "")) > 30:
                 proveedor += "..."
-            
-            self.selection_label.config(
-                text=f"Seleccionado: {folio} - {proveedor}"
-            )
-        else:
-            self.selection_label.config(text="")
         
         # Llamar callback si existe
         if self.on_selection_callback:

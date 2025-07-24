@@ -1,5 +1,5 @@
 """
-Vista de facturas contenedora que encapsula la funcionalidad de BuscarApp.
+Vista de facturas contenedora que encapsula la funcionalidad de BuscarApp Refactorizada.
 """
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
@@ -9,18 +9,18 @@ from typing import Optional, Any
 
 from app.utils.logger import get_logger
 
-# Importar la clase de búsqueda de facturas
+# Importar la clase de búsqueda de facturas refactorizada
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 try:
-    from buscarapp.buscar_app import BuscarApp
+    from buscarapp.buscar_app_refactored import BuscarAppRefactored
 except ImportError as e:
-    BuscarApp = None
+    BuscarAppRefactored = None
 
 class FacturasView(tb.Frame):
     """
     Vista contenedora para la funcionalidad de búsqueda de facturas.
-    Encapsula BuscarApp y la integra en la nueva arquitectura.
+    Encapsula BuscarAppRefactored y la integra en la nueva arquitectura.
     """
     
     def __init__(self, parent, db_manager, **kwargs):
@@ -40,20 +40,20 @@ class FacturasView(tb.Frame):
         self._create_buscar_component()
     
     def _create_buscar_component(self):
-        """Crea e integra el componente de búsqueda de facturas."""
+        """Crea e integra el componente de búsqueda de facturas refactorizado."""
         try:
-            if BuscarApp is None:
-                self._show_error("BuscarApp no está disponible")
+            if BuscarAppRefactored is None:
+                self._show_error("BuscarAppRefactored no está disponible")
                 return
             
-            # Crear una instancia de BuscarApp dentro de este frame
-            self.buscar_app = BuscarApp(master=self)
+            # Crear una instancia de BuscarAppRefactored dentro de este frame
+            self.buscar_app = BuscarAppRefactored(master=self)
             self.buscar_app.pack(fill=BOTH, expand=True)
             
-            self.logger.info("Componente de búsqueda de facturas creado correctamente")
+            self.logger.info("Componente de búsqueda de facturas refactorizado creado correctamente")
             
         except Exception as e:
-            self.logger.error(f"Error al crear componente de búsqueda: {e}")
+            self.logger.error(f"Error al crear componente de búsqueda refactorizado: {e}")
             self._show_error(f"Error al cargar búsqueda de facturas: {str(e)}")
     
     def _show_error(self, error_message: str):
@@ -101,21 +101,24 @@ class FacturasView(tb.Frame):
     
     def get_buscar_app(self) -> Optional[Any]:
         """
-        Obtiene la instancia de BuscarApp.
+        Obtiene la instancia de BuscarAppRefactored.
         
         Returns:
-            La instancia de BuscarApp o None si no está disponible
+            La instancia de BuscarAppRefactored o None si no está disponible
         """
         return self.buscar_app
     
     def refresh(self):
         """Método público para refrescar la vista."""
-        if self.buscar_app and hasattr(self.buscar_app, '_load_facturas'):
-            self.buscar_app._load_facturas()
+        if self.buscar_app and hasattr(self.buscar_app, '_load_initial_data'):
+            self.buscar_app._load_initial_data()
     
     def search(self, term: str):
         """Método público para realizar búsqueda."""
-        if self.buscar_app and hasattr(self.buscar_app, 'search_var'):
-            self.buscar_app.search_var.set(term)
-            if hasattr(self.buscar_app, '_search_facturas'):
-                self.buscar_app._search_facturas()
+        if self.buscar_app and hasattr(self.buscar_app, 'search_frame'):
+            if hasattr(self.buscar_app.search_frame, 'texto_busqueda_var'):
+                self.buscar_app.search_frame.texto_busqueda_var.set(term)
+                # Trigger search if there's a search method
+                if hasattr(self.buscar_app, '_on_search'):
+                    filters = self.buscar_app.search_frame.get_filters()
+                    self.buscar_app._on_search(filters)

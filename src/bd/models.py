@@ -1,6 +1,12 @@
 from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, ForeignKeyField, IntegerField, AutoField, BooleanField
+import os
 
-db = SqliteDatabase("facturas.db")
+# Configurar la ruta absoluta a la base de datos
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+db_path = os.path.join(project_root, "facturas.db")
+
+db = SqliteDatabase(db_path)
 
 class Proveedor(Model):
     id = IntegerField(primary_key=True)  # Primary key autoincremental

@@ -63,26 +63,26 @@ class InvoiceController:
                 return None
             
             # Obtener conceptos
-            conceptos = list(Concepto.select().where(Concepto.factura == factura.id))
+            conceptos = list(Concepto.select().where(Concepto.factura == factura.folio_interno))
             
             # Obtener vale (si existe)
             vale = None
             try:
-                if factura.no_vale:
-                    vale = Vale.select().where(Vale.no_vale == factura.no_vale).get()
-            except Vale.DoesNotExist:
+                # Usar la relación backref 'vale' definida en el modelo Vale
+                vale = factura.vale.get() if hasattr(factura, 'vale') else None
+            except (Vale.DoesNotExist, AttributeError):
                 pass
             
             # Obtener repartimientos (si existen)
-            repartimientos = list(Reparto.select().where(Reparto.factura == factura.id))
+            repartimientos = list(Reparto.select().where(Reparto.factura == factura.folio_interno))
             
             # Construir diccionario de detalles
             details = {
                 'factura': {
                     'folio_interno': factura.folio_interno,
                     'tipo': factura.tipo,
-                    'no_vale': factura.no_vale,
-                    'fecha': factura.fecha.strftime('%Y-%m-%d') if factura.fecha else "",
+                    'no_vale': vale.noVale if vale else "",  # Obtener no_vale desde el vale relacionado
+                    'fecha': factura.fecha if isinstance(factura.fecha, str) else factura.fecha.strftime('%Y-%m-%d') if factura.fecha else "",
                     'serie': factura.serie,
                     'folio': factura.folio,
                     'nombre_emisor': factura.nombre_emisor,
@@ -97,10 +97,7 @@ class InvoiceController:
                     'clase': factura.clase,
                     'cargada': bool(factura.cargada),
                     'pagada': bool(factura.pagada),
-                    'comentario': factura.comentario,
-                    'uuid': factura.uuid,
-                    'xml_path': factura.xml_path,
-                    'pdf_path': factura.pdf_path
+                    'comentario': factura.comentario
                 },
                 'proveedor': {
                     'id': factura.proveedor.id,
@@ -114,30 +111,30 @@ class InvoiceController:
                     {
                         'id': c.id,
                         'cantidad': float(c.cantidad) if c.cantidad else 0.0,
-                        'unidad': c.unidad,
                         'descripcion': c.descripcion,
-                        'valor_unitario': float(c.valor_unitario) if c.valor_unitario else 0.0,
-                        'importe': float(c.importe) if c.importe else 0.0,
-                        'clave_prodserv': c.clave_prodserv,
-                        'clave_unidad': c.clave_unidad
+                        'precio_unitario': float(c.precio_unitario) if c.precio_unitario else 0.0,  # Campo correcto
+                        'total': float(c.total) if c.total else 0.0  # Campo correcto
                     }
                     for c in conceptos
                 ],
                 'vale': {
-                    'no_vale': vale.no_vale,
-                    'fecha_vale': vale.fecha_vale.strftime('%Y-%m-%d') if vale.fecha_vale else "",
-                    'beneficiario': vale.beneficiario,
-                    'comentario': vale.comentario,
-                    'cargado': bool(vale.cargado),
-                    'pagado': bool(vale.pagado)
+                    'no_vale': vale.noVale,  # Campo correcto es noVale
+                    'fecha_vale': vale.fechaVale if isinstance(vale.fechaVale, str) else vale.fechaVale.strftime('%Y-%m-%d') if vale.fechaVale else "",  # Campo correcto es fechaVale
+                    'tipo': vale.tipo,
+                    'descripcion': vale.descripcion,
+                    'total': vale.total,
+                    'proveedor': vale.proveedor
                 } if vale else None,
                 'repartimientos': [
                     {
                         'id': r.id,
-                        'cuenta': r.cuenta,
-                        'debe': float(r.debe) if r.debe else 0.0,
-                        'haber': float(r.haber) if r.haber else 0.0,
-                        'referencia': r.referencia
+                        'comercial': float(r.comercial) if r.comercial else 0.0,
+                        'fleet': float(r.fleet) if r.fleet else 0.0,
+                        'seminuevos': float(r.seminuevos) if r.seminuevos else 0.0,
+                        'refacciones': float(r.refacciones) if r.refacciones else 0.0,
+                        'servicio': float(r.servicio) if r.servicio else 0.0,
+                        'hyp': float(r.hyp) if r.hyp else 0.0,
+                        'administracion': float(r.administracion) if r.administracion else 0.0
                     }
                     for r in repartimientos
                 ]
