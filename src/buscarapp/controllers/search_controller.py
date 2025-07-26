@@ -14,8 +14,12 @@ sys.path.insert(0, parent_dir)
 
 try:
     from ..models.search_models import SearchFilters, SearchState, FacturaData
+    from bd.models import Factura, Proveedor, Vale
 except ImportError:
     from models.search_models import SearchFilters, SearchState, FacturaData
+    # Fallback import para Vale
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'src'))
+    from bd.models import Factura, Proveedor, Vale
 
 
 class SearchController:
@@ -43,9 +47,6 @@ class SearchController:
                 self.state.all_facturas.clear()
                 return False
             
-            # Importar modelos de BD
-            from bd.models import Factura, Proveedor
-            
             # Verificar si hay facturas en la base de datos
             facturas_count = Factura.select().count()
             if facturas_count == 0:
@@ -66,9 +67,12 @@ class SearchController:
                 # Obtener el vale asociado si existe
                 vale_asociado = None
                 try:
-                    if hasattr(factura, 'vale') and factura.vale:
-                        vale_asociado = factura.vale[0] if factura.vale else None
-                except:
+                    # Buscar vale por factura_id usando el modelo correcto
+                    vale_asociado = Vale.get(Vale.factura_id == factura.folio_interno)
+                except Vale.DoesNotExist:
+                    vale_asociado = None
+                except Exception as e:
+                    self.logger.debug(f"Error buscando vale para factura {factura.folio_interno}: {e}")
                     vale_asociado = None
                 
                 factura_data = FacturaData(

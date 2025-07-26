@@ -150,7 +150,7 @@ class DBManager:
             repartos_eliminados = Reparto.delete().where(Reparto.factura == factura).execute()
             
             # Eliminar vales relacionados (si existen)
-            vales_eliminados = Vale.delete().where(Vale.factura == factura).execute()
+            vales_eliminados = Vale.delete().where(Vale.factura_id == factura).execute()
             
             # Finalmente eliminar la factura
             factura.delete_instance()

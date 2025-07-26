@@ -560,7 +560,7 @@ class BuscarApp(tb.Frame):
                             no_vale_str = factura.vale.noVale
                         else:
                             # Si no hay vale asociado, intentar obtenerlo directamente
-                            vale_asociado = Vale.select().where(Vale.factura == factura.folio_interno).first()
+                            vale_asociado = Vale.select().where(Vale.factura_id == factura.folio_interno).first()
                             if vale_asociado:
                                 no_vale_str = vale_asociado.noVale
                     except Exception as e:
@@ -1193,7 +1193,7 @@ class BuscarApp(tb.Frame):
             # Obtener vale asociado si existe
             vale = None
             try:
-                vale = Vale.get(Vale.factura == factura.folio_interno)
+                vale = Vale.get(Vale.factura_id == factura.folio_interno)
             except:
                 pass
             
@@ -1738,7 +1738,7 @@ class BuscarApp(tb.Frame):
                 self.proveedor_codigo_label.config(text="Código Quiter: -")
             
             # 2. Actualizar datos del vale
-            vale = Vale.get_or_none(Vale.factura == factura.folio_interno)
+            vale = Vale.get_or_none(Vale.factura_id == factura.folio_interno)
             if vale:
                 self.vale_no_label.config(text=f"No Vale: {vale.noVale}")
                 self.vale_tipo_label.config(text=f"Tipo: {vale.tipo}")
