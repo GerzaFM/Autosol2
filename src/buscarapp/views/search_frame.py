@@ -89,9 +89,9 @@ class SearchFrame:
             self.tipo_search = SearchEntry(
                 parent=row1_frame,
                 items=self.tipos_data,
-                search_fields=["value", "descripcion"],
+                search_fields=["clave", "descripcion"],
                 display_columns=[
-                    {"name": "value", "text": "Tipo", "width": 80},
+                    {"name": "clave", "text": "Clave", "width": 80},
                     {"name": "descripcion", "text": "Descripción", "width": 200}
                 ],
                 entity_type="Tipo de Vale",
@@ -237,7 +237,7 @@ class SearchFrame:
         if hasattr(self, 'tipo_search') and self.tipo_search:
             selected_tipo = self.tipo_search.get_selected_item()
             if selected_tipo:
-                tipo_filtro = selected_tipo.get('value', '')
+                tipo_filtro = selected_tipo.get('clave', '')
         elif hasattr(self, 'tipo_var'):
             tipo_filtro = self.tipo_var.get()
         

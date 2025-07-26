@@ -354,3 +354,7 @@ class SearchEntry(tb.Frame):
     def set_items(self, items: List[Dict[str, Any]]):
         """Actualiza la lista de elementos disponibles para búsqueda."""
         self.items = items or []
+    
+    def update_items(self, items: List[Dict[str, Any]]):
+        """Alias para set_items - actualiza la lista de elementos disponibles para búsqueda."""
+        self.set_items(items)

@@ -68,9 +68,10 @@ class InvoiceController:
             # Obtener vale (si existe)
             vale = None
             try:
-                # Usar la relación backref 'vale' definida en el modelo Vale
-                vale = factura.vale.get() if hasattr(factura, 'vale') else None
-            except (Vale.DoesNotExist, AttributeError):
+                # Buscar vale directamente por factura_id
+                vale = Vale.select().where(Vale.factura_id == factura.folio_interno).get()
+            except Vale.DoesNotExist:
+                self.logger.debug(f"No se encontró vale para la factura {folio_interno}")
                 pass
             
             # Obtener repartimientos (si existen)
@@ -118,12 +119,18 @@ class InvoiceController:
                     for c in conceptos
                 ],
                 'vale': {
-                    'no_vale': vale.noVale,  # Campo correcto es noVale
-                    'fecha_vale': vale.fechaVale if isinstance(vale.fechaVale, str) else vale.fechaVale.strftime('%Y-%m-%d') if vale.fechaVale else "",  # Campo correcto es fechaVale
+                    'noVale': vale.noVale,  # Campo correcto es noVale
+                    'fechaVale': vale.fechaVale if isinstance(vale.fechaVale, str) else vale.fechaVale.strftime('%Y-%m-%d') if vale.fechaVale else "",  # Campo correcto es fechaVale
                     'tipo': vale.tipo,
+                    'noDocumento': vale.noDocumento,
                     'descripcion': vale.descripcion,
+                    'referencia': vale.referencia,
                     'total': vale.total,
-                    'proveedor': vale.proveedor
+                    'proveedor': vale.proveedor,
+                    'departamento': vale.departamento,
+                    'sucursal': vale.sucursal,
+                    'marca': vale.marca,
+                    'responsable': vale.responsable
                 } if vale else None,
                 'repartimientos': [
                     {

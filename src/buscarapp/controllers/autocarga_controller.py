@@ -276,36 +276,54 @@ class AutocargaController:
     
     def _procesar_vale_individual(self, vale_data: Dict, contadores: Dict):
         """Procesa un vale individual para actualizar la BD"""
-        from bd.models import Proveedor, Vale
-        
-        matcher = ProviderMatcher()
-        
-        # Buscar/actualizar proveedor
-        proveedor, fue_actualizado = matcher.match_provider_from_vale_data(vale_data)
-        
-        if fue_actualizado:
-            contadores['proveedores_actualizados'] += 1
-        
-        # Crear vale si no existe
-        numero_vale = vale_data.get('Numero', '').replace('V', '')
-        if numero_vale and proveedor:
+        try:
+            # Importar funciones de procesamiento
             try:
-                # Verificar si el vale ya existe
-                vale_existente = Vale.get(Vale.noVale == numero_vale)
-                self.logger.info(f"Vale {numero_vale} ya existe")
+                from ..utils.procesar_datos_vale import procesar_datos_vale
+            except ImportError:
+                from utils.procesar_datos_vale import procesar_datos_vale
+            
+            # Import del modelo Vale con ruta absoluta
+            import sys
+            src_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            sys.path.insert(0, src_path)
+            from bd.models import Vale
+            
+            # Procesar datos al formato correcto para BD
+            datos_procesados = procesar_datos_vale(vale_data)
+            
+            # Verificar si el vale ya existe
+            try:
+                vale_existente = Vale.get(Vale.noVale == datos_procesados['noVale'])
+                self.logger.info(f"Vale {datos_procesados['noVale']} ya existe en BD")
+                return
             except Vale.DoesNotExist:
-                # Crear nuevo vale
-                nuevo_vale = Vale.create(
-                    noVale=numero_vale,
-                    fechaVale=vale_data.get('Fecha', ''),
-                    tipo=vale_data.get('TipodeVale', ''),
-                    descripcion=f"Autocarga: {vale_data.get('Departamento', '')}",
-                    total=vale_data.get('Total', 0),
-                    proveedor=proveedor.id,
-                    noDocumento=vale_data.get('NºDocumento', '')  # Agregar campo requerido
-                )
-                contadores['vales_creados'] += 1
-                self.logger.info(f"Vale {numero_vale} creado automáticamente")
+                pass
+            
+            # Crear nuevo vale con todos los datos procesados
+            nuevo_vale = Vale.create(
+                noVale=datos_procesados['noVale'],
+                tipo=datos_procesados['tipo'],
+                noDocumento=datos_procesados['noDocumento'],
+                descripcion=datos_procesados['descripcion'],
+                referencia=datos_procesados['referencia'],
+                total=datos_procesados['total'],
+                cuenta=datos_procesados['cuenta'],
+                fechaVale=datos_procesados['fechaVale'],
+                departamento=datos_procesados['departamento'],
+                sucursal=datos_procesados['sucursal'],
+                marca=datos_procesados['marca'],
+                responsable=datos_procesados['responsable'],
+                proveedor=datos_procesados['proveedor']
+            )
+            
+            contadores['vales_creados'] += 1
+            self.logger.info(f"Vale {datos_procesados['noVale']} creado exitosamente con ID: {nuevo_vale.id}")
+            
+        except Exception as e:
+            self.logger.error(f"Error procesando vale individual: {e}")
+            contadores['errores'] += 1
+            raise
     
     def _procesar_orden_individual(self, orden_data: Dict, contadores: Dict):
         """Procesa una orden individual para actualizar la BD"""

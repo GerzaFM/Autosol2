@@ -3,7 +3,6 @@ Vista para los paneles de información
 """
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-from ttkbootstrap.scrolled import ScrolledText
 from typing import Dict, Any, Optional, List
 import logging
 
@@ -90,11 +89,11 @@ class InfoPanelsFrame:
         )
         vale_frame.pack(side="left", fill="both", expand=True, padx=5)
         
-        # Campos del vale
+        # Campos del vale - expandidos para mostrar más información
         self.vale_no_label = ttk.Label(
             vale_frame,
             text="No Vale: -",
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 10, "bold"),
             anchor="w"
         )
         self.vale_no_label.pack(fill="x", pady=2)
@@ -107,13 +106,56 @@ class InfoPanelsFrame:
         )
         self.vale_tipo_label.pack(fill="x", pady=2)
         
-        self.vale_folio_label = ttk.Label(
+        self.vale_total_label = ttk.Label(
             vale_frame,
-            text="Folio Factura: -",
+            text="Total: -",
+            font=("Segoe UI", 10, "bold"),
+            anchor="w"
+        )
+        self.vale_total_label.pack(fill="x", pady=2)
+        
+        self.vale_proveedor_label = ttk.Label(
+            vale_frame,
+            text="Proveedor: -",
             font=("Segoe UI", 10),
             anchor="w"
         )
-        self.vale_folio_label.pack(fill="x", pady=2)
+        self.vale_proveedor_label.pack(fill="x", pady=2)
+        
+        self.vale_fecha_label = ttk.Label(
+            vale_frame,
+            text="Fecha: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_fecha_label.pack(fill="x", pady=2)
+        
+        self.vale_referencia_label = ttk.Label(
+            vale_frame,
+            text="Referencia: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_referencia_label.pack(fill="x", pady=2)
+        
+        self.vale_departamento_label = ttk.Label(
+            vale_frame,
+            text="Departamento: -",
+            font=("Segoe UI", 10),
+            anchor="w"
+        )
+        self.vale_departamento_label.pack(fill="x", pady=2)
+        
+        # Descripción como Label normal (sin bordes, igual que los otros labels)
+        self.vale_descripcion_label = ttk.Label(
+            vale_frame,
+            text="Descripción: Sin información disponible",
+            font=("Segoe UI", 10),
+            anchor="nw",
+            justify="left",
+            wraplength=250  # Ajustar según el ancho del panel
+        )
+        self.vale_descripcion_label.pack(fill="both", expand=True, pady=2)
     
     def _create_orden_compra_panel(self, parent):
         """Crea el panel de orden de compra"""
@@ -188,26 +230,87 @@ class InfoPanelsFrame:
     
     def update_vale_info(self, vale_data: Dict[str, Any]):
         """
-        Actualiza la información del vale
+        Actualiza la información del vale con todos los campos extraídos
         
         Args:
-            vale_data: Diccionario con los datos del vale
+            vale_data: Diccionario con los datos del vale (ya procesados o directos del extractor)
         """
         try:
             # Verificar que vale_data no sea None
             if not vale_data:
-                vale_data = {}
+                self._clear_vale_info()
+                return
             
-            no_vale = vale_data.get('no_vale', '-')
-            tipo = vale_data.get('tipo', '-')
-            folio_factura = vale_data.get('folio_factura', '-')
+            # Determinar si los datos vienen del extractor (formato original) o de BD (procesados)
+            # Los datos del extractor tienen claves como 'Numero', 'Nombre', etc.
+            # Los datos de BD tienen claves como 'noVale', 'proveedor', etc.
             
+            if 'Numero' in vale_data:  # Datos del extractor
+                no_vale = vale_data.get('Numero', '-')
+                tipo = vale_data.get('Tipo De Vale', '-')
+                total = vale_data.get('Total', '-')
+                proveedor = vale_data.get('Nombre', '-')
+                fecha = vale_data.get('Fecha', '-')
+                referencia = vale_data.get('Referencia', '-')
+                departamento = vale_data.get('Departamento', '-')
+                descripcion = vale_data.get('Descripcion', '-')
+            else:  # Datos de BD (ya procesados)
+                no_vale = vale_data.get('noVale', '-')
+                tipo = vale_data.get('tipo', '-')
+                total = vale_data.get('total', '-')
+                proveedor = vale_data.get('proveedor', '-')
+                fecha = vale_data.get('fechaVale', '-')
+                referencia = vale_data.get('referencia', '-')
+                departamento = vale_data.get('departamento', '-')
+                descripcion = vale_data.get('descripcion', '-')
+            
+            # Actualizar los labels
             self.vale_no_label.config(text=f"No Vale: {no_vale}")
             self.vale_tipo_label.config(text=f"Tipo: {tipo}")
-            self.vale_folio_label.config(text=f"Folio Factura: {folio_factura}")
+            
+            # Formatear total si es numérico
+            if total and total != '-':
+                if isinstance(total, (int, float)):
+                    total_text = f"${total:,.2f}"
+                else:
+                    total_text = f"${total}" if not str(total).startswith('$') else str(total)
+            else:
+                total_text = "-"
+            self.vale_total_label.config(text=f"Total: {total_text}")
+            
+            self.vale_proveedor_label.config(text=f"Proveedor: {proveedor}")
+            self.vale_fecha_label.config(text=f"Fecha: {fecha}")
+            self.vale_referencia_label.config(text=f"Referencia: {referencia}")
+            self.vale_departamento_label.config(text=f"Departamento: {departamento}")
+            
+            # Actualizar descripción en el label
+            if descripcion and descripcion != '-':
+                # Limitar la longitud si es muy larga
+                if len(descripcion) > 200:
+                    descripcion_mostrar = descripcion[:200] + "..."
+                else:
+                    descripcion_mostrar = descripcion
+                self.vale_descripcion_label.config(text=f"Descripción: {descripcion_mostrar}")
+            else:
+                self.vale_descripcion_label.config(text="Descripción: Sin información disponible")
             
         except Exception as e:
             self.logger.error(f"Error actualizando información de vale: {e}")
+            self._clear_vale_info()
+    
+    def _clear_vale_info(self):
+        """Limpia toda la información del vale"""
+        try:
+            self.vale_no_label.config(text="No Vale: -")
+            self.vale_tipo_label.config(text="Tipo: -")
+            self.vale_total_label.config(text="Total: -")
+            self.vale_proveedor_label.config(text="Proveedor: -")
+            self.vale_fecha_label.config(text="Fecha: -")
+            self.vale_referencia_label.config(text="Referencia: -")
+            self.vale_departamento_label.config(text="Departamento: -")
+            self.vale_descripcion_label.config(text="Descripción: Sin información disponible")
+        except Exception as e:
+            self.logger.error(f"Error limpiando información de vale: {e}")
     
     def update_orden_compra_info(self, orden_data: Dict[str, Any]):
         """
@@ -308,7 +411,12 @@ class InfoPanelsFrame:
             # Limpiar panel de vale
             self.vale_no_label.config(text="No Vale: -")
             self.vale_tipo_label.config(text="Tipo: -")
-            self.vale_folio_label.config(text="Folio Factura: -")
+            self.vale_total_label.config(text="Total: -")
+            self.vale_proveedor_label.config(text="Proveedor: -")
+            self.vale_fecha_label.config(text="Fecha: -")
+            self.vale_referencia_label.config(text="Referencia: -")
+            self.vale_departamento_label.config(text="Departamento: -")
+            self.vale_descripcion_label.config(text="Descripción: Sin información disponible")
             
             # Limpiar panel de orden de compra
             self.orden_importe_label.config(text="Importe: -")

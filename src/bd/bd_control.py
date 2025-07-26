@@ -168,5 +168,18 @@ class DBManager:
             traceback.print_exc()
             return False
 
+    def obtener_ultimo_vale(self):
+        """
+        Obtiene el último vale insertado en la base de datos.
+        
+        Returns:
+            Vale: El último vale insertado o None si no hay vales
+        """
+        try:
+            return Vale.select().order_by(Vale.id.desc()).first()
+        except Exception as e:
+            print(f"Error al obtener último vale: {e}")
+            return None
+
 # Alias para compatibilidad con código existente
 BDControl = DBManager

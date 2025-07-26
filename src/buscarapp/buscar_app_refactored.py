@@ -38,6 +38,14 @@ except ImportError:
     from utils.dialog_utils import DialogUtils
     from autocarga.autocarga import AutoCarga
 
+# Importar configuración de tipos de vale
+try:
+    from solicitudapp.config.app_config import AppConfig
+    CONFIG_AVAILABLE = True
+except ImportError:
+    AppConfig = None
+    CONFIG_AVAILABLE = False
+
 # Intentar importar base de datos
 try:
     from bd.bd_control import BDControl
@@ -164,6 +172,33 @@ class BuscarAppRefactored(ttk.Frame):
             
             # Cargar proveedores
             self.search_controller.load_proveedores()
+            
+            # Pasar datos de proveedores al SearchFrame
+            if hasattr(self.search_controller.get_state(), 'proveedores_data'):
+                proveedores_data = self.search_controller.get_state().proveedores_data
+                if hasattr(self.search_frame, 'set_proveedores_data'):
+                    self.search_frame.set_proveedores_data(proveedores_data)
+                    self.logger.info(f"Datos de proveedores pasados al SearchFrame: {len(proveedores_data)} proveedores")
+            
+            # Cargar y pasar datos de tipos de vale desde la configuración
+            if CONFIG_AVAILABLE and hasattr(AppConfig, 'TIPO_VALE'):
+                tipos_data = []
+                for clave, descripcion in AppConfig.TIPO_VALE.items():
+                    tipos_data.append({
+                        'clave': clave,
+                        'descripcion': descripcion,
+                        'display': f"{clave} - {descripcion}"
+                    })
+                self.logger.info(f"Tipos de vale cargados desde configuración: {len(tipos_data)} tipos")
+                
+                if hasattr(self.search_frame, 'set_tipos_data'):
+                    self.search_frame.set_tipos_data(tipos_data)
+                    self.logger.info(f"Datos de tipos pasados al SearchFrame: {len(tipos_data)} tipos")
+            else:
+                # No cargar datos falsos si no está disponible la configuración
+                self.logger.error("Configuración de tipos de vale no disponible - botones de búsqueda de tipo deshabilitados")
+                if hasattr(self.search_frame, 'set_tipos_data'):
+                    self.search_frame.set_tipos_data([])  # Lista vacía
             
             # Actualizar estado inicial
             self._update_status_message()
@@ -472,7 +507,7 @@ class BuscarAppRefactored(ttk.Frame):
                 self.logger.info("Autocarga completada exitosamente")
                 
                 # Refrescar datos en la aplicación
-                self._refresh_after_autocarga()
+                self._refresh_after_autocarga(stats)
                 
                 # Mostrar mensaje de éxito
                 self.dialog_utils.show_info(
@@ -487,7 +522,7 @@ class BuscarAppRefactored(ttk.Frame):
             self.logger.error(f"Error en autocarga: {e}")
             self.dialog_utils.show_error("Error en Autocarga", f"Error durante la autocarga: {str(e)}")
     
-    def _refresh_after_autocarga(self):
+    def _refresh_after_autocarga(self, stats: Optional[Dict] = None):
         """Refresca los datos de la aplicación después de la autocarga"""
         try:
             # Recargar facturas
@@ -496,8 +531,68 @@ class BuscarAppRefactored(ttk.Frame):
             # Recargar proveedores
             self.search_controller.load_proveedores()
             
+            # Pasar datos actualizados al SearchFrame
+            if hasattr(self.search_controller.get_state(), 'proveedores_data'):
+                proveedores_data = self.search_controller.get_state().proveedores_data
+                if hasattr(self.search_frame, 'set_proveedores_data'):
+                    self.search_frame.set_proveedores_data(proveedores_data)
+            
+            # Recargar tipos de vale desde configuración
+            if CONFIG_AVAILABLE and hasattr(AppConfig, 'TIPO_VALE'):
+                tipos_data = []
+                for clave, descripcion in AppConfig.TIPO_VALE.items():
+                    tipos_data.append({
+                        'clave': clave,
+                        'descripcion': descripcion,
+                        'display': f"{clave} - {descripcion}"
+                    })
+                
+                if hasattr(self.search_frame, 'set_tipos_data'):
+                    self.search_frame.set_tipos_data(tipos_data)
+            else:
+                # No cargar datos falsos
+                if hasattr(self.search_frame, 'set_tipos_data'):
+                    self.search_frame.set_tipos_data([])
+            
             # Limpiar búsqueda actual para mostrar datos actualizados
             self._on_clear_search()
+            
+            # Si hay estadísticas de autocarga, mostrar el último vale procesado
+            if stats and hasattr(self, 'info_panels'):
+                self._mostrar_ultimo_vale_procesado()
+                
+        except Exception as e:
+            self.logger.error(f"Error refrescando después de autocarga: {e}")
+    
+    def _mostrar_ultimo_vale_procesado(self):
+        """Muestra el último vale procesado en el frame de información"""
+        try:
+            if not self.bd_control:
+                return
+            
+            # Obtener el último vale insertado
+            ultimo_vale = self.bd_control.obtener_ultimo_vale()
+            
+            if ultimo_vale:
+                # Convertir datos del vale a formato para mostrar
+                vale_data = {
+                    'noVale': ultimo_vale.noVale,
+                    'tipo': ultimo_vale.tipo,
+                    'total': ultimo_vale.total,
+                    'proveedor': ultimo_vale.proveedor,
+                    'fechaVale': ultimo_vale.fechaVale,
+                    'referencia': ultimo_vale.referencia,
+                    'departamento': ultimo_vale.departamento,
+                    'descripcion': ultimo_vale.descripcion
+                }
+                
+                # Actualizar panel de información
+                self.info_panels.update_vale_info(vale_data)
+                
+                self.logger.info(f"Mostrando información del último vale procesado: {ultimo_vale.noVale}")
+            
+        except Exception as e:
+            self.logger.error(f"Error mostrando último vale procesado: {e}")
             
             # Actualizar estado
             self._update_status_message()
