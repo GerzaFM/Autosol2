@@ -153,12 +153,16 @@ class ActionButtonsFrame:
     def _on_toggle_cargada_clicked(self):
         """Maneja el toggle de estado cargada"""
         if self.on_toggle_cargada_callback and self.selected_data:
-            self.on_toggle_cargada_callback(self.selected_data)
+            folio_interno = self.selected_data.get('folio_interno')
+            if folio_interno:
+                self.on_toggle_cargada_callback(folio_interno)
     
     def _on_toggle_pagada_clicked(self):
         """Maneja el toggle de estado pagada"""
         if self.on_toggle_pagada_callback and self.selected_data:
-            self.on_toggle_pagada_callback(self.selected_data)
+            folio_interno = self.selected_data.get('folio_interno')
+            if folio_interno:
+                self.on_toggle_pagada_callback(folio_interno)
     
     def _on_abrir_xml_clicked(self):
         """Maneja el click en Abrir XML"""

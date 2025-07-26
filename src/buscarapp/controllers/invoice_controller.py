@@ -161,19 +161,19 @@ class InvoiceController:
             # Obtener detalles completos de la factura
             folio_interno = selected_data.get('folio_interno')
             if not folio_interno:
-                self.dialog_utils.show_warning("No se puede identificar la factura seleccionada")
+                self.dialog_utils.show_warning("Error de datos", "No se puede identificar la factura seleccionada")
                 return False
             
             details = self.get_invoice_details(folio_interno)
             if not details:
-                self.dialog_utils.show_warning("No se pudieron obtener los detalles de la factura")
+                self.dialog_utils.show_warning("Error de datos", "No se pudieron obtener los detalles de la factura")
                 return False
             
             # Importar form_control
             try:
                 from solicitudapp.form_control import FormPDF
             except ImportError:
-                self.dialog_utils.show_error("No se pudo importar el módulo form_control")
+                self.dialog_utils.show_error("Error de importación", "No se pudo importar el módulo form_control")
                 return False
             
             # Preparar datos para el formulario
@@ -183,19 +183,66 @@ class InvoiceController:
             vale = details['vale']
             
             # Formatear datos según el formato esperado por FormPDF
+            # Usar los mismos nombres de campos que en buscar_app.py
+            
+            # Formatear tipo de vale
+            tipo_vale_formatted = ""
+            if factura['tipo']:
+                try:
+                    from solicitudapp.config.app_config import AppConfig
+                    if hasattr(AppConfig, 'TIPO_VALE') and factura['tipo'] in AppConfig.TIPO_VALE:
+                        tipo_vale_formatted = f"{factura['tipo']} - {AppConfig.TIPO_VALE[factura['tipo']]}"
+                    else:
+                        tipo_vale_formatted = factura['tipo']
+                except:
+                    tipo_vale_formatted = factura['tipo']
+            
+            # Construir comentario con serie y folio de la factura
+            serie_str = factura.get('serie') or ""
+            folio_str = factura.get('folio') or ""
+            
+            if serie_str and folio_str:
+                comentario_factura = f"Factura: {serie_str} {folio_str}"
+            elif serie_str:
+                comentario_factura = f"Factura: {serie_str}"
+            elif folio_str:
+                comentario_factura = f"Factura: {folio_str}"
+            else:
+                comentario_factura = "Factura:"
+            
+            # Obtener repartimientos si existen
+            repartimientos = details.get('repartimientos', [])
+            reparto = repartimientos[0] if repartimientos else {}
+            
             form_data = {
-                'folio_interno': format_folio(factura['folio_interno']),
-                'tipo_vale': format_tipo_vale(factura['tipo']),
-                'no_vale': factura['no_vale'] or '',
-                'fecha': factura['fecha'],
-                'proveedor': proveedor['nombre'],
-                'rfc_proveedor': proveedor['rfc'],
-                'comentarios': self._format_comentarios_reimprimir(factura, conceptos),
-                'subtotal': format_currency(factura['subtotal']),
-                'iva': format_currency(factura['iva_trasladado']),
-                'retencion_iva': format_currency(factura['ret_iva']),
-                'retencion_isr': format_currency(factura['ret_isr']),
-                'total': format_currency(factura['total'])
+                "TIPO DE VALE": tipo_vale_formatted,
+                "C A N T I D A D": "\n".join([str(concepto['cantidad']) for concepto in conceptos]),
+                "C O M E N T A R I O S": comentario_factura,
+                "Nombre de Empresa": proveedor['nombre'],
+                "RFC": proveedor['rfc'],
+                "Teléfono": proveedor.get('telefono', ''),
+                "Correo": proveedor.get('email', ''),
+                "Nombre Contacto": proveedor.get('nombre_contacto', ''),
+                "Menudeo": str(reparto.get('comercial', '')) if reparto.get('comercial') else "",
+                "Seminuevos": str(reparto.get('seminuevos', '')) if reparto.get('seminuevos') else "",
+                "Flotas": str(reparto.get('fleet', '')) if reparto.get('fleet') else "",
+                "Administración": str(reparto.get('administracion', '')) if reparto.get('administracion') else "",
+                "Refacciones": str(reparto.get('refacciones', '')) if reparto.get('refacciones') else "",
+                "Servicio": str(reparto.get('servicio', '')) if reparto.get('servicio') else "",
+                "HYP": str(reparto.get('hyp', '')) if reparto.get('hyp') else "",
+                "DESCRIPCIÓN": "\n".join([concepto['descripcion'] for concepto in conceptos]),
+                "PRECIO UNITARIO": "\n".join([f"${concepto['precio_unitario']:,.2f}" for concepto in conceptos]),
+                "TOTAL": "\n".join([f"${concepto['total']:,.2f}" for concepto in conceptos]),
+                "FECHA GERENTE DE ÁREA": "",
+                "FECHA GERENTE ADMINISTRATIVO": "",
+                "FECHA DE AUTORIZACIÓN GG O DIRECTOR DE MARCA": "",
+                "SUBTOTAL": f"${factura['subtotal']:,.2f}" if factura['subtotal'] else "",
+                "IVA": f"${factura['iva_trasladado']:,.2f}" if factura['iva_trasladado'] else "",
+                "TOTAL, SUMATORIA": f"${factura['total']:,.2f}" if factura['total'] else "",
+                "FECHA CREACIÓN SOLICITUD": factura['fecha'],
+                "FOLIO": str(factura['folio_interno']),
+                "RETENCIÓN": f"${(factura.get('ret_iva', 0) + factura.get('ret_isr', 0)):,.2f}" if factura.get('ret_iva') or factura.get('ret_isr') else "",
+                "Departamento": ""
             }
             
             # Crear instancia de FormPDF y llenar
@@ -203,70 +250,36 @@ class InvoiceController:
             
             # Solicitar archivo de destino
             output_path = self.dialog_utils.save_file_dialog(
+                parent=None,
                 title="Guardar solicitud reimpresa",
-                defaultextension=".pdf",
-                filetypes=[("PDF files", "*.pdf")]
+                default_filename="",
+                file_types=[("PDF files", "*.pdf")]
             )
             
             if not output_path:
                 return False
             
             # Llenar y guardar el formulario
-            success = form_pdf.llenar_formulario(form_data, output_path)
+            try:
+                form_pdf.rellenar(form_data, output_path)
+                success = True
+            except Exception as form_error:
+                self.logger.error(f"Error al llenar formulario: {form_error}")
+                success = False
             
             if success:
-                self.dialog_utils.show_info(f"Solicitud reimpresa guardada en:\n{output_path}")
+                self.dialog_utils.show_info("Reimpresión exitosa", f"Solicitud reimpresa guardada en:\n{output_path}")
                 self.logger.info(f"Factura {folio_interno} reimpresa exitosamente")
                 return True
             else:
-                self.dialog_utils.show_error("Error al generar la solicitud")
+                self.dialog_utils.show_error("Error al generar", "Error al generar la solicitud")
                 return False
                 
         except Exception as e:
             self.logger.error(f"Error en reimprimir_factura: {e}")
             traceback.print_exc()
-            self.dialog_utils.show_error(f"Error al reimprimir: {str(e)}")
+            self.dialog_utils.show_error("Error al reimprimir", f"Error al reimprimir: {str(e)}")
             return False
-    
-    def _format_comentarios_reimprimir(self, factura: Dict[str, Any], conceptos: List[Dict[str, Any]]) -> str:
-        """
-        Formatea los comentarios para la reimpresión
-        
-        Args:
-            factura: Datos de la factura
-            conceptos: Lista de conceptos
-            
-        Returns:
-            str: Comentarios formateados
-        """
-        comentarios = []
-        
-        # Agregar número de factura
-        folio_factura = format_comentario_factura(factura.get('serie'), factura.get('folio'))
-        if folio_factura:
-            comentarios.append(f"FACTURA: {folio_factura}")
-        
-        # Agregar conceptos principales
-        if conceptos:
-            # Mostrar los primeros conceptos más importantes
-            for i, concepto in enumerate(conceptos[:3]):  # Limitar a 3 conceptos
-                desc = concepto.get('descripcion', '').strip()
-                if desc:
-                    # Limitar longitud del concepto
-                    if len(desc) > 50:
-                        desc = desc[:47] + "..."
-                    comentarios.append(f"• {desc}")
-            
-            # Si hay más conceptos, indicarlo
-            if len(conceptos) > 3:
-                comentarios.append(f"... y {len(conceptos) - 3} conceptos más")
-        
-        # Agregar comentario adicional si existe
-        comentario_adicional = factura.get('comentario', '').strip()
-        if comentario_adicional:
-            comentarios.append(f"OBSERVACIONES: {comentario_adicional}")
-        
-        return '\n'.join(comentarios)
     
     def toggle_cargada_status(self, folio_interno: str) -> bool:
         """
@@ -352,7 +365,7 @@ class InvoiceController:
         """
         try:
             if not file_path or not os.path.exists(file_path):
-                self.dialog_utils.show_warning("El archivo no existe o la ruta está vacía")
+                self.dialog_utils.show_warning("Archivo no encontrado", "El archivo no existe o la ruta está vacía")
                 return False
             
             import subprocess
@@ -371,5 +384,5 @@ class InvoiceController:
             
         except Exception as e:
             self.logger.error(f"Error abriendo archivo {file_path}: {e}")
-            self.dialog_utils.show_error(f"No se pudo abrir el archivo: {str(e)}")
+            self.dialog_utils.show_error("Error abriendo archivo", f"No se pudo abrir el archivo: {str(e)}")
             return False
