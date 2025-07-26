@@ -18,21 +18,25 @@ sys.path.insert(0, current_dir)
 try:
     # Imports relativos (cuando se ejecuta como módulo)
     from .controllers import SearchController, InvoiceController, ExportController
+    from .controllers.autocarga_controller import AutocargaController
     from .views.search_frame import SearchFrame
     from .views.table_frame import TableFrame
     from .views.action_buttons_frame import ActionButtonsFrame
     from .views.info_panels_frame import InfoPanelsFrame
     from .models.search_models import SearchFilters
     from .utils.dialog_utils import DialogUtils
+    from .autocarga.autocarga import AutoCarga
 except ImportError:
     # Imports absolutos (cuando se ejecuta directamente)
     from controllers import SearchController, InvoiceController, ExportController
+    from controllers.autocarga_controller import AutocargaController
     from views.search_frame import SearchFrame
     from views.table_frame import TableFrame
     from views.action_buttons_frame import ActionButtonsFrame
     from views.info_panels_frame import InfoPanelsFrame
     from models.search_models import SearchFilters
     from utils.dialog_utils import DialogUtils
+    from autocarga.autocarga import AutoCarga
 
 # Intentar importar base de datos
 try:
@@ -68,6 +72,7 @@ class BuscarAppRefactored(ttk.Frame):
         self.search_controller = SearchController(self.bd_control)
         self.invoice_controller = InvoiceController(self.bd_control)
         self.export_controller = ExportController()
+        self.autocarga_controller = AutocargaController(self.bd_control, self)
         
         # Variables de estado
         self.current_selection = None
@@ -440,10 +445,67 @@ class BuscarAppRefactored(ttk.Frame):
     
     def _on_autocarga(self):
         """Maneja el evento de autocarga"""
-        self.dialog_utils.show_info(
-            "Funcionalidad de Autocarga",
-            "Esta funcionalidad estará disponible en una próxima actualización."
-        )
+        try:
+            if not self.bd_control:
+                self.dialog_utils.show_warning(
+                    "Base de datos no disponible",
+                    "La funcionalidad de autocarga requiere conexión a la base de datos."
+                )
+                return
+            
+            # Mostrar mensaje informativo
+            confirmar = self.dialog_utils.ask_yes_no(
+                "Iniciar Autocarga",
+                "La autocarga buscará automáticamente archivos PDF de vales y órdenes "
+                "para extraer datos y actualizar la base de datos.\n\n"
+                "¿Desea continuar?"
+            )
+            
+            if not confirmar:
+                return
+            
+            # Ejecutar autocarga
+            self.logger.info("Iniciando proceso de autocarga")
+            success, stats = self.autocarga_controller.ejecutar_autocarga_con_configuracion()
+            
+            if success:
+                self.logger.info("Autocarga completada exitosamente")
+                
+                # Refrescar datos en la aplicación
+                self._refresh_after_autocarga()
+                
+                # Mostrar mensaje de éxito
+                self.dialog_utils.show_info(
+                    "Autocarga Completada",
+                    "La autocarga se ha completado exitosamente. "
+                    "Los datos han sido actualizados en la base de datos."
+                )
+            else:
+                self.logger.warning("Autocarga cancelada o falló")
+                
+        except Exception as e:
+            self.logger.error(f"Error en autocarga: {e}")
+            self.dialog_utils.show_error("Error en Autocarga", f"Error durante la autocarga: {str(e)}")
+    
+    def _refresh_after_autocarga(self):
+        """Refresca los datos de la aplicación después de la autocarga"""
+        try:
+            # Recargar facturas
+            self.search_controller.load_facturas()
+            
+            # Recargar proveedores
+            self.search_controller.load_proveedores()
+            
+            # Limpiar búsqueda actual para mostrar datos actualizados
+            self._on_clear_search()
+            
+            # Actualizar estado
+            self._update_status_message()
+            
+            self.logger.info("Datos actualizados después de autocarga")
+            
+        except Exception as e:
+            self.logger.error(f"Error refrescando datos después de autocarga: {e}")
     
     def _on_reimprimir(self, selected_data: Dict[str, Any]):
         """Maneja el evento de reimprimir"""

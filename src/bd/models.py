@@ -86,15 +86,17 @@ class Reparto(Model):
         database = db
 
 class Vale(Model):
-    noVale = CharField(primary_key=True)
+    id = IntegerField(primary_key=True)  # Nueva clave primaria autoincremental
+    noVale = CharField(unique=True)  # Ya no es primary key pero debe ser único
     tipo = CharField()
     noDocumento = CharField()
     descripcion = CharField()
     referencia = IntegerField()
     total = CharField()
+    cuenta = IntegerField(null=True)  # Campo agregado para cuenta
 
     fechaVale = DateField(null=True)
-    departameto = IntegerField(null=True)
+    departamento = IntegerField(null=True)  # Corregido el typo: departameto -> departamento
     sucursal = IntegerField(null=True)
     marca = IntegerField(null=True)
     responsable = IntegerField(null=True)
