@@ -43,10 +43,19 @@ class AutocargaController:
             Tuple[bool, Dict]: (éxito, estadísticas)
         """
         try:
+            # DEBUG: Agregar logging para diagnosticar el problema
+            self.logger.info(f"🔍 DIAGNÓSTICO AUTOCARGA - Facturas recibidas: {len(facturas_seleccionadas) if facturas_seleccionadas else 0}")
+            if facturas_seleccionadas:
+                for i, factura in enumerate(facturas_seleccionadas):
+                    self.logger.info(f"   📋 Factura {i+1}: {factura}")
+            
             # Mostrar diálogo de configuración
             config = self._mostrar_dialogo_configuracion()
             if not config:
+                self.logger.info("🔴 Autocarga cancelada por usuario")
                 return False, {}
+            
+            self.logger.info(f"⚙️ Configuración de autocarga: {config}")
             
             # Crear instancia de AutoCarga
             autocarga = AutoCarga(
@@ -58,19 +67,28 @@ class AutocargaController:
             self._mostrar_mensaje_progreso("Iniciando autocarga...")
             
             # Ejecutar autocarga
+            self.logger.info("🚀 Ejecutando autocarga...")
             vales, ordenes = autocarga.ejecutar_autocarga()
+            
+            self.logger.info(f"📊 Autocarga ejecutada - Vales: {len(vales) if vales else 0}, Órdenes: {len(ordenes) if ordenes else 0}")
             
             # Obtener estadísticas
             stats = autocarga.obtener_estadisticas()
+            self.logger.info(f"📈 Estadísticas autocarga: {stats}")
             
             # Procesar resultados para llenar BD
             if self.bd_control:
+                self.logger.info("💾 Procesando resultados a base de datos...")
                 self._procesar_resultados_a_bd(vales, ordenes, stats, facturas_seleccionadas)
+            else:
+                self.logger.warning("⚠️ Sin conexión a BD - No se procesarán resultados")
             
             return True, stats
             
         except Exception as e:
-            self.logger.error(f"Error en autocarga: {e}")
+            self.logger.error(f"❌ Error en autocarga: {e}")
+            import traceback
+            self.logger.error(f"📍 Traceback completo: {traceback.format_exc()}")
             self.dialog_utils.show_error("Error en Autocarga", f"Error durante la autocarga: {str(e)}")
             return False, {}
     
@@ -302,23 +320,152 @@ class AutocargaController:
             try:
                 vale_existente = Vale.get(Vale.noVale == datos_procesados['noVale'])
                 self.logger.info(f"Vale {datos_procesados['noVale']} ya existe en BD")
-                return
+                
+                # NUEVO: Verificar si el vale existente necesita asociación con facturas seleccionadas
+                if facturas_seleccionadas and not vale_existente.factura:
+                    self.logger.info(f"🔄 Vale {datos_procesados['noVale']} existe pero SIN ASOCIAR - intentando asociar con facturas seleccionadas")
+                    
+                    # Buscar asociación para el vale existente usando la misma lógica
+                    no_documento = datos_procesados.get('noDocumento', '').strip()
+                    factura_asociada = None
+                    
+                    if no_documento:
+                        self.logger.debug(f"   🔍 Buscando asociación para vale existente: '{no_documento}'")
+                        
+                        for i, factura_data in enumerate(facturas_seleccionadas):
+                            try:
+                                # Obtener serie y folio de los datos de la factura seleccionada
+                                serie_folio = factura_data.get('serie_folio', '')
+                                
+                                # Si no hay 'serie_folio', intentar construirlo desde otros campos
+                                if not serie_folio:
+                                    serie = factura_data.get('serie', '')
+                                    folio = factura_data.get('folio', '')
+                                    if serie and folio:
+                                        serie_folio = f"{serie}-{folio}"
+                                
+                                # Convertir a string y limpiar espacios
+                                serie_folio = str(serie_folio).strip() if serie_folio else ''
+                                
+                                if not serie_folio:
+                                    continue
+                                
+                                # Manejar el formato "CC 10604" (con espacio)
+                                if ' ' in serie_folio and '-' not in serie_folio:
+                                    partes = serie_folio.split(' ')
+                                    if len(partes) == 2:
+                                        serie = partes[0].strip()
+                                        folio = partes[1].strip()
+                                        folio_completo = f"{serie}{folio}"
+                                    else:
+                                        folio_completo = serie_folio.replace(' ', '')
+                                        folio = serie_folio.replace(' ', '')
+                                elif '-' in serie_folio:
+                                    serie, folio = serie_folio.split('-', 1)
+                                    folio_completo = f"{serie.strip()}{folio.strip()}"
+                                else:
+                                    folio_completo = serie_folio
+                                    folio = serie_folio
+                                
+                                self.logger.debug(f"      📋 Verificando vale existente: '{serie_folio}' -> folio_completo: '{folio_completo}', folio: '{folio}', no_documento: '{no_documento}'")
+                                
+                                # Verificar coincidencias
+                                if folio_completo == no_documento or folio == no_documento:
+                                    self.logger.info(f"      ✅ ¡COINCIDENCIA para vale existente!")
+                                    
+                                    # Obtener la factura real de la BD
+                                    try:
+                                        if ' ' in serie_folio and '-' not in serie_folio:
+                                            # Caso: "CC 10604" -> serie="CC", folio=10604
+                                            partes = serie_folio.split(' ')
+                                            if len(partes) == 2:
+                                                serie_bd = partes[0].strip()
+                                                folio_bd_int = int(partes[1].strip())
+                                                factura_asociada = Factura.get(
+                                                    (Factura.serie == serie_bd) & 
+                                                    (Factura.folio == folio_bd_int)
+                                                )
+                                        elif '-' in serie_folio:
+                                            # Caso: "CC-10604" -> serie="CC", folio=10604
+                                            serie_bd, folio_bd = serie_folio.split('-', 1)
+                                            serie_bd = serie_bd.strip()
+                                            folio_bd_int = int(folio_bd.strip())
+                                            factura_asociada = Factura.get(
+                                                (Factura.serie == serie_bd) & 
+                                                (Factura.folio == folio_bd_int)
+                                            )
+                                        else:
+                                            # Caso: solo folio numérico
+                                            folio_bd_int = int(folio)
+                                            factura_asociada = Factura.get(Factura.folio == folio_bd_int)
+                                        
+                                        self.logger.info(f"      🔗 Factura encontrada para vale existente: {factura_asociada.serie}-{factura_asociada.folio}")
+                                        break
+                                        
+                                    except (Factura.DoesNotExist, ValueError) as e:
+                                        self.logger.warning(f"      ❌ Error buscando factura para vale existente: {e}")
+                                        continue
+                                        
+                            except Exception as e:
+                                self.logger.warning(f"      ❌ Error procesando factura para vale existente: {e}")
+                                continue
+                        
+                        # Asociar el vale existente si se encontró coincidencia
+                        if factura_asociada:
+                            try:
+                                vale_existente.factura = factura_asociada
+                                vale_existente.save()
+                                contadores['vales_asociados'] += 1
+                                self.logger.info(f"      ✅ Vale existente {datos_procesados['noVale']} ASOCIADO con {factura_asociada.serie}-{factura_asociada.folio}")
+                            except Exception as e:
+                                self.logger.error(f"      ❌ Error asociando vale existente: {e}")
+                        else:
+                            self.logger.info(f"      ⚠️ Vale existente {datos_procesados['noVale']} - No se encontró coincidencia con facturas seleccionadas")
+                    else:
+                        self.logger.warning(f"   ⚠️ Vale existente {datos_procesados['noVale']} sin No Documento para asociar")
+                elif facturas_seleccionadas and vale_existente.factura:
+                    self.logger.info(f"✅ Vale {datos_procesados['noVale']} ya existe y YA ESTÁ ASOCIADO con {vale_existente.factura.serie}-{vale_existente.factura.folio}")
+                
+                return  # Salir después de procesar vale existente
+                
             except Vale.DoesNotExist:
-                pass
+                pass  # Está bien, no existe, continuar con creación
             
             # Buscar factura correspondiente basándose en el No Documento
             factura_asociada = None
             no_documento = datos_procesados.get('noDocumento', '').strip()
             
+            self.logger.debug(f"🔄 Procesando vale: {datos_procesados.get('noVale', 'SIN_NUMERO')}, No Documento: '{no_documento}'")
+            
             if no_documento and facturas_seleccionadas:
                 # Buscar solo entre las facturas seleccionadas
                 self.logger.info(f"🔍 Buscando asociación para vale {datos_procesados['noVale']} con No Documento '{no_documento}' entre {len(facturas_seleccionadas)} facturas seleccionadas")
                 
-                for factura_data in facturas_seleccionadas:
+                for i, factura_data in enumerate(facturas_seleccionadas):
                     try:
+                        self.logger.debug(f"      📋 Procesando factura {i+1}: {factura_data}")
+                        
                         # Obtener serie y folio de los datos de la factura seleccionada
                         serie_folio = factura_data.get('serie_folio', '')
                         folio_interno = factura_data.get('folio_interno', '')
+                        
+                        # Si no hay 'serie_folio', intentar construirlo desde otros campos
+                        if not serie_folio:
+                            serie = factura_data.get('serie', '')
+                            folio = factura_data.get('folio', '')
+                            if serie and folio:
+                                serie_folio = f"{serie}-{folio}"
+                                self.logger.debug(f"         🔧 Construyendo serie_folio: {serie_folio}")
+                        
+                        # Convertir a string para evitar errores
+                        serie_folio = str(serie_folio) if serie_folio else ''
+                        folio_interno = str(folio_interno) if folio_interno else ''
+                        
+                        self.logger.debug(f"         📋 Verificando factura {folio_interno} con serie_folio '{serie_folio}'")
+                        
+                        if not serie_folio:
+                            self.logger.warning(f"         ⚠️ Factura sin serie_folio válido, saltando...")
+                            continue
                         
                         # Convertir a string para evitar errores
                         serie_folio = str(serie_folio) if serie_folio else ''
@@ -392,7 +539,7 @@ class AutocargaController:
                 marca=datos_procesados['marca'],
                 responsable=datos_procesados['responsable'],
                 proveedor=datos_procesados['proveedor'],
-                factura_id=factura_asociada.folio_interno if factura_asociada else None
+                factura=factura_asociada
             )
             
             contadores['vales_creados'] += 1

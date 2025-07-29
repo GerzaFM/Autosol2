@@ -188,39 +188,89 @@ class PDFDataExtractor:
             value = re.sub(r'(\d+)-([A-Z])', r'\1 - \2', value)
             
         elif field_name == 'tipo_de_vale':
-            # Extrae solo la abreviatura del tipo de vale
-            # Busca patrones comunes de abreviaturas seguidas de palabras completas
+            # Extrae solo la abreviatura del tipo de vale usando el diccionario de configuración
+            
+            # Importar el diccionario de tipos válidos
+            try:
+                # Intentar múltiples rutas de importación
+                from solicitudapp.config.app_config import TIPO_VALE
+                tipos_validos = set(TIPO_VALE.keys())
+            except ImportError:
+                try:
+                    import sys
+                    import os
+                    # Agregar el path de src para importación
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    src_dir = os.path.dirname(os.path.dirname(current_dir))
+                    if src_dir not in sys.path:
+                        sys.path.append(src_dir)
+                    from solicitudapp.config.app_config import TIPO_VALE
+                    tipos_validos = set(TIPO_VALE.keys())
+                except ImportError:
+                    # Fallback con tipos conocidos del diccionario
+                    tipos_validos = {
+                        'AU', 'AF', 'SA', 'AGO', 'APR', 'ALF', 'INS', 'BLI', 'CP', 'GA', 'CDG', 
+                        'CBA', 'CE', 'CSN', 'CI', 'CIM', 'CS', 'DEP', 'DEV', 'DIV', 'ENE', 'EC', 
+                        'EQ', 'ES', 'FE', 'GU', 'GV', 'GFA', 'GE', 'HPP', 'IM', 'IRN', 'IFJ', 
+                        'DAS', 'ME', 'MEU', 'OSI', 'OID', 'ISAN', 'ISR', 'IVA', 'RET', 'PA', 
+                        'PM', 'PR', 'MM', 'PMT', 'PRO', 'GM', 'REI', 'RA', 'RE', 'RI', 'RC', 
+                        'SAN', 'SGM', 'SE', 'SAD', 'SET', 'SL', 'SS', 'SC', 'ST', 'TU', 'TV', 
+                        'UN', 'AL', 'VG', 'VC', '1', '1R', '2', '3', '4', '5', '7'
+                    }
             
             # Primero intenta encontrar patrones específicos conocidos
             if value.startswith('CECOMPRA'):
                 value = 'CE'
-            elif value.startswith('GAVALE') or value.startswith('GA'):
+            elif value.startswith('GAVALE') or value.startswith('GASOLINA'):
                 value = 'GA'  # Gasolina
             elif value.startswith('AVALE') or value.startswith('AL'):
                 value = 'AL'  # Alimentación
             elif value.startswith('VTRANSPORTE') or value.startswith('VT'):
-                value = 'VT'  # Vales de transporte
-            elif value.startswith('CICONSUMIBLES') or value.startswith('CI'):
+                value = 'VT'  # Vales de transporte (aunque no está en diccionario)
+            elif value.startswith('CICONSUMIBLES'):
                 value = 'CI'  # Consumibles
-            elif value.startswith('SETSERVICIO') or value.startswith('SET'):
+            elif value.startswith('SETSERVICIO'):
                 value = 'SET'  # Servicios externos
+            elif value.startswith('GUGASOLINA') or (value.startswith('GU') and 'GASOLINA' in value):
+                value = 'GU'  # Gasolina previa unidades
             else:
-                # Si no coincide con patrones conocidos, busca abreviatura simple
-                # Buscar abreviaturas de 1-3 caracteres seguidas de palabras
-                # Patrón para detectar abreviatura seguida de palabra completa
-                match = re.match(r'^([A-Z]{1,3})(?:[A-Z][a-z]|[A-Z]{4,})', value)
-                if match:
-                    value = match.group(1)
-                elif len(value) >= 3 and value[:2].isupper():
-                    # Si los primeros 2 caracteres son mayúsculas, usar esos
-                    value = value[:2]
-                elif len(value) >= 2 and value[:1].isupper():
-                    # Si solo el primer carácter es mayúscula, usar solo ese
-                    value = value[:1]
-                else:
-                    # Último recurso: toma hasta 3 caracteres si todo está en mayúsculas
-                    if value.isupper() and len(value) > 3:
-                        value = value[:3]
+                # Buscar abreviaturas válidas en el texto usando el diccionario
+                # Intentar matchear con tipos del diccionario (de mayor a menor longitud)
+                tipos_ordenados = sorted(tipos_validos, key=len, reverse=True)
+                encontrado = False
+                
+                for tipo in tipos_ordenados:
+                    if value.startswith(tipo):
+                        value = tipo
+                        encontrado = True
+                        break
+                
+                if not encontrado:
+                    # Si no coincide con tipos válidos, busca abreviatura simple
+                    # Patrón para detectar abreviatura seguida de palabra completa
+                    match = re.match(r'^([A-Z]{1,3})(?:[A-Z][a-z]|[A-Z]{4,})', value)
+                    if match:
+                        candidate = match.group(1)
+                        # Verificar si el candidato está en tipos válidos
+                        if candidate in tipos_validos:
+                            value = candidate
+                        else:
+                            # Si no está en tipos válidos, usar los primeros 2 caracteres como fallback
+                            value = value[:2] if len(value) >= 2 else value
+                    elif len(value) >= 3 and value[:2].isupper():
+                        # Si los primeros 2 caracteres son mayúsculas, verificar si están en tipos válidos
+                        candidate = value[:2]
+                        if candidate in tipos_validos:
+                            value = candidate
+                        else:
+                            value = candidate  # Usar de todas formas
+                    elif len(value) >= 2 and value[:1].isupper():
+                        # Si solo el primer carácter es mayúscula, usar solo ese
+                        value = value[:1]
+                    else:
+                        # Último recurso: toma hasta 3 caracteres si todo está en mayúsculas
+                        if value.isupper() and len(value) > 3:
+                            value = value[:3]
         
         return value
 

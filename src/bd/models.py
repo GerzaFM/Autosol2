@@ -32,7 +32,7 @@ class Layout(Model):
 
 class Factura(Model):
     folio_interno = IntegerField(primary_key=True)
-    serie = IntegerField()
+    serie = CharField()  # Cambiado de IntegerField a CharField para manejar "CC", "OLEK", etc.
     folio = IntegerField()
     fecha = DateField()
     fecha_emision = DateField()
@@ -100,7 +100,7 @@ class Vale(Model):
     marca = IntegerField(null=True)
     responsable = IntegerField(null=True)
     proveedor = CharField(null=True)
-    factura_id = IntegerField(null=True)  # Relación con factura
+    factura = ForeignKeyField(Factura, backref='vale', unique=True, null=True, db_column='factura')  # Relación uno a uno con factura
 
     class Meta:
         database = db
