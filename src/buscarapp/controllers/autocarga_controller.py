@@ -298,6 +298,80 @@ class AutocargaController:
             self.logger.error(f"Error procesando resultados a BD: {e}")
             self.dialog_utils.show_error("Error procesando resultados", f"Error: {str(e)}")
     
+    def _actualizar_codigo_proveedor(self, datos_procesados: Dict[str, Any]):
+        """
+        Actualiza el código_quiter del proveedor si no lo tiene y el vale incluye código.
+        
+        Args:
+            datos_procesados: Datos del vale procesados que incluyen proveedor y código
+        """
+        try:
+            # Import del modelo Proveedor
+            import sys
+            src_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            sys.path.insert(0, src_path)
+            from bd.models import Proveedor
+            
+            nombre_proveedor = datos_procesados.get('proveedor')
+            codigo_vale = datos_procesados.get('codigo')
+            
+            # Solo proceder si tenemos tanto proveedor como código
+            if not nombre_proveedor or not codigo_vale:
+                return
+            
+            # Buscar el proveedor por nombre
+            try:
+                # Búsqueda exacta primero
+                proveedor = Proveedor.get(Proveedor.nombre == nombre_proveedor)
+            except Proveedor.DoesNotExist:
+                # Búsqueda parcial si no hay coincidencia exacta
+                try:
+                    proveedor = Proveedor.get(Proveedor.nombre.contains(nombre_proveedor))
+                except Proveedor.DoesNotExist:
+                    # Búsqueda avanzada para casos como "MX SADECV" -> "OLEKSEI-MX SA DE CV"
+                    try:
+                        # Extraer palabras clave del nombre del vale
+                        palabras_vale = nombre_proveedor.upper().split()
+                        self.logger.debug(f"🔍 Palabras del vale: {palabras_vale}")
+                        
+                        # Buscar proveedor que contenga alguna de las palabras clave
+                        proveedor_encontrado = None
+                        for palabra in palabras_vale:
+                            if len(palabra) >= 2:  # Solo palabras de 2+ caracteres
+                                try:
+                                    proveedor_candidato = Proveedor.get(Proveedor.nombre.contains(palabra))
+                                    self.logger.debug(f"✅ Encontrado candidato '{proveedor_candidato.nombre}' con palabra '{palabra}'")
+                                    proveedor_encontrado = proveedor_candidato
+                                    break
+                                except Proveedor.DoesNotExist:
+                                    continue
+                        
+                        if proveedor_encontrado:
+                            proveedor = proveedor_encontrado
+                            self.logger.info(f"🔄 Coincidencia avanzada: Vale '{nombre_proveedor}' -> Proveedor '{proveedor.nombre}'")
+                        else:
+                            raise Proveedor.DoesNotExist()
+                            
+                    except Proveedor.DoesNotExist:
+                        self.logger.debug(f"📋 Proveedor '{nombre_proveedor}' no encontrado en BD para actualizar código")
+                        return
+            
+            # Verificar si el proveedor ya tiene código
+            if proveedor.codigo_quiter is None or proveedor.codigo_quiter == '':
+                # Actualizar el código del proveedor
+                proveedor.codigo_quiter = codigo_vale
+                proveedor.save()
+                self.logger.info(f"🔄 Código '{codigo_vale}' agregado al proveedor '{proveedor.nombre}'")
+            else:
+                # El proveedor ya tiene código
+                if str(proveedor.codigo_quiter) != str(codigo_vale):
+                    self.logger.warning(f"⚠️ Proveedor '{proveedor.nombre}' ya tiene código '{proveedor.codigo_quiter}', pero vale tiene '{codigo_vale}'")
+                else:
+                    self.logger.debug(f"✅ Proveedor '{proveedor.nombre}' ya tiene el código correcto '{proveedor.codigo_quiter}'")
+                    
+        except Exception as e:
+            self.logger.error(f"Error actualizando código del proveedor: {e}")
+    
     def _procesar_vale_individual(self, vale_data: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
         """Procesa un vale individual para actualizar la BD"""
         try:
@@ -426,6 +500,9 @@ class AutocargaController:
                 elif facturas_seleccionadas and vale_existente.factura:
                     self.logger.info(f"✅ Vale {datos_procesados['noVale']} ya existe y YA ESTÁ ASOCIADO con {vale_existente.factura.serie}-{vale_existente.factura.folio}")
                 
+                # Actualizar código del proveedor si es necesario (para vales existentes también)
+                self._actualizar_codigo_proveedor(datos_procesados)
+                
                 return  # Salir después de procesar vale existente
                 
             except Vale.DoesNotExist:
@@ -539,8 +616,12 @@ class AutocargaController:
                 marca=datos_procesados['marca'],
                 responsable=datos_procesados['responsable'],
                 proveedor=datos_procesados['proveedor'],
+                codigo=datos_procesados.get('codigo'),  # Nuevo campo código
                 factura=factura_asociada
             )
+            
+            # Actualizar código del proveedor si es necesario
+            self._actualizar_codigo_proveedor(datos_procesados)
             
             contadores['vales_creados'] += 1
             if factura_asociada:

@@ -100,6 +100,7 @@ class Vale(Model):
     marca = IntegerField(null=True)
     responsable = IntegerField(null=True)
     proveedor = CharField(null=True)
+    codigo = CharField(null=True)  # Código del proveedor extraído del vale
     factura = ForeignKeyField(Factura, backref='vale', unique=True, null=True, db_column='factura')  # Relación uno a uno con factura
 
     class Meta:

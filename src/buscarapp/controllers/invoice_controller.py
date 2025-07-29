@@ -106,7 +106,8 @@ class InvoiceController:
                     'rfc': factura.proveedor.rfc,
                     'telefono': factura.proveedor.telefono,
                     'email': factura.proveedor.email,
-                    'nombre_contacto': factura.proveedor.nombre_contacto
+                    'nombre_contacto': factura.proveedor.nombre_contacto,
+                    'codigo': factura.proveedor.codigo_quiter  # Agregar código del proveedor
                 },
                 'conceptos': [
                     {

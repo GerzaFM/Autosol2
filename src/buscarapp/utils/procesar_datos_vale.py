@@ -57,6 +57,11 @@ def procesar_datos_vale(datos_extraidos: Dict[str, str]) -> Dict[str, Any]:
     datos_procesados['total'] = datos_extraidos.get('Total', '')
     datos_procesados['proveedor'] = datos_extraidos.get('Nombre', '')
     
+    # IMPORTANTE: El código del proveedor viene en el campo "cuenta" del PDF
+    # Usamos el valor de cuenta como código del proveedor para actualizar BD
+    codigo_proveedor = datos_extraidos.get('Cuenta', '')
+    datos_procesados['codigo'] = codigo_proveedor if codigo_proveedor else datos_extraidos.get('Codigo', '')
+    
     # Campo entero - extraer solo números
     datos_procesados['referencia'] = extraer_numero_entero(datos_extraidos.get('Referencia', ''))
     datos_procesados['cuenta'] = extraer_numero_entero(datos_extraidos.get('Cuenta', ''))

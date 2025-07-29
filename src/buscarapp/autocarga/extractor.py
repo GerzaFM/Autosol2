@@ -16,6 +16,10 @@ class PDFDataExtractor:
                 r'Proveedor:\s*([A-Z][A-Z\s]+?)(?:\s*Tipo\s*de|$)',
                 r'Nombre:\s*([A-Z][A-Z\s]+?)(?:\s*Domicilio|\s*Tipo|\s*$)',
                 r'NOMBRE:\s*([A-Z][A-Z\s]+?)(?:\s*DOMICILIO|\s*TIPO|\s*$)',
+                # Patrón específico para nombres como "OLEKSEI-MX SA DE CV"
+                r'([A-Z][A-Z\-\s&]+(?:SA\s+DE\s+CV|S\.A\.|DE\s*CV|SADECV))\b',
+                # Patrón para nombres con guiones como "OLEKSEI-MX"
+                r'([A-Z]+\-[A-Z]+(?:\s+[A-Z\s]+)*(?:SA|S\.A\.|DE\s*CV|SADECV)?)\b',
                 # Fallback para nombres con terminaciones corporativas
                 r'([A-Z][A-Z\s&]+(?:SA|S\.A\.|DE\s*CV|SADECV))\b',
             ],
@@ -98,6 +102,18 @@ class PDFDataExtractor:
                 r'(HERRAMIENTAS\s+[A-Z\s]+)',
                 r'([A-Z]{3,}\s+[A-Z\s]+)',
                 r'(MAGNA|PREMIUM|DIESEL|GASOLINA)',
+            ],
+            'codigo': [
+                # Patrones para código del proveedor en el vale
+                r'Código:\s*([A-Z0-9]+)',
+                r'CÓDIGO:\s*([A-Z0-9]+)',
+                r'Codigo:\s*([A-Z0-9]+)',
+                r'CODIGO:\s*([A-Z0-9]+)',
+                r'Cod:\s*([A-Z0-9]+)',
+                r'COD:\s*([A-Z0-9]+)',
+                # Patrón para códigos numéricos comunes
+                r'\bCOD[:\s]*([0-9]+)\b',
+                r'\bCódigo[:\s]*([A-Z0-9]+)\b'
             ]
         }
     
@@ -170,8 +186,15 @@ class PDFDataExtractor:
             # La comparación sin espacios se hará en provider_matcher.py si es necesario
             
         elif field_name == 'descripcion':
-            # Mantener la descripción tal como viene del PDF
-            # NO agregar espacios automáticamente - preservar el texto original
+            # Corregir espacios faltantes en palabras conocidas
+            value = re.sub(r'DEPUBLICIDAD', 'DE PUBLICIDAD', value)
+            value = re.sub(r'YMARKETING', 'Y MARKETING', value)
+            value = re.sub(r'DEEXPERIENCIA', 'DE EXPERIENCIA', value)
+            value = re.sub(r'DEACUERDO', 'DE ACUERDO', value) 
+            value = re.sub(r'ACONTRATO', 'A CONTRATO', value)
+            # Agregar espacios entre palabras pegadas comunes
+            value = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', value)
+            # Preservar el texto original con correcciones mínimas
             pass
             
         elif field_name == 'departamento':
@@ -350,7 +373,7 @@ class PDFDataExtractor:
         fields = [
             'nombre', 'numero', 'referencia', 'fecha', 'cuenta', 'departamento', 
             'sucursal', 'marca', 'responsable', 'tipo_de_vale', 
-            'no_documento', 'total', 'descripcion'
+            'no_documento', 'total', 'descripcion', 'codigo'
         ]
         
         # Extrae cada campo
@@ -421,6 +444,8 @@ class PDFDataExtractor:
                     # Unir las líneas
                     full_description = ' '.join(description_lines)
                     # Correcciones específicas para casos conocidos
+                    full_description = full_description.replace('DEPUBLICIDAD', 'DE PUBLICIDAD')
+                    full_description = full_description.replace('YMARKETING', 'Y MARKETING')
                     full_description = full_description.replace('DEEXPERIENCIA', 'DE EXPERIENCIA')
                     full_description = full_description.replace('DEACUERDO', 'DE ACUERDO') 
                     full_description = full_description.replace('ACONTRATO', 'A CONTRATO')
