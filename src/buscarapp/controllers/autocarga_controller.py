@@ -169,7 +169,7 @@ class AutocargaController:
         
         ttk.Label(periodo_frame, text="Buscar archivos modificados en los últimos:").pack(anchor="w")
         
-        dias_var = ttk.IntVar(value=3)
+        dias_var = ttk.IntVar(value=1)
         dias_frame = ttk.Frame(periodo_frame)
         dias_frame.pack(fill="x", pady=(5, 0))
         
@@ -181,7 +181,7 @@ class AutocargaController:
             orient="horizontal"
         ).pack(side="left", fill="x", expand=True, padx=(0, 10))
         
-        dias_label = ttk.Label(dias_frame, text="3 días")
+        dias_label = ttk.Label(dias_frame, text="1 día")
         dias_label.pack(side="right")
         
         def actualizar_dias_label(event=None):
@@ -604,7 +604,7 @@ class AutocargaController:
         # Crear ventana de reporte
         reporte_window = ttk.Toplevel(self.parent_widget)
         reporte_window.title("Reporte de Autocarga")
-        reporte_window.geometry("600x500")
+        reporte_window.geometry("700x550")
         reporte_window.transient(self.parent_widget)
         reporte_window.grab_set()
         
@@ -676,19 +676,32 @@ class AutocargaController:
 • Confirma que los proveedores tengan los códigos correctos
 """
         
-        reporte_text.insert("1.0", reporte_content)
-        reporte_text.config(state="disabled")
-        
+        # Frame contenedor para el área de texto con scrollbar
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill="both", expand=True, pady=(0, 20))
+
+        # Crear área de texto y scrollbar dentro de text_frame
+        reporte_text = ttk.Text(text_frame, wrap="word", height=20)
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=reporte_text.yview)
+        reporte_text.configure(yscrollcommand=scrollbar.set)
+
         reporte_text.pack(side="left", fill="both", expand=True, padx=(0, 5))
         scrollbar.pack(side="right", fill="y")
-        
-        # Botón cerrar
+
+        # Insertar contenido después de crear el widget
+        reporte_text.insert("1.0", reporte_content)
+        reporte_text.config(state="disabled")
+
+        # Frame separado para el botón (siempre visible en la parte inferior)
+        botones_frame = ttk.Frame(main_frame)
+        botones_frame.pack(fill="x", pady=(0, 0))
+
         ttk.Button(
-            main_frame,
+            botones_frame,
             text="Cerrar",
             bootstyle="primary",
             command=reporte_window.destroy
-        ).pack(pady=(20, 0))
+        ).pack(pady=10)
         
         # Centrar ventana
         reporte_window.update_idletasks()
