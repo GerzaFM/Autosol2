@@ -9,141 +9,95 @@ class PDFDataExtractor:
     """
     
     def __init__(self):
-        # Patrones de expresiones regulares mejorados para encontrar los datos
+        # Patrones de expresiones regulares SIMPLIFICADOS para mejor rendimiento
         self.patterns = {
             'nombre': [
-                # Patrones para PyPDF2 (preserva espacios)
-                r'Proveedor:\s*([A-Z\s]+?)(?=\s*(?:\d|\n|$))',
-                r'([A-Z\s]+)\s*Nombre:',  # PyPDF2 a veces invierte el orden
-                # Patrones originales para pdfplumber
-                r'Nombre:\s*([A-Z]+(?:[A-Z\s]*[A-Z])*)',
-                r'NOMBRE:\s*([A-Z]+(?:[A-Z\s]*[A-Z])*)',
-                r'Nombre:\s*([A-Z]{2,}(?:[A-Z]*[A-Z])*)',
-                # Fallback patterns
-                r'([A-Z][A-Z\s&]+(?:SA|S\.A\.|DE|CV|S\.C\.|LTDA|INC|CORP)[A-Z\s]*)',
-                r'Nombre[:\s]*([A-Za-z\s.&]+?)(?=\n|$|\s{3,})'
+                # Patrón específico para PyPDF2 que evita "Tipo deVale"
+                r'Proveedor:\s*([A-Z][A-Z\s]+?)(?:\s*Tipo\s*de|$)',
+                r'Nombre:\s*([A-Z][A-Z\s]+?)(?:\s*Domicilio|\s*Tipo|\s*$)',
+                r'NOMBRE:\s*([A-Z][A-Z\s]+?)(?:\s*DOMICILIO|\s*TIPO|\s*$)',
+                # Fallback para nombres con terminaciones corporativas
+                r'([A-Z][A-Z\s&]+(?:SA|S\.A\.|DE\s*CV|SADECV))\b',
             ],
             'numero': [
-                # Funciona bien: V152885
+                # Patrones simples para números de vale
                 r'Número:\s*(V\d+)',
                 r'(V\d{6})',
-                r'Número[:\s]*([0-9A-Za-z-]+?)(?=\n|$|\s{3,})',
                 r'\b(V\d+)\b'
             ],
             'referencia': [
-                # Basado en: "Número: V152885 Referencia: 8158095"
+                # Patrones simples para referencia
                 r'Referencia:\s*(\d+)',
                 r'REFERENCIA:\s*(\d+)',
-                # Patrón específico para capturar después de "Referencia:"
-                r'Número:\s*V\d+\s+Referencia:\s*(\d+)',
-                # Patrón más general para referencias numéricas
-                r'(?i)referencia[:\s]*(\d+)',
-                # Fallback para números largos después de "Referencia"
-                r'Referencia[:\s]*([0-9]+)'
+                r'referencia[:\s]*(\d+)'
             ],
             'fecha': [
-                # Funciona bien: 23/07/2025
+                # Patrones simples para fechas
                 r'Fecha:\s*(\d{1,2}/\d{1,2}/\d{4})',
                 r'(\d{1,2}/\d{1,2}/\d{4})',
-                r'(\d{1,2}-\d{1,2}-\d{4})',
-                r'Fecha[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})(?=\n|$|\s{3,})'
+                r'(\d{1,2}-\d{1,2}-\d{4})'
             ],
             'cuenta': [
-                # Funciona bien: 60309
+                # Patrones simples para cuenta
                 r'Cuenta:\s*(\d+)',
                 r'CUENTA:\s*(\d+)',
-                r'(?i)cuenta[:\s]*(\d+)',
                 r'\b(\d{5})\b'
             ],
             'departamento': [
-                # Basado en el texto: "Departamento: 6ADMINISTRACION"
+                # Patrones simples para departamento
                 r'Departamento:\s*(\d+[A-Z]+)',
                 r'DEPARTAMENTO:\s*(\d+[A-Z]+)',
-                # Patrón específico para capturar "6ADMINISTRACION" 
-                r'Departamento:\s*(\d+[A-Z][A-Z]*)',
-                r'(\d+\s*[A-Z]{3,})',
-                # Fallback
-                r'Departamento[:\s]*([0-9A-Za-z\s]+?)(?=\n|$|\s{3,})'
+                r'(\d+[A-Z]{3,})'
             ],
             'sucursal': [
-                # Basado en el texto: "Sucursal: 15NISSANMATEHUALA"
-                r'Sucursal:\s*(\d+[A-Z]+(?:[A-Z]*[A-Z])*)',
-                r'SUCURSAL:\s*(\d+[A-Z]+(?:[A-Z]*[A-Z])*)',
-                # Patrón específico para capturar "15NISSANMATEHUALA"
-                r'Sucursal:\s*(\d+[A-Z][A-Z]*)',
-                r'(\d{1,2}[A-Z]{3,}[A-Z]*)',
-                # Fallback
-                r'Sucursal[:\s]*([0-9A-Za-z\s]+?)(?=\n|$|\s{3,})'
+                # Patrones simples para sucursal
+                r'Sucursal:\s*(\d+[A-Z]+)',
+                r'SUCURSAL:\s*(\d+[A-Z]+)',
+                r'(\d{1,2}[A-Z]{3,})'
             ],
             'marca': [
-                # Basado en el texto: "Marca: 2-NISSAN"
+                # Patrones simples para marca
                 r'Marca:\s*(\d+-[A-Z]+)',
                 r'MARCA:\s*(\d+-[A-Z]+)',
-                # Patrón específico para capturar "2-NISSAN"
-                r'Marca:\s*(\d+\-[A-Z][A-Z]*)',
-                r'(\d+\s*-\s*[A-Z]+)',
-                # Fallback
-                r'Marca[:\s]*([0-9A-Za-z\s-]+?)(?=\n|$|\s{3,})'
+                r'(\d+\s*-\s*[A-Z]+)'
             ],
             'responsable': [
-                # Funciona bien: 294379
+                # Patrones simples para responsable
                 r'Responsable:\s*(\d+)',
                 r'RESPONSABLE:\s*(\d+)',
-                r'Responsable[:\s]*(\d+)',
                 r'\b(\d{6})\b'
             ],
             'tipo_de_vale': [
-                # Basado en el texto: "TipodeVale: CECOMPRADEEQUIPOCOMPUTOYOFICINA"
+                # Patrones simples para tipo de vale
                 r'TipodeVale:\s*([A-Z]+)',
                 r'TIPODEVALE:\s*([A-Z]+)',
-                r'Tipo\s*de\s*Vale:\s*([A-Z\s]+)',
-                r'TipodeVale:\s*([A-Z][A-Z]*)',
-                # Fallback
-                r'Tipo de Vale[:\s]*([A-Za-z\s]+?)(?=\n|$|\s{3,})'
+                r'Tipo\s*de\s*Vale:\s*([A-Z\s]+)'
             ],
             'no_documento': [
-                # Basado en el texto: "NºDocumento: 6976073-1"
+                # Patrones simples para no documento
                 r'NºDocumento:\s*([0-9-]+)',
                 r'N[ºo]Documento:\s*([0-9A-Za-z-]+)',
-                r'No\s*Documento:\s*([0-9A-Za-z-]+)',
-                r'NºDocumento:\s*([0-9A-Za-z-]+)',
-                # Fallback
-                r'No Documento[:\s]*([0-9A-Za-z-]+?)(?=\n|$|\s{3,})'
+                r'No\s*Documento:\s*([0-9A-Za-z-]+)'
             ],
             'total': [
-                # Funciona bien: 3,132.77
+                # Patrones simples para total
                 r'ValorVale:\s*([0-9,]+\.[0-9]{2})',
                 r'TOTAL[:\s]*\$?\s*([0-9,]+\.?[0-9]*)',
                 r'Total[:\s]*\$?\s*([0-9,]+\.?[0-9]*)',
-                r'([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2})',
-                r'\$?\s*([0-9,]+\.[0-9]{2})(?=\s|$)'
+                r'([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2})'
             ],
             'descripcion': [
-                # Patrones para PyPDF2 (preserva espacios) - Múltiples líneas
-                r'Descripción:\s*\n([A-Z\s,()]+(?:\n[A-Z\s,()]+)*?)(?=\n\d|\n[A-Z]+:|$)',
-                r'Descripción:\s*([A-Z\s,()]+(?:\n[A-Z\s,()]+)*?)(?=\n\d|\nTOTAL:)',
-                # Patrón específico para descripciones largas en PyPDF2
-                r'Descripción:\s*\n([A-Z\s,()]+)\n([A-Z\s,()]+)',
-                # Patrones específicos para texto PyPDF2
-                r'(MARKETING\s+[A-Z\s,()]+(?:\n[A-Z\s,()]+)*)',
+                # Patrones SIMPLIFICADOS para descripción
+                r'Descripción:\s*([A-Z\s,()]+)',
+                r'DESCRIPCIÓN:\s*([A-Z\s,()]+)',
+                r'Descripcion:\s*([A-Z\s,()]+)',
+                r'DESCRIPCION:\s*([A-Z\s,()]+)',
+                # Patrones específicos comunes
+                r'(MARKETING\s+[A-Z\s,()]+)',
                 r'(IMPRESORA\s+[A-Z\s,]+)',
                 r'(HERRAMIENTAS\s+[A-Z\s]+)',
-                # Patrones originales para pdfplumber
-                r'Descripción:\s*.*?\n(?:.*?\n)*(IMPRESORA[A-Z0-9,]+)\s+MATEHUALA',
-                r'Descripción:\s*.*?\n(?:.*?\n)*(HERRAMIENTASDETRABAJO|HERRAMIENTAS\s*DE\s*TRABAJO)',
-                r'Descripción:\s*.*?\n(?:.*?\n)*([A-Z][A-Z0-9,\s]+?)\s+MATEHUALA',
-                r'Descripción:\s*.*?\n(?:.*?\n)*([A-Z]*HERRAMIENTAS[A-Z]*)',
-                r'Descripción:\s*.*?\n(?:.*?\n)*([A-Z]+(?:DE)?[A-Z]+)\s+[A-Z]+',
-                r'Descripción:\s*\n(?:\s*\n)*(?:[0-9-]+\s+[A-Z]+\s+[0-9%.\s]+\n)*([A-Z]+(?:DE)?[A-Z]+)',
-                r'(?:DESCRIPCI[ÓO]N|D\s*E\s*S\s*C\s*R\s*I\s*P\s*C\s*I\s*[ÓO]\s*N).*?\n\s*([A-Z\s]+(?:\s+DE\s+)?[A-Z\s]*)\n',
-                r'(?:DESCRIPCI[ÓO]N|D\s*E\s*S\s*C\s*R\s*I\s*P\s*C\s*I\s*[ÓO]\s*N).*?\n\s*([A-Z][A-Z\s]+)',
-                r'[0-9.,]+\s*([A-Z]{3,})\s+[0-9]+\.?[0-9]*',
-                r'[0-9.,]+\s*(MAGNA|PREMIUM|DIESEL|GASOLINA)\s+',
-                r'Descripción:\s*(.+?)(?=\n[A-Z][a-z]*:|$)',
-                r'DESCRIPCIÓN:\s*(.+?)(?=\n[A-Z][a-z]*:|$)',
-                r'Descripcion:\s*(.+?)(?=\n[A-Z][a-z]*:|$)',
-                r'DESCRIPCION:\s*(.+?)(?=\n[A-Z][a-z]*:|$)',
-                r'Descripci[óo]n[:\s]*(.+?)(?=\n|$)'
+                r'([A-Z]{3,}\s+[A-Z\s]+)',
+                r'(MAGNA|PREMIUM|DIESEL|GASOLINA)',
             ]
         }
     
@@ -246,16 +200,27 @@ class PDFDataExtractor:
                 value = 'AL'  # Alimentación
             elif value.startswith('VTRANSPORTE') or value.startswith('VT'):
                 value = 'VT'  # Vales de transporte
+            elif value.startswith('CICONSUMIBLES') or value.startswith('CI'):
+                value = 'CI'  # Consumibles
+            elif value.startswith('SETSERVICIO') or value.startswith('SET'):
+                value = 'SET'  # Servicios externos
             else:
-                # Si no coincide con patrones conocidos, busca abreviatura de 1-3 caracteres
-                # seguida de una palabra completa en mayúsculas
-                match = re.search(r'^([A-Z]{1,3})(?=[A-Z]{4,})', value)
+                # Si no coincide con patrones conocidos, busca abreviatura simple
+                # Buscar abreviaturas de 1-3 caracteres seguidas de palabras
+                # Patrón para detectar abreviatura seguida de palabra completa
+                match = re.match(r'^([A-Z]{1,3})(?:[A-Z][a-z]|[A-Z]{4,})', value)
                 if match:
                     value = match.group(1)
+                elif len(value) >= 3 and value[:2].isupper():
+                    # Si los primeros 2 caracteres son mayúsculas, usar esos
+                    value = value[:2]
+                elif len(value) >= 2 and value[:1].isupper():
+                    # Si solo el primer carácter es mayúscula, usar solo ese
+                    value = value[:1]
                 else:
-                    # Último recurso: toma los primeros 2 caracteres si todo está en mayúsculas
-                    if value.isupper() and len(value) > 2:
-                        value = value[:2]
+                    # Último recurso: toma hasta 3 caracteres si todo está en mayúsculas
+                    if value.isupper() and len(value) > 3:
+                        value = value[:3]
         
         return value
 
@@ -281,9 +246,9 @@ class PDFDataExtractor:
                     if result:
                         return self.post_process_field(field_name, result)
                 
-                # Buscar en el texto de PyPDF2
+                # Buscar en el texto de PyPDF2 (SIMPLIFICADO)
                 for pattern in self.patterns[field_name]:
-                    match = re.search(pattern, pypdf2_text, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+                    match = re.search(pattern, pypdf2_text, re.IGNORECASE)
                     if match:
                         result = match.group(1).strip()
                         result = re.sub(r'\s+', ' ', result)
@@ -296,9 +261,9 @@ class PDFDataExtractor:
         else:
             current_text = text_or_path
         
-        # Intenta cada patrón para el campo
+        # Intenta cada patrón para el campo (SIMPLIFICADO)
         for pattern in self.patterns[field_name]:
-            match = re.search(pattern, current_text, re.IGNORECASE | re.MULTILINE)
+            match = re.search(pattern, current_text, re.IGNORECASE)
             if match:
                 # Limpia el resultado
                 result = match.group(1).strip()

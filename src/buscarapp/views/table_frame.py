@@ -71,7 +71,8 @@ class TableFrame:
             table_container,
             columns=all_columns,
             show="headings",
-            height=7
+            height=7,
+            selectmode='extended'  # Habilitar selección múltiple
         )
         
         # Configurar columnas
@@ -201,6 +202,39 @@ class TableFrame:
             return data
         
         return None
+
+    def get_selected_data_multiple(self) -> List[Dict[str, Any]]:
+        """
+        Obtiene los datos de todas las filas seleccionadas
+        
+        Returns:
+            Lista de Dict con los datos de las filas seleccionadas
+        """
+        selection = self.tree.selection()
+        if not selection:
+            return []
+        
+        selected_data_list = []
+        
+        for item in selection:
+            # Obtener índice original
+            try:
+                original_index = int(self.tree.set(item, "original_index"))
+                if 0 <= original_index < len(self._current_data):
+                    selected_data_list.append(self._current_data[original_index])
+                    continue
+            except (ValueError, IndexError):
+                pass
+            
+            # Fallback: construir datos desde los valores de la tabla
+            values = self.tree.item(item, "values")
+            if len(values) >= len(self.columns):
+                data = {}
+                for i, col in enumerate(self.columns):
+                    data[col] = values[i]
+                selected_data_list.append(data)
+        
+        return selected_data_list
     
     def get_selected_index(self) -> Optional[int]:
         """

@@ -488,20 +488,32 @@ class BuscarAppRefactored(ttk.Frame):
                 )
                 return
             
-            # Mostrar mensaje informativo
+            # Obtener facturas seleccionadas del tree
+            facturas_seleccionadas = self.table_frame.get_selected_data_multiple()
+            
+            if not facturas_seleccionadas:
+                self.dialog_utils.show_warning(
+                    "Sin Selección",
+                    "Debe seleccionar al menos una factura en la tabla para asociar los vales.\n\n"
+                    "Use Ctrl+Click para seleccionar múltiples facturas."
+                )
+                return
+            
+            # Mostrar mensaje informativo con número de facturas seleccionadas
             confirmar = self.dialog_utils.ask_yes_no(
                 "Iniciar Autocarga",
-                "La autocarga buscará automáticamente archivos PDF de vales y órdenes "
-                "para extraer datos y actualizar la base de datos.\n\n"
+                f"La autocarga buscará automáticamente archivos PDF de vales y órdenes "
+                f"para extraer datos y asociarlos únicamente con las {len(facturas_seleccionadas)} "
+                f"factura(s) seleccionada(s) en la tabla.\n\n"
                 "¿Desea continuar?"
             )
             
             if not confirmar:
                 return
             
-            # Ejecutar autocarga
-            self.logger.info("Iniciando proceso de autocarga")
-            success, stats = self.autocarga_controller.ejecutar_autocarga_con_configuracion()
+            # Ejecutar autocarga con facturas seleccionadas
+            self.logger.info(f"Iniciando proceso de autocarga con {len(facturas_seleccionadas)} facturas seleccionadas")
+            success, stats = self.autocarga_controller.ejecutar_autocarga_con_configuracion(facturas_seleccionadas)
             
             if success:
                 self.logger.info("Autocarga completada exitosamente")

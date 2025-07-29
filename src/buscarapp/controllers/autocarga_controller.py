@@ -32,9 +32,12 @@ class AutocargaController:
         self.logger = logging.getLogger(__name__)
         self.dialog_utils = DialogUtils(parent_widget)
     
-    def ejecutar_autocarga_con_configuracion(self) -> Tuple[bool, Dict[str, Any]]:
+    def ejecutar_autocarga_con_configuracion(self, facturas_seleccionadas: List[Dict[str, Any]] = None) -> Tuple[bool, Dict[str, Any]]:
         """
         Ejecuta la autocarga después de solicitar configuración al usuario.
+        
+        Args:
+            facturas_seleccionadas: Lista de facturas seleccionadas para asociación
         
         Returns:
             Tuple[bool, Dict]: (éxito, estadísticas)
@@ -62,7 +65,7 @@ class AutocargaController:
             
             # Procesar resultados para llenar BD
             if self.bd_control:
-                self._procesar_resultados_a_bd(vales, ordenes, stats)
+                self._procesar_resultados_a_bd(vales, ordenes, stats, facturas_seleccionadas)
             
             return True, stats
             
@@ -231,7 +234,7 @@ class AutocargaController:
         """Muestra un mensaje de progreso"""
         self.logger.info(mensaje)
     
-    def _procesar_resultados_a_bd(self, vales: Dict, ordenes: Dict, stats: Dict):
+    def _procesar_resultados_a_bd(self, vales: Dict, ordenes: Dict, stats: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
         """
         Procesa los resultados de la autocarga para llenar la base de datos.
         
@@ -239,6 +242,7 @@ class AutocargaController:
             vales: Datos de vales extraídos
             ordenes: Datos de órdenes extraídas
             stats: Estadísticas del procesamiento
+            facturas_seleccionadas: Lista de facturas seleccionadas para asociación
         """
         try:
             from bd.models import Factura, Proveedor, Vale, Concepto
@@ -247,6 +251,8 @@ class AutocargaController:
             contadores = {
                 'proveedores_actualizados': 0,
                 'vales_creados': 0,
+                'vales_asociados': 0,
+                'vales_sin_asociar': 0,
                 'facturas_actualizadas': 0,
                 'errores': 0
             }
@@ -254,7 +260,7 @@ class AutocargaController:
             # Procesar vales
             for vale_id, vale_data in vales.items():
                 try:
-                    self._procesar_vale_individual(vale_data, contadores)
+                    self._procesar_vale_individual(vale_data, contadores, facturas_seleccionadas)
                 except Exception as e:
                     self.logger.error(f"Error procesando vale {vale_id}: {e}")
                     contadores['errores'] += 1
@@ -268,13 +274,13 @@ class AutocargaController:
                     contadores['errores'] += 1
             
             # Mostrar reporte final
-            self._mostrar_reporte_procesamiento(stats, contadores)
+            self._mostrar_reporte_procesamiento(stats, contadores, facturas_seleccionadas)
             
         except Exception as e:
             self.logger.error(f"Error procesando resultados a BD: {e}")
             self.dialog_utils.show_error("Error procesando resultados", f"Error: {str(e)}")
     
-    def _procesar_vale_individual(self, vale_data: Dict, contadores: Dict):
+    def _procesar_vale_individual(self, vale_data: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
         """Procesa un vale individual para actualizar la BD"""
         try:
             # Importar funciones de procesamiento
@@ -287,7 +293,7 @@ class AutocargaController:
             import sys
             src_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             sys.path.insert(0, src_path)
-            from bd.models import Vale
+            from bd.models import Vale, Factura
             
             # Procesar datos al formato correcto para BD
             datos_procesados = procesar_datos_vale(vale_data)
@@ -299,6 +305,77 @@ class AutocargaController:
                 return
             except Vale.DoesNotExist:
                 pass
+            
+            # Buscar factura correspondiente basándose en el No Documento
+            factura_asociada = None
+            no_documento = datos_procesados.get('noDocumento', '').strip()
+            
+            if no_documento and facturas_seleccionadas:
+                # Buscar solo entre las facturas seleccionadas
+                self.logger.info(f"🔍 Buscando asociación para vale {datos_procesados['noVale']} con No Documento '{no_documento}' entre {len(facturas_seleccionadas)} facturas seleccionadas")
+                
+                for factura_data in facturas_seleccionadas:
+                    try:
+                        # Obtener serie y folio de los datos de la factura seleccionada
+                        serie_folio = factura_data.get('serie_folio', '')
+                        folio_interno = factura_data.get('folio_interno', '')
+                        
+                        # Convertir a string para evitar errores
+                        serie_folio = str(serie_folio) if serie_folio else ''
+                        folio_interno = str(folio_interno) if folio_interno else ''
+                        
+                        self.logger.debug(f"   📋 Procesando factura {folio_interno} con serie_folio '{serie_folio}'")
+                        
+                        # Intentar extraer serie y folio del campo serie_folio
+                        if '-' in serie_folio:
+                            serie, folio = serie_folio.split('-', 1)
+                            folio_completo = f"{serie}{folio}"
+                        else:
+                            folio_completo = serie_folio
+                            folio = serie_folio
+                        
+                        # Verificar coincidencias
+                        if folio_completo == no_documento or folio == no_documento:
+                            # Obtener la factura real de la BD para la asociación
+                            try:
+                                # Buscar por serie y folio, no por folio_interno
+                                if '-' in serie_folio:
+                                    # Caso: "OLEK-5718" -> serie="OLEK", folio=5718
+                                    serie_bd, folio_bd = serie_folio.split('-', 1)
+                                    folio_bd_int = int(folio_bd)
+                                    factura_asociada = Factura.get(
+                                        (Factura.serie == serie_bd) & 
+                                        (Factura.folio == folio_bd_int)
+                                    )
+                                    tipo_coincidencia = "serie+folio" if folio_completo == no_documento else "folio"
+                                else:
+                                    # Caso: solo folio numérico
+                                    folio_bd_int = int(folio)
+                                    # Buscar cualquier factura con ese folio (puede haber múltiples series)
+                                    factura_asociada = Factura.get(Factura.folio == folio_bd_int)
+                                    tipo_coincidencia = "folio"
+                                
+                                self.logger.info(f"🔗 Vale {datos_procesados['noVale']} asociado con factura serie={factura_asociada.serie}, folio={factura_asociada.folio} (folio_interno={factura_asociada.folio_interno}) por {tipo_coincidencia}")
+                                break
+                            except (Factura.DoesNotExist, ValueError) as e:
+                                if isinstance(e, ValueError):
+                                    self.logger.warning(f"Error convirtiendo folio '{folio}' a entero")
+                                else:
+                                    if '-' in serie_folio:
+                                        serie_bd, folio_bd = serie_folio.split('-', 1)
+                                        self.logger.warning(f"No se encontró factura con serie='{serie_bd}' y folio='{folio_bd}' en BD")
+                                    else:
+                                        self.logger.warning(f"No se encontró factura con folio='{folio}' en BD")
+                                continue
+                                
+                    except Exception as e:
+                        self.logger.warning(f"Error procesando factura seleccionada: {e}")
+                        continue
+                        
+                if not factura_asociada:
+                    self.logger.info(f"⚠️ Vale {datos_procesados['noVale']} - No Documento '{no_documento}' no coincide con ninguna factura seleccionada")
+            elif not facturas_seleccionadas:
+                self.logger.warning("No hay facturas seleccionadas para asociar vales")
             
             # Crear nuevo vale con todos los datos procesados
             nuevo_vale = Vale.create(
@@ -314,11 +391,17 @@ class AutocargaController:
                 sucursal=datos_procesados['sucursal'],
                 marca=datos_procesados['marca'],
                 responsable=datos_procesados['responsable'],
-                proveedor=datos_procesados['proveedor']
+                proveedor=datos_procesados['proveedor'],
+                factura_id=factura_asociada.folio_interno if factura_asociada else None
             )
             
             contadores['vales_creados'] += 1
-            self.logger.info(f"Vale {datos_procesados['noVale']} creado exitosamente con ID: {nuevo_vale.id}")
+            if factura_asociada:
+                contadores['vales_asociados'] += 1
+                self.logger.info(f"✅ Vale {datos_procesados['noVale']} creado y asociado con factura seleccionada {factura_asociada.folio_interno}")
+            else:
+                contadores['vales_sin_asociar'] += 1
+                self.logger.info(f"⚠️ Vale {datos_procesados['noVale']} creado SIN ASOCIAR (No Documento '{no_documento}' no coincide con facturas seleccionadas)")
             
         except Exception as e:
             self.logger.error(f"Error procesando vale individual: {e}")
@@ -337,7 +420,7 @@ class AutocargaController:
         else:
             self.logger.warning(f"No se encontró proveedor para orden: {orden_data.get('Nombre', 'Sin nombre')}")
     
-    def _mostrar_reporte_procesamiento(self, stats: Dict, contadores: Dict):
+    def _mostrar_reporte_procesamiento(self, stats: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
         """Muestra un reporte completo del procesamiento"""
         import ttkbootstrap as ttk
         
@@ -366,12 +449,20 @@ class AutocargaController:
         reporte_text.configure(yscrollcommand=scrollbar.set)
         
         # Contenido del reporte
+        facturas_info = ""
+        if facturas_seleccionadas:
+            facturas_info = f"""
+🎯 FACTURAS SELECCIONADAS PARA ASOCIACIÓN:
+• Total de facturas seleccionadas: {len(facturas_seleccionadas)}
+• Folios seleccionados: {', '.join([f.get('serie_folio', 'N/A') for f in facturas_seleccionadas[:5]])}{'...' if len(facturas_seleccionadas) > 5 else ''}
+"""
+        
         reporte_content = f"""
 🚀 AUTOCARGA COMPLETADA
 {"="*50}
 
 📅 Fecha y hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
+{facturas_info}
 📋 PROCESAMIENTO DE ARCHIVOS:
 • Vales encontrados: {stats.get('vales_encontrados', 0)}
 • Vales procesados exitosamente: {stats.get('vales_exitosos', 0)}
@@ -393,6 +484,8 @@ class AutocargaController:
 🔄 ACTUALIZACIONES EN BASE DE DATOS:
 • Proveedores actualizados con código: {contadores['proveedores_actualizados']}
 • Vales creados automáticamente: {contadores['vales_creados']}
+• Vales asociados a facturas: {contadores['vales_asociados']}
+• Vales sin asociar: {contadores['vales_sin_asociar']}
 • Facturas actualizadas: {contadores['facturas_actualizadas']}
 • Errores durante procesamiento: {contadores['errores']}
 
@@ -400,8 +493,10 @@ class AutocargaController:
 
 💡 PRÓXIMOS PASOS:
 • Revisa los datos importados en la aplicación principal
-• Verifica que los proveedores tengan los códigos correctos
-• Confirma que los vales se han creado apropiadamente
+• Verifica que los vales estén correctamente asociados a las facturas seleccionadas
+• Los vales sin asociar requieren revisión manual del No Documento vs Folio
+• Solo se consideraron las facturas que estaban seleccionadas en la tabla
+• Confirma que los proveedores tengan los códigos correctos
 """
         
         reporte_text.insert("1.0", reporte_content)
