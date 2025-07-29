@@ -93,9 +93,9 @@ class Vale(Model):
     descripcion = CharField()
     referencia = IntegerField()
     total = CharField()
-    cuenta = IntegerField(null=True)  # Campo cuenta que existe en la BD
+    cuenta = IntegerField(null=True) 
     fechaVale = DateField(null=True)
-    departamento = IntegerField(null=True)  # Campo departamento (sin typo)
+    departamento = IntegerField(null=True) 
     sucursal = IntegerField(null=True)
     marca = IntegerField(null=True)
     responsable = IntegerField(null=True)

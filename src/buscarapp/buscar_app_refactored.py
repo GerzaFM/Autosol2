@@ -499,18 +499,6 @@ class BuscarAppRefactored(ttk.Frame):
                 )
                 return
             
-            # Mostrar mensaje informativo con número de facturas seleccionadas
-            confirmar = self.dialog_utils.ask_yes_no(
-                "Iniciar Autocarga",
-                f"La autocarga buscará automáticamente archivos PDF de vales y órdenes "
-                f"para extraer datos y asociarlos únicamente con las {len(facturas_seleccionadas)} "
-                f"factura(s) seleccionada(s) en la tabla.\n\n"
-                "¿Desea continuar?"
-            )
-            
-            if not confirmar:
-                return
-            
             # Ejecutar autocarga con facturas seleccionadas
             self.logger.info(f"Iniciando proceso de autocarga con {len(facturas_seleccionadas)} facturas seleccionadas")
             success, stats = self.autocarga_controller.ejecutar_autocarga_con_configuracion(facturas_seleccionadas)
@@ -520,13 +508,6 @@ class BuscarAppRefactored(ttk.Frame):
                 
                 # Refrescar datos en la aplicación
                 self._refresh_after_autocarga(stats)
-                
-                # Mostrar mensaje de éxito
-                self.dialog_utils.show_info(
-                    "Autocarga Completada",
-                    "La autocarga se ha completado exitosamente. "
-                    "Los datos han sido actualizados en la base de datos."
-                )
             else:
                 self.logger.warning("Autocarga cancelada o falló")
                 
