@@ -209,7 +209,7 @@ class AutoCarga:
         
         return ordenes_dict
     
-    def ejecutar_autocarga(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def ejecutar_autocarga(self, progress_callback=None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Ejecuta el proceso completo de autocarga.
         
@@ -224,27 +224,64 @@ class AutoCarga:
         
         # 1. Buscar archivos
         lista_vales, lista_ordenes = self.buscar_archivos()
-        
+
+        total_archivos = len(lista_vales) + len(lista_ordenes)
+        idx = 0
+
         # 2. Procesar Vales
         if lista_vales:
-            self.vales = self.procesar_vales(lista_vales)
+            vales_dict = {}
+            for i, archivo_vale in enumerate(lista_vales, 1):
+                try:
+                    nombre_archivo = Path(archivo_vale).name
+                    print(f"📄 {i}/{len(lista_vales)} Procesando: {nombre_archivo}")
+                    datos = self.extractor_vales.extract_all_data(archivo_vale)
+                    if datos and any(datos.values()):
+                        clave = Path(archivo_vale).stem
+                        vales_dict[clave] = datos
+                        print(f"   ✅ Datos extraídos exitosamente")
+                    else:
+                        print(f"   ❌ No se pudieron extraer datos")
+                except Exception as e:
+                    print(f"   ❌ Error al procesar: {str(e)}")
+                idx += 1
+                if progress_callback:
+                    progress_callback(idx, total_archivos)
+            self.vales = vales_dict
         else:
             print("💳 No se encontraron Vales para procesar")
-        
+
         print()  # Línea en blanco
-        
+
         # 3. Procesar Órdenes
         if lista_ordenes:
-            self.ordenes = self.procesar_ordenes(lista_ordenes)
+            ordenes_dict = {}
+            for i, archivo_orden in enumerate(lista_ordenes, 1):
+                try:
+                    nombre_archivo = Path(archivo_orden).name
+                    print(f"📄 {i}/{len(lista_ordenes)} Procesando: {nombre_archivo}")
+                    datos = self.extractor_ordenes.extract_all_data(archivo_orden)
+                    if datos and any(datos.values()):
+                        clave = Path(archivo_orden).stem
+                        ordenes_dict[clave] = datos
+                        print(f"   ✅ Datos extraídos exitosamente")
+                    else:
+                        print(f"   ❌ No se pudieron extraer datos")
+                except Exception as e:
+                    print(f"   ❌ Error al procesar: {str(e)}")
+                idx += 1
+                if progress_callback:
+                    progress_callback(idx, total_archivos)
+            self.ordenes = ordenes_dict
         else:
             print("📋 No se encontraron Órdenes para procesar")
-        
+
         # 4. Mostrar resumen final
         self.mostrar_resumen_final()
-        
+
         # 5. Generar reporte de coincidencias de proveedores
         self.provider_matcher.print_matching_report(self.vales, self.ordenes)
-        
+
         return self.vales, self.ordenes
     
     def mostrar_resumen_final(self):

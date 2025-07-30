@@ -24,6 +24,40 @@ except ImportError:
 
 
 class AutocargaController:
+    def _mostrar_barra_progreso(self, total_archivos):
+        import ttkbootstrap as ttk
+        progreso_window = ttk.Toplevel(self.parent_widget)
+        progreso_window.title("Procesando archivos PDF...")
+        progreso_window.geometry("400x120")
+        progreso_window.transient(self.parent_widget)
+        progreso_window.grab_set()
+
+        # Centrar ventana en pantalla
+        progreso_window.update_idletasks()
+        w = progreso_window.winfo_width()
+        h = progreso_window.winfo_height()
+        ws = progreso_window.winfo_screenwidth()
+        hs = progreso_window.winfo_screenheight()
+        x = (ws // 2) - (w // 2)
+        y = (hs // 2) - (h // 2)
+        progreso_window.geometry(f"400x120+{x}+{y}")
+
+        # Detectar tema actual
+        theme = str(ttk.Style().theme)
+        if 'dark' in theme.lower():
+            fg_color = '#FFFFFF'
+        else:
+            fg_color = '#222222'
+
+        label = ttk.Label(progreso_window, text="Procesando archivos PDF...", font=("Segoe UI", 12, "bold"), bootstyle="light")
+        label.pack(pady=(20, 10))
+        label.configure(foreground=fg_color)
+
+        barra = ttk.Progressbar(progreso_window, maximum=total_archivos, length=350, bootstyle="info-striped")
+        barra.pack(pady=(0, 10))
+
+        progreso_window.update_idletasks()
+        return progreso_window, barra
     """Controlador que maneja la lógica de autocarga de facturas"""
     
     def __init__(self, bd_control=None, parent_widget=None):
@@ -66,14 +100,39 @@ class AutocargaController:
                 ruta_carpeta=config['ruta_carpeta'],
                 dias_atras=config['dias_atras']
             )
-            
-            # Mostrar progreso
-            self._mostrar_mensaje_progreso("Iniciando autocarga...")
-            
-            # Ejecutar autocarga
-            self.logger.info("🚀 Ejecutando autocarga...")
-            vales, ordenes = autocarga.ejecutar_autocarga()
-            
+
+            # Buscar archivos para saber el total
+            lista_vales, lista_ordenes = autocarga.buscar_archivos()
+            total_archivos = len(lista_vales) + len(lista_ordenes)
+
+            import threading
+            progreso_window, barra = (None, None)
+            resultado = {'vales': None, 'ordenes': None}
+            if total_archivos > 0:
+                progreso_window, barra = self._mostrar_barra_progreso(total_archivos)
+
+                def progress_callback(idx, total):
+                    if barra:
+                        barra.after(0, barra.config, {'value': idx})
+
+                def procesamiento():
+                    self._mostrar_mensaje_progreso("Iniciando autocarga...")
+                    self.logger.info("🚀 Ejecutando autocarga...")
+                    vales, ordenes = autocarga.ejecutar_autocarga(progress_callback=progress_callback)
+                    resultado['vales'] = vales
+                    resultado['ordenes'] = ordenes
+                    if progreso_window:
+                        progreso_window.after(0, progreso_window.destroy)
+
+                hilo = threading.Thread(target=procesamiento)
+                hilo.start()
+                progreso_window.wait_window()
+                vales, ordenes = resultado['vales'], resultado['ordenes']
+            else:
+                self._mostrar_mensaje_progreso("Iniciando autocarga...")
+                self.logger.info("🚀 Ejecutando autocarga...")
+                vales, ordenes = autocarga.ejecutar_autocarga()
+
             self.logger.info(f"📊 Autocarga ejecutada - Vales: {len(vales) if vales else 0}, Órdenes: {len(ordenes) if ordenes else 0}")
             
             # Obtener estadísticas
