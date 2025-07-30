@@ -24,6 +24,112 @@ except ImportError:
 
 
 class AutocargaController:
+    def _procesar_orden_individual(self, orden_data: Dict, contadores: Dict):
+        """Procesa una orden individual para actualizar la BD"""
+        matcher = ProviderMatcher()
+        # Buscar proveedor por nombre
+        proveedor = matcher.match_provider_from_orden_data(orden_data)
+        if proveedor:
+            self.logger.info(f"Orden procesada para proveedor: {proveedor.nombre}")
+        else:
+            self.logger.warning(f"No se encontró proveedor para orden: {orden_data.get('Nombre', 'Sin nombre')}")
+
+    def _mostrar_reporte_procesamiento(self, stats: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
+        """Muestra un reporte completo del procesamiento"""
+        import ttkbootstrap as ttk
+        # Crear ventana de reporte
+        reporte_window = ttk.Toplevel(self.parent_widget)
+        reporte_window.title("Reporte de Autocarga")
+        reporte_window.geometry("700x550")
+        reporte_window.transient(self.parent_widget)
+        reporte_window.grab_set()
+        # Frame principal
+        main_frame = ttk.Frame(reporte_window, padding=20)
+        main_frame.pack(fill="both", expand=True)
+        # Título
+        ttk.Label(
+            main_frame,
+            text="📊 Reporte de Autocarga Completada",
+            font=("Segoe UI", 16, "bold"),
+            bootstyle="primary"
+        ).pack(pady=(0, 20))
+        # Crear texto del reporte
+        reporte_text = ttk.Text(main_frame, wrap="word", height=20)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=reporte_text.yview)
+        reporte_text.configure(yscrollcommand=scrollbar.set)
+        # Contenido del reporte
+        facturas_info = ""
+        if facturas_seleccionadas:
+            facturas_info = f"""
+🎯 FACTURAS SELECCIONADAS PARA ASOCIACIÓN:
+• Total de facturas seleccionadas: {len(facturas_seleccionadas)}
+• Folios seleccionados: {', '.join([f.get('serie_folio', 'N/A') for f in facturas_seleccionadas[:5]])}{'...' if len(facturas_seleccionadas) > 5 else ''}
+"""
+        reporte_content = f"""
+🚀 AUTOCARGA COMPLETADA
+{'='*50}
+
+📅 Fecha y hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+{facturas_info}
+📋 PROCESAMIENTO DE ARCHIVOS:
+• Vales encontrados: {stats.get('vales_encontrados', 0)}
+• Vales procesados exitosamente: {stats.get('vales_exitosos', 0)}
+• Órdenes encontradas: {stats.get('ordenes_encontradas', 0)}
+• Órdenes procesadas exitosamente: {stats.get('ordenes_exitosas', 0)}
+
+🔍 COINCIDENCIAS DE PROVEEDORES:
+"""
+        if 'provider_matching' in stats:
+            pm = stats['provider_matching']
+            reporte_content += f"""• Vales con proveedor encontrado: {pm.get('vales_con_proveedor', 0)}
+• Vales sin proveedor: {pm.get('vales_sin_proveedor', 0)}
+• Órdenes con proveedor encontrado: {pm.get('ordenes_con_proveedor', 0)}
+• Órdenes sin proveedor: {pm.get('ordenes_sin_proveedor', 0)}
+"""
+        reporte_content += f"""
+🔄 ACTUALIZACIONES EN BASE DE DATOS:
+• Proveedores actualizados con código: {contadores['proveedores_actualizados']}
+• Vales creados automáticamente: {contadores['vales_creados']}
+• Vales asociados a facturas: {contadores['vales_asociados']}
+• Vales sin asociar: {contadores['vales_sin_asociar']}
+• Facturas actualizadas: {contadores['facturas_actualizadas']}
+• Errores durante procesamiento: {contadores['errores']}
+
+✅ PROCESO COMPLETADO EXITOSAMENTE
+
+💡 PRÓXIMOS PASOS:
+• Revisa los datos importados en la aplicación principal
+• Verifica que los vales estén correctamente asociados a las facturas seleccionadas
+• Los vales sin asociar requieren revisión manual del No Documento vs Folio
+• Solo se consideraron las facturas que estaban seleccionadas en la tabla
+• Confirma que los proveedores tengan los códigos correctos
+"""
+        # Frame contenedor para el área de texto con scrollbar
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill="both", expand=True, pady=(0, 20))
+        # Crear área de texto y scrollbar dentro de text_frame
+        reporte_text = ttk.Text(text_frame, wrap="word", height=20)
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=reporte_text.yview)
+        reporte_text.configure(yscrollcommand=scrollbar.set)
+        reporte_text.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        scrollbar.pack(side="right", fill="y")
+        # Insertar contenido después de crear el widget
+        reporte_text.insert("1.0", reporte_content)
+        reporte_text.config(state="disabled")
+        # Frame separado para el botón (siempre visible en la parte inferior)
+        botones_frame = ttk.Frame(main_frame)
+        botones_frame.pack(fill="x", pady=(0, 0))
+        ttk.Button(
+            botones_frame,
+            text="Cerrar",
+            bootstyle="primary",
+            command=reporte_window.destroy
+        ).pack(pady=10)
+        # Centrar ventana
+        reporte_window.update_idletasks()
+        x = reporte_window.master.winfo_x() + (reporte_window.master.winfo_width() // 2) - (reporte_window.winfo_width() // 2)
+        y = reporte_window.master.winfo_y() + (reporte_window.master.winfo_height() // 2) - (reporte_window.winfo_height() // 2)
+        reporte_window.geometry(f"+{x}+{y}")
     def _mostrar_barra_progreso(self, total_archivos):
         import ttkbootstrap as ttk
         progreso_window = ttk.Toplevel(self.parent_widget)
@@ -178,7 +284,7 @@ class AutocargaController:
         # Frame principal
         main_frame = ttk.Frame(config_window, padding=20)
         main_frame.pack(fill="both", expand=True)
-        
+         
         # Título
         ttk.Label(
             main_frame,
@@ -443,136 +549,79 @@ class AutocargaController:
                 from ..utils.procesar_datos_vale import procesar_datos_vale
             except ImportError:
                 from utils.procesar_datos_vale import procesar_datos_vale
-            
-            # Import del modelo Vale con ruta absoluta
+
             import sys
             src_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             sys.path.insert(0, src_path)
             from bd.models import Vale, Factura
-            
-            def buscar_factura_asociada(no_documento: str, facturas_seleccionadas: List[Dict[str, Any]], nombre_vale: str = "") -> tuple:
-                """
-                Busca una factura asociada para un vale basándose en el No Documento.
-                
-                Args:
-                    no_documento: Número de documento del vale
-                    facturas_seleccionadas: Lista de facturas donde buscar
-                    nombre_vale: Nombre del vale para logging (opcional)
-                    
-                Returns:
-                    tuple: (factura_encontrada, tipo_coincidencia) donde factura_encontrada puede ser None
-                """
+
+            def normalizar_documento(doc):
+                """Normaliza un documento para comparación: elimina espacios y guiones"""
+                return str(doc).replace(' ', '').replace('-', '').strip()
+
+            def extraer_serie_folio(doc):
+                """Extrae serie y folio de un documento en formato 'SERIE-FOLIO' o 'SERIE FOLIO'"""
+                if '-' in doc:
+                    partes = doc.split('-', 1)
+                elif ' ' in doc:
+                    partes = doc.split(' ', 1)
+                else:
+                    return None, None
+                if len(partes) == 2:
+                    return partes[0].strip(), partes[1].strip()
+                return None, None
+
+            def buscar_factura_asociada(no_documento, facturas_seleccionadas, nombre_vale=""):
                 if not no_documento or not facturas_seleccionadas:
                     return None, None
-                    
-                factura_asociada = None
-                tipo_coincidencia = None
-                
-                self.logger.debug(f"🔍 Buscando asociación para vale {nombre_vale}: No Documento '{no_documento}'")
-                
+                doc_norm = normalizar_documento(no_documento)
+                self.logger.debug(f"🔍 Buscando asociación para vale {nombre_vale}: No Documento '{no_documento}' (normalizado: '{doc_norm}')")
                 for i, factura_data in enumerate(facturas_seleccionadas):
-                    try:
-                        # Obtener serie y folio de los datos de la factura seleccionada
-                        serie_folio = factura_data.get('serie_folio', '')
-                        
-                        # Si no hay 'serie_folio', intentar construirlo desde otros campos
-                        if not serie_folio:
-                            serie = factura_data.get('serie', '')
-                            folio = factura_data.get('folio', '')
-                            if serie and folio:
-                                serie_folio = f"{serie}-{folio}"
-                        
-                        # Convertir a string y limpiar espacios
-                        serie_folio = str(serie_folio).strip() if serie_folio else ''
-                        
-                        if not serie_folio:
-                            continue
-                        
-                        # Manejar el formato "CC 10604" (con espacio)
-                        if ' ' in serie_folio and '-' not in serie_folio:
-                            partes = serie_folio.split(' ')
-                            if len(partes) == 2:
-                                serie = partes[0].strip()
-                                folio = partes[1].strip()
-                                folio_completo = f"{serie}{folio}"
-                            else:
-                                folio_completo = serie_folio.replace(' ', '')
-                                folio = serie_folio.replace(' ', '')
-                        elif '-' in serie_folio:
-                            serie, folio = serie_folio.split('-', 1)
-                            folio_completo = f"{serie.strip()}{folio.strip()}"
-                        else:
-                            folio_completo = serie_folio
-                            folio = serie_folio
-                        
-                        self.logger.debug(f"   📋 Verificando factura: '{serie_folio}' -> folio_completo: '{folio_completo}', folio: '{folio}', no_documento: '{no_documento}'")
-                        
-                        # Verificar coincidencias
-                        if folio_completo == no_documento or folio == no_documento:
-                            self.logger.info(f"   ✅ ¡COINCIDENCIA encontrada!")
-                            
-                            # Obtener la factura real de la BD
-                            try:
-                                if ' ' in serie_folio and '-' not in serie_folio:
-                                    # Caso: "CC 10604" -> serie="CC", folio=10604
-                                    partes = serie_folio.split(' ')
-                                    if len(partes) == 2:
-                                        serie_bd = partes[0].strip()
-                                        folio_bd_int = int(partes[1].strip())
-                                        factura_asociada = Factura.get(
-                                            (Factura.serie == serie_bd) & 
-                                            (Factura.folio == folio_bd_int)
-                                        )
-                                        tipo_coincidencia = "serie+folio_espacio"
-                                elif '-' in serie_folio:
-                                    # Caso: "CC-10604" -> serie="CC", folio=10604
-                                    serie_bd, folio_bd = serie_folio.split('-', 1)
-                                    serie_bd = serie_bd.strip()
-                                    folio_bd_int = int(folio_bd.strip())
-                                    factura_asociada = Factura.get(
-                                        (Factura.serie == serie_bd) & 
-                                        (Factura.folio == folio_bd_int)
-                                    )
-                                    tipo_coincidencia = "serie+folio_guion"
-                                else:
-                                    # Caso: solo folio numérico
-                                    folio_bd_int = int(folio)
-                                    factura_asociada = Factura.get(Factura.folio == folio_bd_int)
-                                    tipo_coincidencia = "solo_folio"
-                                
-                                self.logger.info(f"   🔗 Factura encontrada: {factura_asociada.serie}-{factura_asociada.folio} (tipo: {tipo_coincidencia})")
-                                break
-                                
-                            except (Factura.DoesNotExist, ValueError) as e:
-                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                continue
-                                
-                    except Exception as e:
-                        self.logger.warning(f"   ❌ Error procesando factura: {e}")
+                    serie_folio = factura_data.get('serie_folio', '')
+                    if not serie_folio:
+                        serie = factura_data.get('serie', '')
+                        folio = factura_data.get('folio', '')
+                        if serie and folio:
+                            serie_folio = f"{serie}-{folio}"
+                    serie_folio = str(serie_folio).strip() if serie_folio else ''
+                    if not serie_folio:
                         continue
-                
-                if not factura_asociada:
-                    self.logger.info(f"   ⚠️ No se encontró coincidencia para No Documento '{no_documento}'")
-                    
-                return factura_asociada, tipo_coincidencia
-            
-            # Procesar datos al formato correcto para BD
+                    serie_folio_norm = normalizar_documento(serie_folio)
+                    serie, folio = extraer_serie_folio(serie_folio)
+                    self.logger.debug(f"   📋 Verificando factura: '{serie_folio}' (normalizado: '{serie_folio_norm}') contra No Documento '{no_documento}' (normalizado: '{doc_norm}')")
+                    # Coincidencia directa
+                    if serie_folio_norm == doc_norm or (folio and folio == no_documento):
+                        self.logger.info(f"   ✅ Coincidencia directa encontrada para vale {nombre_vale}")
+                        try:
+                            if serie and folio:
+                                factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio)))
+                                return factura_asociada, "serie+folio"
+                            else:
+                                factura_asociada = Factura.get(Factura.folio == int(serie_folio))
+                                return factura_asociada, "solo_folio"
+                        except Exception as e:
+                            self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                            continue
+                    # Coincidencia por normalización
+                    if serie and folio and (serie.strip() == no_documento or folio.strip() == no_documento):
+                        self.logger.info(f"   ✅ Coincidencia por serie o folio para vale {nombre_vale}")
+                        try:
+                            factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio)))
+                            return factura_asociada, "serie|folio"
+                        except Exception as e:
+                            self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                            continue
+                self.logger.info(f"   ⚠️ No se encontró coincidencia para No Documento '{no_documento}'")
+                return None, None
+
             datos_procesados = procesar_datos_vale(vale_data)
-            
-            # Verificar si el vale ya existe
             try:
                 vale_existente = Vale.get(Vale.noVale == datos_procesados['noVale'])
                 self.logger.info(f"Vale {datos_procesados['noVale']} ya existe en BD")
-                
-                # NUEVO: Verificar si el vale existente necesita asociación con facturas seleccionadas
                 if facturas_seleccionadas and not vale_existente.factura:
                     self.logger.info(f"🔄 Vale {datos_procesados['noVale']} existe pero SIN ASOCIAR - intentando asociar con facturas seleccionadas")
-                    
-                    # Buscar asociación usando función unificada
                     no_documento = datos_procesados.get('noDocumento', '').strip()
                     factura_asociada, tipo_coincidencia = buscar_factura_asociada(no_documento, facturas_seleccionadas, datos_procesados['noVale'])
-                    
-                    # Asociar el vale existente si se encontró coincidencia
                     if factura_asociada:
                         try:
                             vale_existente.factura = factura_asociada
@@ -585,137 +634,25 @@ class AutocargaController:
                         self.logger.info(f"      ⚠️ Vale existente {datos_procesados['noVale']} - No se encontró coincidencia con facturas seleccionadas")
                 elif facturas_seleccionadas and vale_existente.factura:
                     self.logger.info(f"✅ Vale {datos_procesados['noVale']} ya existe y YA ESTÁ ASOCIADO con {vale_existente.factura.serie}-{vale_existente.factura.folio}")
-                
-                # Actualizar código del proveedor si es necesario (para vales existentes también)
                 self._actualizar_codigo_proveedor(datos_procesados)
-                
-                return  # Salir después de procesar vale existente
-                
+                return
             except Vale.DoesNotExist:
-                pass  # Está bien, no existe, continuar con creación
-            
-            # Buscar factura correspondiente basándose en el No Documento
+                pass
             no_documento = datos_procesados.get('noDocumento', '').strip()
-            
             self.logger.debug(f"🔄 Procesando vale: {datos_procesados.get('noVale', 'SIN_NUMERO')}, No Documento: '{no_documento}'")
-            
-            # Usar función unificada para buscar factura asociada
             factura_asociada, tipo_coincidencia = buscar_factura_asociada(no_documento, facturas_seleccionadas, datos_procesados['noVale'])
-            
             if factura_asociada:
                 self.logger.info(f"✅ Vale {datos_procesados['noVale']} será asociado con factura {factura_asociada.serie}-{factura_asociada.folio} (tipo: {tipo_coincidencia})")
             elif facturas_seleccionadas:
                 self.logger.info(f"⚠️ Vale {datos_procesados['noVale']} - No Documento '{no_documento}' no coincide con ninguna factura seleccionada")
             else:
                 self.logger.warning("No hay facturas seleccionadas para asociar vales")
-            
-            # Crear nuevo vale con todos los datos procesados
-            nuevo_vale = Vale.create(
-                noVale=datos_procesados['noVale'],
-                tipo=datos_procesados['tipo'],
-                noDocumento=datos_procesados['noDocumento'],
-                descripcion=datos_procesados['descripcion'],
-                referencia=datos_procesados['referencia'],
-                total=datos_procesados['total'],
-                cuenta=datos_procesados['cuenta'],
-                fechaVale=datos_procesados['fechaVale'],
-                departamento=datos_procesados['departamento'],
-                sucursal=datos_procesados['sucursal'],
-                marca=datos_procesados['marca'],
-                responsable=datos_procesados['responsable'],
-                proveedor=datos_procesados['proveedor'],
-                codigo=datos_procesados.get('codigo'),  # Nuevo campo código
-                factura=factura_asociada
-            )
-            
-            # Actualizar código del proveedor si es necesario
-            self._actualizar_codigo_proveedor(datos_procesados)
-            
-            contadores['vales_creados'] += 1
-            if factura_asociada:
-                contadores['vales_asociados'] += 1
-                self.logger.info(f"✅ Vale {datos_procesados['noVale']} creado y asociado con factura seleccionada {factura_asociada.folio_interno}")
-            else:
-                contadores['vales_sin_asociar'] += 1
-                self.logger.info(f"⚠️ Vale {datos_procesados['noVale']} creado SIN ASOCIAR (No Documento '{no_documento}' no coincide con facturas seleccionadas)")
-            
         except Exception as e:
-            self.logger.error(f"Error procesando vale individual: {e}")
-            contadores['errores'] += 1
-            raise
-    
-    def _procesar_orden_individual(self, orden_data: Dict, contadores: Dict):
-        """Procesa una orden individual para actualizar la BD"""
-        matcher = ProviderMatcher()
-        
-        # Buscar proveedor por nombre
-        proveedor = matcher.match_provider_from_orden_data(orden_data)
-        
-        if proveedor:
-            self.logger.info(f"Orden procesada para proveedor: {proveedor.nombre}")
-        else:
-            self.logger.warning(f"No se encontró proveedor para orden: {orden_data.get('Nombre', 'Sin nombre')}")
-    
-    def _mostrar_reporte_procesamiento(self, stats: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
-        """Muestra un reporte completo del procesamiento"""
-        import ttkbootstrap as ttk
-        
-        # Crear ventana de reporte
-        reporte_window = ttk.Toplevel(self.parent_widget)
-        reporte_window.title("Reporte de Autocarga")
-        reporte_window.geometry("700x550")
-        reporte_window.transient(self.parent_widget)
-        reporte_window.grab_set()
-        
-        # Frame principal
-        main_frame = ttk.Frame(reporte_window, padding=20)
-        main_frame.pack(fill="both", expand=True)
-        
-        # Título
-        ttk.Label(
-            main_frame,
-            text="📊 Reporte de Autocarga Completada",
-            font=("Segoe UI", 16, "bold"),
-            bootstyle="primary"
-        ).pack(pady=(0, 20))
+            import traceback
+            self.logger.error(f"❌ Error inesperado en _procesar_vale_individual: {e}")
+            self.logger.error(traceback.format_exc())
         
         # Crear texto del reporte
-        reporte_text = ttk.Text(main_frame, wrap="word", height=20)
-        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=reporte_text.yview)
-        reporte_text.configure(yscrollcommand=scrollbar.set)
-        
-        # Contenido del reporte
-        facturas_info = ""
-        if facturas_seleccionadas:
-            facturas_info = f"""
-🎯 FACTURAS SELECCIONADAS PARA ASOCIACIÓN:
-• Total de facturas seleccionadas: {len(facturas_seleccionadas)}
-• Folios seleccionados: {', '.join([f.get('serie_folio', 'N/A') for f in facturas_seleccionadas[:5]])}{'...' if len(facturas_seleccionadas) > 5 else ''}
-"""
-        
-        reporte_content = f"""
-🚀 AUTOCARGA COMPLETADA
-{"="*50}
-
-📅 Fecha y hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-{facturas_info}
-📋 PROCESAMIENTO DE ARCHIVOS:
-• Vales encontrados: {stats.get('vales_encontrados', 0)}
-• Vales procesados exitosamente: {stats.get('vales_exitosos', 0)}
-• Órdenes encontradas: {stats.get('ordenes_encontradas', 0)}
-• Órdenes procesadas exitosamente: {stats.get('ordenes_exitosas', 0)}
-
-🔍 COINCIDENCIAS DE PROVEEDORES:
-"""
-        
-        if 'provider_matching' in stats:
-            pm = stats['provider_matching']
-            reporte_content += f"""• Vales con proveedor encontrado: {pm.get('vales_con_proveedor', 0)}
-• Vales sin proveedor: {pm.get('vales_sin_proveedor', 0)}
-• Órdenes con proveedor encontrado: {pm.get('ordenes_con_proveedor', 0)}
-• Órdenes sin proveedor: {pm.get('ordenes_sin_proveedor', 0)}
-"""
-        
         reporte_content += f"""
 🔄 ACTUALIZACIONES EN BASE DE DATOS:
 • Proveedores actualizados con código: {contadores['proveedores_actualizados']}
@@ -735,6 +672,19 @@ class AutocargaController:
 • Confirma que los proveedores tengan los códigos correctos
 """
         
+        import ttkbootstrap as ttk
+        from tkinter import Toplevel
+        # Crear ventana de reporte
+        reporte_window = Toplevel(self.parent_widget)
+        reporte_window.title("Reporte de Autocarga")
+        reporte_window.geometry("700x600")
+        reporte_window.transient(self.parent_widget)
+        reporte_window.grab_set()
+
+        # Frame principal
+        main_frame = ttk.Frame(reporte_window, padding=20)
+        main_frame.pack(fill="both", expand=True)
+
         # Frame contenedor para el área de texto con scrollbar
         text_frame = ttk.Frame(main_frame)
         text_frame.pack(fill="both", expand=True, pady=(0, 20))
@@ -761,7 +711,7 @@ class AutocargaController:
             bootstyle="primary",
             command=reporte_window.destroy
         ).pack(pady=10)
-        
+
         # Centrar ventana
         reporte_window.update_idletasks()
         x = reporte_window.master.winfo_x() + (reporte_window.master.winfo_width() // 2) - (reporte_window.winfo_width() // 2)
