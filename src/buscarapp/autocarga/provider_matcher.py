@@ -282,22 +282,24 @@ class ProviderMatcher:
         """
         stats = self.get_matching_stats(vales_data, ordenes_data)
         
-        print("\n" + "🔍 REPORTE DE COINCIDENCIAS DE PROVEEDORES")
-        print("=" * 60)
-        print(f"💳 VALES:")
-        print(f"   ✅ Con proveedor encontrado: {stats['vales_con_proveedor']}")
-        print(f"   ❌ Sin proveedor: {stats['vales_sin_proveedor']}")
-        print(f"📋 ÓRDENES:")
-        print(f"   ✅ Con proveedor encontrado: {stats['ordenes_con_proveedor']}")
-        print(f"   ❌ Sin proveedor: {stats['ordenes_sin_proveedor']}")
-        print(f"🔄 Proveedores actualizados con nuevo código: {stats['proveedores_actualizados']}")
+        # Comentado para evitar reportes múltiples - la información se incluye en el reporte principal
+        # logging.info("\n" + "🔍 REPORTE DE COINCIDENCIAS DE PROVEEDORES")
+        # logging.info("=" * 60)
+        # logging.info(f"💳 VALES:")
+        # logging.info(f"   ✅ Con proveedor encontrado: {stats['vales_con_proveedor']}")
+        # logging.info(f"   ❌ Sin proveedor: {stats['vales_sin_proveedor']}")
+        # logging.info(f"📋 ÓRDENES:")
+        # logging.info(f"   ✅ Con proveedor encontrado: {stats['ordenes_con_proveedor']}")
+        # logging.info(f"   ❌ Sin proveedor: {stats['ordenes_sin_proveedor']}")
+        # logging.info(f"🔄 Proveedores actualizados con nuevo código: {stats['proveedores_actualizados']}")
         
         if stats['nombres_no_encontrados']:
-            print(f"\n⚠️ NOMBRES NO ENCONTRADOS EN BD:")
+            # logging.info(f"\n⚠️ NOMBRES NO ENCONTRADOS EN BD:")
             for nombre in stats['nombres_no_encontrados']:
-                print(f"   • {nombre}")
+                # logging.info(f"   • {nombre}")
+                pass
         
-        print("=" * 60)
+        # logging.info("=" * 60)
 
 
 def test_matcher():

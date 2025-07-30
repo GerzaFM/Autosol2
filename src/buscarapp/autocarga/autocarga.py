@@ -68,9 +68,9 @@ class AutoCarga:
         Returns:
             Tuple[List[str], List[str]]: (lista_vales, lista_ordenes)
         """
-        print(f"🔍 Buscando archivos en: {self.ruta_carpeta}")
-        print(f"📅 Archivos modificados en los últimos {self.dias_atras} días")
-        print("-" * 60)
+        # logging.info(f"🔍 Buscando archivos en: {self.ruta_carpeta}")
+        # logging.info(f"📅 Archivos modificados en los últimos {self.dias_atras} días")
+        # logging.info("-" * 60)
         
         try:
             tupla_vales, tupla_ordenes = buscar_vales_y_ordenes_recientes(
@@ -85,9 +85,9 @@ class AutoCarga:
             self.stats['vales_encontrados'] = len(lista_vales)
             self.stats['ordenes_encontradas'] = len(lista_ordenes)
             
-            print(f"💳 Vales encontrados: {len(lista_vales)}")
-            print(f"📋 Órdenes encontradas: {len(lista_ordenes)}")
-            print("-" * 60)
+            # logging.info(f"💳 Vales encontrados: {len(lista_vales)}")
+            # logging.info(f"📋 Órdenes encontradas: {len(lista_ordenes)}")
+            # logging.info("-" * 60)
             
             return lista_vales, lista_ordenes
             
@@ -105,8 +105,8 @@ class AutoCarga:
         Returns:
             Dict[str, Any]: Diccionario con datos de Vales procesados
         """
-        print("🚀 PROCESANDO VALES")
-        print("=" * 40)
+        # logging.info("🚀 PROCESANDO VALES")
+        # logging.info("=" * 40)
         
         vales_dict = {}
         procesados = 0
@@ -116,7 +116,7 @@ class AutoCarga:
         for i, archivo_vale in enumerate(lista_vales, 1):
             try:
                 nombre_archivo = Path(archivo_vale).name
-                print(f"📄 {i}/{len(lista_vales)} Procesando: {nombre_archivo}")
+                # logging.info(f"📄 {i}/{len(lista_vales)} Procesando: {nombre_archivo}")
                 
                 # Extraer datos del Vale
                 datos = self.extractor_vales.extract_all_data(archivo_vale)
@@ -126,29 +126,29 @@ class AutoCarga:
                     clave = Path(archivo_vale).stem
                     vales_dict[clave] = datos
                     exitosos += 1
-                    print(f"   ✅ Datos extraídos exitosamente")
-                    print(f"   🔢 Número: {datos.get('Numero', 'N/A')}")
-                    print(f"   🏢 Nombre: {datos.get('Nombre', 'N/A')}")
-                    print(f"   💰 Total: {datos.get('Total', 'N/A')}")
-                    print(f"   📝 Descripción: {datos.get('Descripcion', 'N/A')}")
+                    # logging.info(f"   ✅ Datos extraídos exitosamente")
+                    # logging.info(f"   🔢 Número: {datos.get('Numero', 'N/A')}")
+                    # logging.info(f"   🏢 Nombre: {datos.get('Nombre', 'N/A')}")
+                    # logging.info(f"   💰 Total: {datos.get('Total', 'N/A')}")
+                    # logging.info(f"   📝 Descripción: {datos.get('Descripcion', 'N/A')}")
                 else:
                     errores += 1
-                    print(f"   ❌ No se pudieron extraer datos")
+                    # logging.info(f"   ❌ No se pudieron extraer datos")
                 
                 procesados += 1
                 
             except Exception as e:
                 errores += 1
-                print(f"   ❌ Error al procesar: {str(e)}")
+                # logging.info(f"   ❌ Error al procesar: {str(e)}")
         
         # Actualizar estadísticas
         self.stats['vales_procesados'] = procesados
         self.stats['vales_exitosos'] = exitosos
         self.stats['errores_vales'] = errores
         
-        print("\n" + "=" * 40)
-        print(f"📊 RESUMEN VALES: {exitosos}/{procesados} exitosos")
-        print("=" * 40)
+        # logging.info("\n" + "=" * 40)
+        # logging.info(f"📊 RESUMEN VALES: {exitosos}/{procesados} exitosos")
+        # logging.info("=" * 40)
         
         return vales_dict
     
@@ -162,8 +162,8 @@ class AutoCarga:
         Returns:
             Dict[str, Any]: Diccionario con datos de Órdenes procesadas
         """
-        print("🚀 PROCESANDO ÓRDENES")
-        print("=" * 40)
+        # logging.info("🚀 PROCESANDO ÓRDENES")
+        # logging.info("=" * 40)
         
         ordenes_dict = {}
         procesados = 0
@@ -173,7 +173,7 @@ class AutoCarga:
         for i, archivo_orden in enumerate(lista_ordenes, 1):
             try:
                 nombre_archivo = Path(archivo_orden).name
-                print(f"📄 {i}/{len(lista_ordenes)} Procesando: {nombre_archivo}")
+                # logging.info(f"📄 {i}/{len(lista_ordenes)} Procesando: {nombre_archivo}")
                 
                 # Extraer datos de la Orden
                 datos = self.extractor_ordenes.extract_all_data(archivo_orden)
@@ -183,20 +183,20 @@ class AutoCarga:
                     clave = Path(archivo_orden).stem
                     ordenes_dict[clave] = datos
                     exitosos += 1
-                    print(f"   ✅ Datos extraídos exitosamente")
-                    print(f"   📋 Ref. Movimiento: {datos.get('Ref_Movimiento', 'N/A')}")
-                    print(f"   🏢 Nombre: {datos.get('Nombre', 'N/A')}")
-                    print(f"   💰 Importe: {datos.get('Importe', 'N/A')}")
-                    print(f"   🏛️ Banco: {datos.get('Codigo_Banco', 'N/A')}")
+                    # logging.info(f"   ✅ Datos extraídos exitosamente")
+                    # logging.info(f"   📋 Ref. Movimiento: {datos.get('Ref_Movimiento', 'N/A')}")
+                    # logging.info(f"   🏢 Nombre: {datos.get('Nombre', 'N/A')}")
+                    # logging.info(f"   💰 Importe: {datos.get('Importe', 'N/A')}")
+                    # logging.info(f"   🏛️ Banco: {datos.get('Codigo_Banco', 'N/A')}")
                 else:
                     errores += 1
-                    print(f"   ❌ No se pudieron extraer datos")
+                    # logging.info(f"   ❌ No se pudieron extraer datos")
                 
                 procesados += 1
                 
             except Exception as e:
                 errores += 1
-                print(f"   ❌ Error al procesar: {str(e)}")
+                # logging.info(f"   ❌ Error al procesar: {str(e)}")
         
         # Actualizar estadísticas
         self.stats['ordenes_procesadas'] = procesados
@@ -276,11 +276,11 @@ class AutoCarga:
         else:
             print("📋 No se encontraron Órdenes para procesar")
 
-        # 4. Mostrar resumen final
-        self.mostrar_resumen_final()
+        # 4. Solo guardar estadísticas sin mostrar reportes adicionales
+        # self.mostrar_resumen_final()  # Comentado para evitar reportes duplicados
 
-        # 5. Generar reporte de coincidencias de proveedores
-        self.provider_matcher.print_matching_report(self.vales, self.ordenes)
+        # 5. Solo obtener estadísticas sin mostrar reportes en consola
+        # self.provider_matcher.print_matching_report(self.vales, self.ordenes)  # Comentado para evitar reportes duplicados
 
         return self.vales, self.ordenes
     

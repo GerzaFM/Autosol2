@@ -115,6 +115,8 @@ class FacturaData:
             "fecha": self.fecha or "",
             "folio_xml": self.folio_xml or "",
             "serie_folio": self.serie_folio,
+            "serie": self.serie or "",  # AGREGADO: Campo serie para asociación
+            "folio": self.folio or "",  # AGREGADO: Campo folio para asociación
             "nombre_emisor": self.nombre_emisor or "",
             "conceptos": self.conceptos or "",
             "total": self.total or 0,

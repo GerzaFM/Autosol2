@@ -315,27 +315,27 @@ class OrdenDataExtractor:
         Returns:
             dict: Diccionario con los datos extraídos
         """
-        print(f"🔍 Extrayendo datos de la orden: {Path(pdf_path).name}")
-        print("=" * 60)
+        # logging.info(f"🔍 Extrayendo datos de la orden: {Path(pdf_path).name}")
+        # logging.info("=" * 60)
         
         try:
             data = self.extract_all_data(pdf_path)
             
-            # Mostrar resultados
-            print("📋 DATOS EXTRAÍDOS DE LA ORDEN:")
-            print("-" * 40)
-            print(f"📄 Archivo: {data.get('archivo_original', 'N/A')}")
-            print(f"🔢 Ref. Movimiento: {data.get('Ref_Movimiento', 'No encontrado')}")
-            print(f"🏦 Cuenta: {data.get('Cuenta', 'No encontrada')}")
-            print(f"🏢 Nombre: {data.get('Nombre', 'No encontrado')}")
-            print(f"💰 Importe: {data.get('Importe', 'No encontrado')}")
-            print(f"📝 Importe en letras: {data.get('Importe_en_letras', 'No encontrado')}")
-            print(f"🏛️ Código del Banco: {data.get('Codigo_Banco', 'No encontrado')}")
+            # Mostrar resultados solo en log
+            # logging.info("📋 DATOS EXTRAÍDOS DE LA ORDEN:")
+            # logging.info("-" * 40)
+            # logging.info(f"📄 Archivo: {data.get('archivo_original', 'N/A')}")
+            # logging.info(f"🔢 Ref. Movimiento: {data.get('Ref_Movimiento', 'No encontrado')}")
+            # logging.info(f"🏦 Cuenta: {data.get('Cuenta', 'No encontrada')}")
+            # logging.info(f"🏢 Nombre: {data.get('Nombre', 'No encontrado')}")
+            # logging.info(f"💰 Importe: {data.get('Importe', 'No encontrado')}")
+            # logging.info(f"📝 Importe en letras: {data.get('Importe_en_letras', 'No encontrado')}")
+            # logging.info(f"🏛️ Código del Banco: {data.get('Codigo_Banco', 'No encontrado')}")
             
             return data
             
         except Exception as e:
-            print(f"❌ Error al procesar el archivo: {str(e)}")
+            # logging.error(f"❌ Error al procesar el archivo: {str(e)}")
             return {}
 
 def main():
@@ -348,25 +348,27 @@ def main():
     archivo_prueba = r"c:\QuiterWeb\cache\15gerzahin.flores_QRSOPMX208_8178779.pdf"
     
     if Path(archivo_prueba).exists():
-        print("🚀 EXTRACTOR DE DATOS DE ÓRDENES")
-        print("=" * 50)
+        # logging.info("🚀 EXTRACTOR DE DATOS DE ÓRDENES")
+        # logging.info("=" * 50)
         
         # Extraer y mostrar datos
         datos = extractor.extract_and_display(archivo_prueba)
         
-        # Mostrar el diccionario resultante
+        # Mostrar el diccionario resultante solo en logs
         if datos:
-            print("\n" + "=" * 60)
-            print("📊 DICCIONARIO RESULTANTE:")
-            print("=" * 60)
+            # logging.info("\n" + "=" * 60)
+            # logging.info("📊 DICCIONARIO RESULTANTE:")
+            # logging.info("=" * 60)
             for clave, valor in datos.items():
-                print(f"{clave}: {valor}")
+                # logging.info(f"{clave}: {valor}")
+                pass
         
     else:
-        print(f"❌ El archivo de prueba no existe: {archivo_prueba}")
-        print("💡 Puedes usar el extractor con cualquier archivo de orden:")
-        print("extractor = OrdenDataExtractor()")
-        print("datos = extractor.extract_all_data('ruta_a_tu_archivo.pdf')")
+        # logging.error(f"❌ El archivo de prueba no existe: {archivo_prueba}")
+        # logging.info("💡 Puedes usar el extractor con cualquier archivo de orden:")
+        # logging.info("extractor = OrdenDataExtractor()")
+        # logging.info("datos = extractor.extract_all_data('ruta_a_tu_archivo.pdf')")
+        pass
 
 if __name__ == "__main__":
     main()

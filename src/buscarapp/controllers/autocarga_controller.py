@@ -36,6 +36,10 @@ class AutocargaController:
 
     def _mostrar_reporte_procesamiento(self, stats: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
         """Muestra un reporte completo del procesamiento"""
+        if getattr(self, 'reporte_mostrado', False):
+            self.logger.info("El reporte ya fue mostrado, se omite ventana adicional.")
+            return
+        self.reporte_mostrado = True
         import ttkbootstrap as ttk
         # Crear ventana de reporte
         reporte_window = ttk.Toplevel(self.parent_widget)
@@ -171,6 +175,7 @@ class AutocargaController:
         self.parent_widget = parent_widget
         self.logger = logging.getLogger(__name__)
         self.dialog_utils = DialogUtils(parent_widget)
+        self.reporte_mostrado = False  # Flag para evitar reportes múltiples
     
     def ejecutar_autocarga_con_configuracion(self, facturas_seleccionadas: List[Dict[str, Any]] = None) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -543,6 +548,7 @@ class AutocargaController:
     
     def _procesar_vale_individual(self, vale_data: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
         """Procesa un vale individual para actualizar la BD"""
+        reporte_content = ""
         try:
             # Importar funciones de procesamiento
             try:
@@ -574,44 +580,112 @@ class AutocargaController:
             def buscar_factura_asociada(no_documento, facturas_seleccionadas, nombre_vale=""):
                 if not no_documento or not facturas_seleccionadas:
                     return None, None
+                    
                 doc_norm = normalizar_documento(no_documento)
                 self.logger.debug(f"🔍 Buscando asociación para vale {nombre_vale}: No Documento '{no_documento}' (normalizado: '{doc_norm}')")
+                
                 for i, factura_data in enumerate(facturas_seleccionadas):
-                    serie_folio = factura_data.get('serie_folio', '')
-                    if not serie_folio:
-                        serie = factura_data.get('serie', '')
-                        folio = factura_data.get('folio', '')
-                        if serie and folio:
-                            serie_folio = f"{serie}-{folio}"
-                    serie_folio = str(serie_folio).strip() if serie_folio else ''
-                    if not serie_folio:
+                    try:
+                        # Obtener datos directamente del diccionario de factura
+                        serie_folio = factura_data.get('serie_folio', '')
+                        # IMPORTANTE: Obtener serie y folio directamente del diccionario
+                        serie_original = factura_data.get('serie', '')
+                        folio_original = factura_data.get('folio', '')
+                        
+                        # DEBUG: Mostrar valores originales
+                        self.logger.debug(f"   🔍 Datos originales: serie_original='{serie_original}' (tipo: {type(serie_original)}), folio_original='{folio_original}' (tipo: {type(folio_original)})")
+                        
+                        # Si no tenemos serie y folio directamente, extraerlos del folio_xml
+                        if not serie_original or not folio_original:
+                            folio_xml = factura_data.get('folio_xml', '')
+                            if folio_xml and ' ' in folio_xml:
+                                partes = folio_xml.split(' ', 1)
+                                if len(partes) == 2:
+                                    serie_original = partes[0].strip()
+                                    try:
+                                        folio_original = int(partes[1].strip())
+                                    except ValueError:
+                                        folio_original = partes[1].strip()
+                        
+                        # Convertir a strings para evitar errores de tipo, manejando None y tipos diversos
+                        serie_folio = str(serie_folio).strip() if serie_folio else ''
+                        serie = str(serie_original).strip() if serie_original else ''
+                        folio_str = str(folio_original).strip() if folio_original not in [None, ''] else ''
+                        
+                        self.logger.debug(f"   🔍 Datos procesados: serie='{serie}', folio_str='{folio_str}', serie_folio='{serie_folio}'")
+                        
+                        if not serie_folio:
+                            self.logger.debug(f"   ⚠️ Saltando factura sin serie_folio")
+                            continue
+                        
+                        self.logger.debug(f"   📋 Verificando factura: '{serie_folio}' - Serie: '{serie}', Folio: '{folio_str}'")
+                        
+                        # Normalizar para comparación
+                        serie_folio_norm = normalizar_documento(serie_folio)
+                        
+                        # 1. Coincidencia directa con serie_folio normalizado
+                        if serie_folio_norm == doc_norm:
+                            self.logger.info(f"   ✅ Coincidencia directa serie_folio para vale {nombre_vale}: '{serie_folio}' ~ '{no_documento}'")
+                            try:
+                                if serie and folio_str and folio_str.isdigit():
+                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                    return factura_asociada, "serie_folio_exacto"
+                                else:
+                                    self.logger.warning(f"   ❌ Datos inválidos: serie='{serie}', folio='{folio_str}'")
+                                    continue
+                            except Exception as e:
+                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                                continue
+                        
+                        # 2. Coincidencia solo con el folio
+                        if folio_str and folio_str == no_documento:
+                            self.logger.info(f"   ✅ Coincidencia por folio para vale {nombre_vale}: folio '{folio_str}' = '{no_documento}'")
+                            try:
+                                if serie and folio_str.isdigit():
+                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                    return factura_asociada, "folio_exacto"
+                                else:
+                                    self.logger.warning(f"   ❌ Datos inválidos para folio: serie='{serie}', folio='{folio_str}'")
+                                    continue
+                            except Exception as e:
+                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                                continue
+                        
+                        # 3. Coincidencia con serie (menos común)
+                        if serie and serie == no_documento:
+                            self.logger.info(f"   ✅ Coincidencia por serie para vale {nombre_vale}: serie '{serie}' = '{no_documento}'")
+                            try:
+                                if folio_str and folio_str.isdigit():
+                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                    return factura_asociada, "serie_exacto"
+                                else:
+                                    self.logger.warning(f"   ❌ Datos inválidos para serie: serie='{serie}', folio='{folio_str}'")
+                                    continue
+                            except Exception as e:
+                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                                continue
+                        
+                        # 4. Coincidencia parcial (normalizada)
+                        if doc_norm and (doc_norm in serie_folio_norm or serie_folio_norm in doc_norm):
+                            self.logger.info(f"   ✅ Coincidencia parcial para vale {nombre_vale}: '{doc_norm}' <-> '{serie_folio_norm}'")
+                            try:
+                                if serie and folio_str and folio_str.isdigit():
+                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                    return factura_asociada, "parcial"
+                                else:
+                                    self.logger.warning(f"   ❌ Datos inválidos para coincidencia parcial: serie='{serie}', folio='{folio_str}'")
+                                    continue
+                            except Exception as e:
+                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                                continue
+                        
+                        self.logger.debug(f"   ❌ Sin coincidencia: '{no_documento}' vs '{serie_folio}' (Serie: '{serie}', Folio: '{folio_str}')")
+                    
+                    except Exception as e:
+                        self.logger.warning(f"   ❌ Error procesando factura {i}: {e}")
                         continue
-                    serie_folio_norm = normalizar_documento(serie_folio)
-                    serie, folio = extraer_serie_folio(serie_folio)
-                    self.logger.debug(f"   📋 Verificando factura: '{serie_folio}' (normalizado: '{serie_folio_norm}') contra No Documento '{no_documento}' (normalizado: '{doc_norm}')")
-                    # Coincidencia directa
-                    if serie_folio_norm == doc_norm or (folio and folio == no_documento):
-                        self.logger.info(f"   ✅ Coincidencia directa encontrada para vale {nombre_vale}")
-                        try:
-                            if serie and folio:
-                                factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio)))
-                                return factura_asociada, "serie+folio"
-                            else:
-                                factura_asociada = Factura.get(Factura.folio == int(serie_folio))
-                                return factura_asociada, "solo_folio"
-                        except Exception as e:
-                            self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                            continue
-                    # Coincidencia por normalización
-                    if serie and folio and (serie.strip() == no_documento or folio.strip() == no_documento):
-                        self.logger.info(f"   ✅ Coincidencia por serie o folio para vale {nombre_vale}")
-                        try:
-                            factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio)))
-                            return factura_asociada, "serie|folio"
-                        except Exception as e:
-                            self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                            continue
-                self.logger.info(f"   ⚠️ No se encontró coincidencia para No Documento '{no_documento}'")
+                
+                self.logger.info(f"   ⚠️ No se encontró coincidencia para No Documento '{no_documento}' entre {len(facturas_seleccionadas)} facturas")
                 return None, None
 
             datos_procesados = procesar_datos_vale(vale_data)
@@ -647,73 +721,46 @@ class AutocargaController:
                 self.logger.info(f"⚠️ Vale {datos_procesados['noVale']} - No Documento '{no_documento}' no coincide con ninguna factura seleccionada")
             else:
                 self.logger.warning("No hay facturas seleccionadas para asociar vales")
+            
+            # Crear y guardar el vale
+            try:
+                # Actualizar proveedor con código si no lo tiene
+                self._actualizar_codigo_proveedor(datos_procesados)
+                
+                # Crear el vale con los campos correctos del modelo
+                nuevo_vale = Vale.create(
+                    noVale=datos_procesados['noVale'],
+                    tipo=datos_procesados.get('tipo', ''),
+                    noDocumento=datos_procesados.get('noDocumento', ''),
+                    descripcion=datos_procesados.get('descripcion', ''),
+                    referencia=datos_procesados.get('referencia', 0),
+                    total=datos_procesados.get('total', ''),
+                    cuenta=datos_procesados.get('cuenta'),
+                    fechaVale=datos_procesados.get('fechaVale'),
+                    departamento=datos_procesados.get('departamento'),
+                    sucursal=datos_procesados.get('sucursal'),
+                    marca=datos_procesados.get('marca'),
+                    responsable=datos_procesados.get('responsable'),
+                    proveedor=datos_procesados.get('proveedor', ''),
+                    codigo=datos_procesados.get('codigo', ''),
+                    factura=factura_asociada  # Asociar con la factura encontrada (puede ser None)
+                )
+                
+                if factura_asociada:
+                    contadores['vales_asociados'] += 1
+                    self.logger.info(f"✅ Vale {datos_procesados['noVale']} CREADO y ASOCIADO con factura {factura_asociada.serie}-{factura_asociada.folio}")
+                else:
+                    contadores['vales_sin_asociar'] += 1
+                    self.logger.info(f"📝 Vale {datos_procesados['noVale']} CREADO sin asociar")
+                
+                contadores['vales_creados'] += 1
+                
+            except Exception as e:
+                contadores['errores'] += 1
+                self.logger.error(f"❌ Error creando vale {datos_procesados['noVale']}: {e}")
+                
         except Exception as e:
             import traceback
             self.logger.error(f"❌ Error inesperado en _procesar_vale_individual: {e}")
             self.logger.error(traceback.format_exc())
-        
-        # Crear texto del reporte
-        reporte_content += f"""
-🔄 ACTUALIZACIONES EN BASE DE DATOS:
-• Proveedores actualizados con código: {contadores['proveedores_actualizados']}
-• Vales creados automáticamente: {contadores['vales_creados']}
-• Vales asociados a facturas: {contadores['vales_asociados']}
-• Vales sin asociar: {contadores['vales_sin_asociar']}
-• Facturas actualizadas: {contadores['facturas_actualizadas']}
-• Errores durante procesamiento: {contadores['errores']}
-
-✅ PROCESO COMPLETADO EXITOSAMENTE
-
-💡 PRÓXIMOS PASOS:
-• Revisa los datos importados en la aplicación principal
-• Verifica que los vales estén correctamente asociados a las facturas seleccionadas
-• Los vales sin asociar requieren revisión manual del No Documento vs Folio
-• Solo se consideraron las facturas que estaban seleccionadas en la tabla
-• Confirma que los proveedores tengan los códigos correctos
-"""
-        
-        import ttkbootstrap as ttk
-        from tkinter import Toplevel
-        # Crear ventana de reporte
-        reporte_window = Toplevel(self.parent_widget)
-        reporte_window.title("Reporte de Autocarga")
-        reporte_window.geometry("700x600")
-        reporte_window.transient(self.parent_widget)
-        reporte_window.grab_set()
-
-        # Frame principal
-        main_frame = ttk.Frame(reporte_window, padding=20)
-        main_frame.pack(fill="both", expand=True)
-
-        # Frame contenedor para el área de texto con scrollbar
-        text_frame = ttk.Frame(main_frame)
-        text_frame.pack(fill="both", expand=True, pady=(0, 20))
-
-        # Crear área de texto y scrollbar dentro de text_frame
-        reporte_text = ttk.Text(text_frame, wrap="word", height=20)
-        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=reporte_text.yview)
-        reporte_text.configure(yscrollcommand=scrollbar.set)
-
-        reporte_text.pack(side="left", fill="both", expand=True, padx=(0, 5))
-        scrollbar.pack(side="right", fill="y")
-
-        # Insertar contenido después de crear el widget
-        reporte_text.insert("1.0", reporte_content)
-        reporte_text.config(state="disabled")
-
-        # Frame separado para el botón (siempre visible en la parte inferior)
-        botones_frame = ttk.Frame(main_frame)
-        botones_frame.pack(fill="x", pady=(0, 0))
-
-        ttk.Button(
-            botones_frame,
-            text="Cerrar",
-            bootstyle="primary",
-            command=reporte_window.destroy
-        ).pack(pady=10)
-
-        # Centrar ventana
-        reporte_window.update_idletasks()
-        x = reporte_window.master.winfo_x() + (reporte_window.master.winfo_width() // 2) - (reporte_window.winfo_width() // 2)
-        y = reporte_window.master.winfo_y() + (reporte_window.master.winfo_height() // 2) - (reporte_window.winfo_height() // 2)
-        reporte_window.geometry(f"+{x}+{y}")
+            contadores['errores'] += 1
