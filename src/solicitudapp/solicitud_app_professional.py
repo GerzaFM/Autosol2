@@ -68,7 +68,9 @@ class SolicitudApp(tb.Frame):
         self.solicitud_actual: Optional[Solicitud] = None
         self.factura_duplicada = False  # Flag para indicar si la factura está duplicada
         self.folio_interno_manual = None  # Almacenar folio interno ingresado manualmente
+        self.folio_segunda_factura = None  # Almacenar folio para la segunda factura en división
         self.valores_ya_divididos = False  # Flag para indicar si los valores ya fueron divididos
+        self.division_con_duplicado = False  # Flag para indicar división con factura duplicada
         
         # Componentes UI
         self.proveedor_frame: Optional[ProveedorFrame] = None
@@ -77,6 +79,25 @@ class SolicitudApp(tb.Frame):
         self.entries_totales = {}
         self.entries_categorias = {}
         self.comentarios: Optional[tb.Text] = None
+        
+        # Inicializar la interfaz de usuario
+        self.setup_ui()
+        
+    def obtener_proximo_folio_interno(self):
+        """Obtiene el próximo folio interno que sería asignado en la base de datos."""
+        try:
+            # Obtener el máximo folio_interno actual
+            ultima_factura = Factura.select().order_by(Factura.folio_interno.desc()).first()
+            if ultima_factura:
+                return ultima_factura.folio_interno + 1
+            else:
+                return 1  # Primera factura
+        except Exception as e:
+            logger.warning(f"Error al obtener próximo folio interno: {e}")
+            return "001"  # Fallback
+    
+    def setup_ui(self):
+        """Configura la interfaz de usuario."""
         self.lbl_sol_rest: Optional[tb.Label] = None
         self.dividir_var: Optional[tb.BooleanVar] = None
         
@@ -411,7 +432,9 @@ class SolicitudApp(tb.Frame):
 
             self.factura_duplicada = False  # Resetear flag
             self.folio_interno_manual = None  # Resetear folio manual
+            self.folio_segunda_factura = None  # Resetear folio segunda factura
             self.valores_ya_divididos = False  # Resetear flag de división
+            self.division_con_duplicado = False  # Resetear flag de división con duplicado
 
             proveedor = Proveedor.get_or_none(Proveedor.rfc == proveedor_rfc)
             if proveedor:
@@ -424,6 +447,11 @@ class SolicitudApp(tb.Frame):
                     # Marcar como duplicada pero continuar con el proceso
                     self.factura_duplicada = True
                     
+                    # Si dividir está activado, marcar contexto de división con duplicado
+                    if hasattr(self, 'dividir_var') and self.dividir_var and self.dividir_var.get():
+                        self.division_con_duplicado = True
+                        logger.info("División con factura duplicada detectada - ambas facturas requerirán folio manual")
+                    
                     # Mostrar mensaje informativo
                     messagebox.showwarning(
                         "Factura duplicada",
@@ -435,18 +463,54 @@ class SolicitudApp(tb.Frame):
                     # Usar el folio interno de la factura existente como valor inicial
                     folio_inicial = str(factura_existente.folio_interno)
                     
-                    # Solicitar folio interno manual
-                    folio_manual = simpledialog.askstring(
-                        "Folio interno manual",
-                        f"La factura ya existe con folio interno: {folio_inicial}\n\n"
-                        f"Ingrese el número de folio interno para el documento:",
-                        initialvalue=folio_inicial
-                    )
-                    
-                    if folio_manual:
-                        self.folio_interno_manual = folio_manual
+                    # Si es división con duplicado, solicitar ambos folios al inicio
+                    if self.division_con_duplicado:
+                        # Solicitar folio para la primera factura (SC)
+                        folio_manual_sc = simpledialog.askstring(
+                            "Folio para Primera Factura (SC)",
+                            f"La factura ya existe con folio interno: {folio_inicial}\n\n"
+                            f"Ingrese el folio interno para la PRIMERA factura (SC):",
+                            initialvalue=folio_inicial
+                        )
+                        
+                        if folio_manual_sc:
+                            self.folio_interno_manual = folio_manual_sc
+                        else:
+                            self.folio_interno_manual = folio_inicial
+                        
+                        # Solicitar folio para la segunda factura (VC)
+                        try:
+                            folio_siguiente = str(int(self.folio_interno_manual) + 1)
+                        except ValueError:
+                            folio_siguiente = f"{self.folio_interno_manual}_VC"
+                        
+                        folio_manual_vc = simpledialog.askstring(
+                            "Folio para Segunda Factura (VC)",
+                            f"Ingrese el folio interno para la SEGUNDA factura (VC):",
+                            initialvalue=folio_siguiente
+                        )
+                        
+                        if folio_manual_vc:
+                            # Guardar el folio de la segunda factura para uso posterior
+                            self.folio_segunda_factura = folio_manual_vc
+                            logger.info(f"Folios configurados - SC: {self.folio_interno_manual}, VC: {self.folio_segunda_factura}")
+                        else:
+                            logger.warning("Usuario canceló la entrada de folio para segunda factura")
+                            messagebox.showwarning("Advertencia", "Debe ingresar ambos folios para usar la división")
+                            return
                     else:
-                        self.folio_interno_manual = folio_inicial
+                        # Caso normal: solo una factura
+                        folio_manual = simpledialog.askstring(
+                            "Folio interno manual",
+                            f"La factura ya existe con folio interno: {folio_inicial}\n\n"
+                            f"Ingrese el número de folio interno para el documento:",
+                            initialvalue=folio_inicial
+                        )
+                        
+                        if folio_manual:
+                            self.folio_interno_manual = folio_manual
+                        else:
+                            self.folio_interno_manual = folio_inicial
 
             self.rellenar_campos()
             logger.info(f"Cargados {len(rutas)} archivos XML")
@@ -812,7 +876,9 @@ class SolicitudApp(tb.Frame):
             # Resetear flags de factura duplicada
             self.factura_duplicada = False
             self.folio_interno_manual = None
+            self.folio_segunda_factura = None
             self.valores_ya_divididos = False
+            self.division_con_duplicado = False
             
             # Limpiar frames principales
             self.proveedor_frame.clear_entries()
@@ -1094,9 +1160,16 @@ class SolicitudApp(tb.Frame):
                 logger.info("Detectada segunda factura (VC) después de dividir")
                 
                 # Si la factura original estaba duplicada (XML ya existía), 
-                # también pedir folio manual para la segunda factura
-                if self.factura_duplicada:
-                    logger.info("Factura original estaba duplicada, pidiendo folio manual para segunda factura")
+                # usar el folio que ya se pidió al inicio
+                if self.factura_duplicada and hasattr(self, 'folio_segunda_factura') and self.folio_segunda_factura:
+                    logger.info("Usando folio pre-configurado para segunda factura")
+                    folio_vc = self.folio_segunda_factura
+                    # Actualizar el folio interno manual para la segunda factura
+                    self.folio_interno_manual = folio_vc
+                    logger.info(f"Folio asignado para segunda factura: {folio_vc}")
+                elif self.factura_duplicada:
+                    # Fallback: pedir folio si no se configuró al inicio (no debería pasar)
+                    logger.warning("Folio para segunda factura no fue configurado, pidiendo ahora")
                     
                     # Usar el folio manual actual como valor inicial para la segunda factura
                     folio_inicial_segunda = self.folio_interno_manual or "001"
@@ -1136,24 +1209,10 @@ class SolicitudApp(tb.Frame):
                 solicitud_data["Folio"] = folio_vc
                 logger.info(f"Folio actualizado para segunda factura: {folio_vc}")
 
-            # Seleccionar ruta de guardado
-            ruta = filedialog.asksaveasfilename(
-                title="Guardar solicitud",
-                filetypes=[("PDF", "*.pdf")],
-                initialfile=f"{solicitud_data.get('Folio', '')} {proveedor_data.get('Nombre', '')}".strip()
-            )
-            if not ruta:
-                logger.info("Exportación cancelada por el usuario")
-                return
-            if not ruta.lower().endswith(".pdf"):
-                ruta += ".pdf"
-            logger.info(f"Ruta de guardado seleccionada: {ruta}")
-
             # Dividir totales si el checkbox está marcado (PRIMERA vez O segunda factura)
             dividir_marcado = self.dividir_var.get()
             dividir_habilitado = str(self.chb_dividir.cget('state')) == "normal"
-            es_segunda_factura = (dividir_marcado and not dividir_habilitado and 
-                                solicitud_data.get("Tipo", "").startswith("VC"))
+            # Nota: es_segunda_factura ya fue definida anteriormente
             
             # Aplicar división solo si está marcado dividir Y no se ha dividido anteriormente
             if dividir_marcado and not self.valores_ya_divididos:
@@ -1245,11 +1304,68 @@ class SolicitudApp(tb.Frame):
 
             # TODO: Aquí deberías llamar a tu servicio de generación de PDF/documento
             try:
-                # Verificar si la factura está duplicada
-                if self.factura_duplicada:
-                    logger.info("Factura duplicada detectada, omitiendo guardado en base de datos")
+                # DEBUG: Logging de variables críticas
+                logger.debug(f"DEBUG - factura_duplicada: {self.factura_duplicada}")
+                logger.debug(f"DEBUG - division_con_duplicado: {self.division_con_duplicado}")
+                logger.debug(f"DEBUG - es_segunda_factura: {es_segunda_factura}")
+                logger.debug(f"DEBUG - folio_interno_manual: {self.folio_interno_manual}")
+                logger.debug(f"DEBUG - dividir_marcado: {dividir_marcado}")
+                logger.debug(f"DEBUG - dividir_habilitado: {dividir_habilitado}")
+                
+                # Verificar si la factura está duplicada O si estamos en contexto de división con duplicado
+                es_contexto_no_guardar = (
+                    self.factura_duplicada or 
+                    (self.division_con_duplicado and es_segunda_factura)
+                )
+                
+                logger.debug(f"DEBUG - es_contexto_no_guardar: {es_contexto_no_guardar}")
+                
+                # Seleccionar ruta de guardado
+                # Construir nombre de archivo con formato: Folio Interno, Proveedor, Folio factura, Clase
+                # Obtener el folio interno que se usará en la BD (si no es contexto de no guardar)
+                if not es_contexto_no_guardar:
+                    # Se guardará en BD: obtener el próximo folio interno
+                    folio_interno = str(self.obtener_proximo_folio_interno())
+                else:
+                    # No se guardará en BD: usar folio manual si existe
+                    folio_interno = self.folio_interno_manual
+                
+                proveedor = proveedor_data.get("Nombre", "")
+                folio_factura = solicitud_data.get("Folio", "")
+                clase = solicitud_data.get("Clase", "")  # Campo específico del formulario
+                
+                # Construcción del nombre según el formato solicitado: Folio Interno, Proveedor, Folio factura, Clase
+                if folio_interno:
+                    nombre_elementos = [folio_interno, proveedor, folio_factura, clase]
+                else:
+                    # Si no hay folio interno, usar formato reducido
+                    nombre_elementos = [proveedor, folio_factura, clase]
+                
+                # Filtrar campos vacíos y construir nombre con espacios
+                nombre_archivo = " ".join(filter(lambda x: x and x.strip(), nombre_elementos))
+                
+                ruta = filedialog.asksaveasfilename(
+                    title="Guardar solicitud",
+                    filetypes=[("PDF", "*.pdf")],
+                    initialfile=nombre_archivo
+                )
+                if not ruta:
+                    logger.info("Exportación cancelada por el usuario")
+                    return
+                if not ruta.lower().endswith(".pdf"):
+                    ruta += ".pdf"
+                logger.info(f"Ruta de guardado seleccionada: {ruta}")
+                
+                if es_contexto_no_guardar:
+                    if self.factura_duplicada and not es_segunda_factura:
+                        logger.info("Factura duplicada detectada, omitiendo guardado en base de datos")
+                    elif self.division_con_duplicado and es_segunda_factura:
+                        logger.info("Segunda factura en división con duplicado, omitiendo guardado en base de datos")
+                    
                     # Usar el folio interno manual proporcionado por el usuario
-                    data["FOLIO"] = self.folio_interno_manual or "DUPLICADO"
+                    folio_a_usar = self.folio_interno_manual or "DUPLICADO"
+                    logger.info(f"DEBUG - Asignando folio manual: {folio_a_usar} (folio_interno_manual: {self.folio_interno_manual})")
+                    data["FOLIO"] = folio_a_usar
                 else:
                     # Proceder con el guardado normal en la base de datos
                     # Mapear los datos correctamente para guardar_solicitud
@@ -1318,8 +1434,11 @@ class SolicitudApp(tb.Frame):
                 
             except Exception as db_error:
                 logger.warning(f"Error al guardar en base de datos: {db_error}")
+                logger.debug(f"DEBUG - Exception caught, folio_interno_manual: {self.folio_interno_manual}")
                 # Continúa sin guardar en BD pero genera el PDF
-                data["FOLIO"] = self.folio_interno_manual or "ERROR"
+                folio_error = self.folio_interno_manual or "ERROR"
+                logger.warning(f"DEBUG - Asignando folio por excepción: {folio_error}")
+                data["FOLIO"] = folio_error
                 
             self.control.rellenar_formulario(data, ruta)
             logger.info("Formulario rellenado con datos de la factura")
@@ -1388,8 +1507,10 @@ class SolicitudApp(tb.Frame):
                 self.chb_dividir.config(state="normal")
                 self.dividir_var.set(False)  # Desmarcar el checkbox
                 self.valores_ya_divididos = False  # Resetear flag de división
+                self.division_con_duplicado = False  # Resetear flag de división con duplicado
+                self.folio_segunda_factura = None  # Resetear folio segunda factura
                 logger.info("Segunda factura (VC) completada, checkbox dividir habilitado y desmarcado")
-                logger.info("Flag valores_ya_divididos reseteado después de completar división")
+                logger.info("Flags de división reseteados después de completar división")
             else:
                 self.chb_dividir.config(state="normal")
                 logger.info("Checkbox dividir habilitado")
