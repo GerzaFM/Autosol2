@@ -49,7 +49,7 @@ class InvoiceController:
                 self.logger.warning("Base de datos no disponible")
                 return None
             
-            from bd.models import Factura, Proveedor, Concepto, Vale, Reparto
+            from bd.models import Factura, Proveedor, Concepto, Vale, Reparto, OrdenCompra
             
             # Buscar la factura
             try:
@@ -76,6 +76,9 @@ class InvoiceController:
             
             # Obtener repartimientos (si existen)
             repartimientos = list(Reparto.select().where(Reparto.factura == factura.folio_interno))
+            
+            # Obtener órdenes de compra (si existen)
+            ordenes_compra = list(OrdenCompra.select().where(OrdenCompra.factura == factura.folio_interno))
             
             # Construir diccionario de detalles
             details = {
@@ -145,7 +148,8 @@ class InvoiceController:
                         'administracion': float(r.administracion) if r.administracion else 0.0
                     }
                     for r in repartimientos
-                ]
+                ],
+                'orden_compra': ordenes_compra[0] if ordenes_compra else None  # Tomar la primera orden si existe
             }
             
             return details

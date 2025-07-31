@@ -109,16 +109,19 @@ class Vale(Model):
 class OrdenCompra(Model):
     id = IntegerField(primary_key=True)
     factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True)
-    cuenta =IntegerField()
-    nombre = IntegerField()
-    referencia = IntegerField()
-    fecha = DateField()
-
-    importe = DecimalField()
-    importe_en_letras = CharField()
-
-    iva = DecimalField(null=True)
-    cuenta_mayor = IntegerField(null=True)
+    cuenta = IntegerField()  # Cuenta del proveedor
+    nombre = CharField()  # Nombre del proveedor
+    referencia = IntegerField()  # Campo legacy requerido (referencia)
+    fecha = DateField()  # Campo legacy requerido (fecha)
+    importe = DecimalField()  # Importe de la orden
+    importe_en_letras = CharField()  # Importe en letras
+    iva = DecimalField(null=True)  # Campo legacy opcional
+    cuenta_mayor = IntegerField(null=True)  # Campo legacy opcional
+    ref_movimiento = CharField(null=True)  # Referencia del movimiento (nuevo)
+    codigo_banco = CharField(null=True)  # Código del banco (ej: BTC23)
+    folio_factura = CharField(null=True)  # Folio de la factura extraído
+    archivo_original = CharField(null=True)  # Nombre del archivo PDF original
+    fecha_procesamiento = DateField(null=True)  # Fecha cuando se procesó
 
     class Meta:
         database = db

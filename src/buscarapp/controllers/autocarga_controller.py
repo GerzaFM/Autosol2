@@ -25,14 +25,211 @@ except ImportError:
 
 class AutocargaController:
     def _procesar_orden_individual(self, orden_data: Dict, contadores: Dict):
-        """Procesa una orden individual para actualizar la BD"""
-        matcher = ProviderMatcher()
-        # Buscar proveedor por nombre
-        proveedor = matcher.match_provider_from_orden_data(orden_data)
-        if proveedor:
-            self.logger.info(f"Orden procesada para proveedor: {proveedor.nombre}")
+        """Procesa una orden individual para guardar en la BD y asociar con factura"""
+        try:
+            from bd.models import OrdenCompra, Factura, Proveedor
+            from datetime import date
+            
+            self.logger.info(f"🔍 Procesando orden: {orden_data.get('archivo_original', 'Sin nombre')}")
+            
+            # Extraer datos de la orden
+            ref_movimiento = orden_data.get('Ref_Movimiento', '')
+            cuenta_str = orden_data.get('Cuenta', '')
+            nombre = orden_data.get('Nombre', '')
+            importe_str = orden_data.get('Importe', '0')
+            importe_letras = orden_data.get('Importe_en_letras', '')
+            codigo_banco = orden_data.get('Codigo_Banco', '')
+            folio_factura = orden_data.get('Folio_Factura', '')
+            archivo_original = orden_data.get('archivo_original', '')
+            
+            # Validar datos esenciales
+            if not ref_movimiento or not cuenta_str or not nombre:
+                self.logger.warning(f"Orden incompleta - faltan datos esenciales: {orden_data}")
+                contadores['errores'] = contadores.get('errores', 0) + 1
+                return
+                
+            # Convertir tipos
+            try:
+                cuenta = int(cuenta_str) if cuenta_str.isdigit() else 0
+                importe = float(importe_str.replace(',', '')) if importe_str else 0.0
+            except (ValueError, AttributeError):
+                self.logger.warning(f"Error convirtiendo datos numéricos para orden: {orden_data}")
+                cuenta = 0
+                importe = 0.0
+            
+            # Verificar si la orden ya existe (evitar duplicados)
+            orden_existente = OrdenCompra.get_or_none(
+                OrdenCompra.ref_movimiento == ref_movimiento,
+                OrdenCompra.cuenta == cuenta
+            )
+            
+            if orden_existente:
+                self.logger.info(f"Orden ya existe: {ref_movimiento} - {cuenta}")
+                return
+            
+            # Buscar asociación usando cuenta/fecha → vale → factura
+            factura_asociada = None
+            
+            try:
+                # Estrategia simplificada: cuenta (codigo_quiter) + proveedor + importe → factura
+                orden_data = {
+                    'cuenta': str(cuenta),
+                    'fecha': None,  # No necesitamos fecha para esta estrategia
+                    'importe_total': float(importe)
+                }
+                factura_asociada = self._buscar_factura_por_asociacion_inteligente(orden_data)
+                
+                if factura_asociada:
+                    self.logger.info(f"✅ Factura encontrada por cuenta/proveedor: {factura_asociada.serie}-{factura_asociada.folio}")
+                else:
+                    self.logger.info(f"❌ No se encontró factura para cuenta {cuenta} y proveedor {nombre}")
+                    
+            except Exception as e:
+                self.logger.error(f"Error en búsqueda de asociación: {e}")
+            
+            # Crear la orden en la BD
+            nueva_orden = OrdenCompra.create(
+                ref_movimiento=ref_movimiento,
+                cuenta=cuenta,
+                nombre=nombre,
+                referencia=int(ref_movimiento) if ref_movimiento.isdigit() else 0,  # Campo requerido
+                fecha=date.today(),  # Campo requerido
+                importe=importe,
+                importe_en_letras=importe_letras,
+                codigo_banco=codigo_banco,
+                folio_factura=folio_factura,
+                archivo_original=archivo_original,
+                fecha_procesamiento=date.today(),
+                factura=factura_asociada  # Asociar con la factura si se encontró
+            )
+            
+            contadores['ordenes_creadas'] = contadores.get('ordenes_creadas', 0) + 1
+            
+            if factura_asociada:
+                contadores['ordenes_asociadas'] = contadores.get('ordenes_asociadas', 0) + 1
+                self.logger.info(f"✅ Orden creada y asociada: ID {nueva_orden.id} → Factura {factura_asociada.serie}-{factura_asociada.folio}")
+            else:
+                contadores['ordenes_sin_asociar'] = contadores.get('ordenes_sin_asociar', 0) + 1
+                self.logger.info(f"✅ Orden creada sin asociar: ID {nueva_orden.id}")
+                
+        except Exception as e:
+            self.logger.error(f"Error procesando orden individual: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            contadores['errores'] = contadores.get('errores', 0) + 1
+
+    def _buscar_asociacion_cuenta_proveedor(self, cuenta: int, nombre_proveedor: str, importe: float, fecha_orden=None):
+        """
+        Busca asociación usando cuenta + proveedor + importe.
+        
+        Estrategia simplificada:
+        1. Buscar vales por cuenta (y opcionalmente fecha)
+        2. De esos vales, buscar facturas por proveedor + importe similar
+        3. Devolver la mejor coincidencia
+        
+        Args:
+            cuenta (int): Cuenta del proveedor
+            nombre_proveedor (str): Nombre del proveedor  
+            importe (float): Importe de la orden
+            fecha_orden (date, optional): Fecha de la orden
+            
+        Returns:
+            tuple: (Factura, Vale) o (None, None) si no hay coincidencia
+        """
+        try:
+            from bd.models import Factura, Proveedor, Vale
+        except ImportError:
+            sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+            from src.bd.models import Factura, Proveedor, Vale
+            
+        self.logger.info(f"🔍 Búsqueda por cuenta/proveedor: cuenta={cuenta}, proveedor='{nombre_proveedor}', importe=${importe:,.2f}")
+        
+        # ESTRATEGIA 1: Buscar por proveedor + importe similar
+        # Normalizar nombre del proveedor (quitar SADECV, espacios, etc.)
+        nombre_limpio = nombre_proveedor.upper().replace('SADECV', '').replace('S.A.DE C.V.', '').replace('SADECV', '').strip()
+        
+        # Buscar proveedores similares
+        proveedores_candidatos = Proveedor.select().where(
+            (Proveedor.nombre.contains(nombre_limpio[:15])) |  # Primeros 15 caracteres
+            (Proveedor.nombre.contains(nombre_limpio.split()[0])) |  # Primera palabra
+            (Proveedor.cuenta == str(cuenta))  # Por cuenta
+        )
+        
+        self.logger.info(f"  📋 Encontrados {proveedores_candidatos.count()} proveedores candidatos")
+        
+        mejor_factura = None
+        mejor_vale = None
+        mejor_puntuacion = 0
+        
+        for proveedor in proveedores_candidatos:
+            self.logger.info(f"  🔍 Verificando proveedor: {proveedor.nombre}")
+            
+            # Buscar facturas de este proveedor con importe similar (±10%)
+            tolerancia = importe * 0.1  # 10% de tolerancia
+            facturas_proveedor = Factura.select().where(
+                (Factura.proveedor == proveedor) &
+                (Factura.total >= importe - tolerancia) &
+                (Factura.total <= importe + tolerancia)
+            )
+            
+            for factura in facturas_proveedor:
+                diferencia_importe = abs(float(factura.total) - importe)
+                
+                # Calcular puntuación (menor diferencia = mejor puntuación)
+                if diferencia_importe == 0:
+                    puntuacion = 100  # Coincidencia exacta
+                elif diferencia_importe < tolerancia:
+                    puntuacion = 90 - (diferencia_importe / tolerancia * 20)  # 70-90 puntos
+                else:
+                    continue  # Fuera de tolerancia
+                
+                # Bonus por coincidencia de nombre
+                if nombre_limpio[:10] in proveedor.nombre.upper():
+                    puntuacion += 10
+                    
+                self.logger.info(f"    💰 Factura {factura.serie}-{factura.folio}: ${factura.total:,.2f} (dif: ${diferencia_importe:,.2f}, puntos: {puntuacion:.1f})")
+                
+                if puntuacion > mejor_puntuacion:
+                    mejor_puntuacion = puntuacion
+                    mejor_factura = factura
+                    
+                    # Buscar vale asociado a esta factura (opcional)
+                    vale_asociado = Vale.get_or_none(Vale.factura == factura)
+                    if vale_asociado:
+                        mejor_vale = vale_asociado
+                        puntuacion += 5  # Bonus por tener vale
+                        self.logger.info(f"      📄 Vale asociado: {vale_asociado.numero}")
+        
+        # ESTRATEGIA 2: Si no hay coincidencia directa, buscar por cuenta en vales
+        if not mejor_factura:
+            self.logger.info(f"  🔄 Estrategia alternativa: buscar vales por cuenta {cuenta}")
+            
+            # Buscar vales que podrían corresponder a esta cuenta
+            # (esto es más especulativo, pero puede ayudar)
+            vales_cuenta = Vale.select().join(Factura).join(Proveedor).where(
+                Proveedor.cuenta.contains(str(cuenta)[-4:])  # Últimos 4 dígitos de cuenta
+            )
+            
+            for vale in vales_cuenta:
+                if vale.factura:
+                    diferencia_importe = abs(float(vale.factura.total) - importe)
+                    if diferencia_importe < importe * 0.15:  # 15% de tolerancia más amplia
+                        puntuacion = 60 - (diferencia_importe / (importe * 0.15) * 10)
+                        
+                        self.logger.info(f"    🎫 Vale {vale.numero} → Factura {vale.factura.serie}-{vale.factura.folio}: ${vale.factura.total:,.2f} (puntos: {puntuacion:.1f})")
+                        
+                        if puntuacion > mejor_puntuacion:
+                            mejor_puntuacion = puntuacion
+                            mejor_factura = vale.factura
+                            mejor_vale = vale
+        
+        # Resultado final
+        if mejor_factura:
+            self.logger.info(f"✅ Mejor coincidencia: {mejor_factura.serie}-{mejor_factura.folio} (puntuación: {mejor_puntuacion:.1f})")
+            return mejor_factura, mejor_vale
         else:
-            self.logger.warning(f"No se encontró proveedor para orden: {orden_data.get('Nombre', 'Sin nombre')}")
+            self.logger.info(f"❌ No se encontró coincidencia para cuenta {cuenta} y proveedor '{nombre_proveedor}'")
+            return None, None
 
     def _mostrar_reporte_procesamiento(self, stats: Dict, contadores: Dict, facturas_seleccionadas: List[Dict[str, Any]] = None):
         """Muestra un reporte completo del procesamiento"""
@@ -96,6 +293,9 @@ class AutocargaController:
 • Vales creados automáticamente: {contadores['vales_creados']}
 • Vales asociados a facturas: {contadores['vales_asociados']}
 • Vales sin asociar: {contadores['vales_sin_asociar']}
+• Órdenes de compra creadas: {contadores.get('ordenes_creadas', 0)}
+• Órdenes asociadas a facturas: {contadores.get('ordenes_asociadas', 0)}
+• Órdenes sin asociar: {contadores.get('ordenes_sin_asociar', 0)}
 • Facturas actualizadas: {contadores['facturas_actualizadas']}
 • Errores durante procesamiento: {contadores['errores']}
 
@@ -764,3 +964,56 @@ class AutocargaController:
             self.logger.error(f"❌ Error inesperado en _procesar_vale_individual: {e}")
             self.logger.error(traceback.format_exc())
             contadores['errores'] += 1
+
+    def _buscar_factura_por_asociacion_inteligente(self, orden_data):
+        """
+        Busca facturas usando cuenta -> proveedor -> factura por importe
+        Estrategia simplificada: cuenta=codigo_quiter, luego match por proveedor+importe
+        """
+        try:
+            from bd.models import Factura, Proveedor
+        except ImportError:
+            from src.bd.models import Factura, Proveedor
+            
+        try:
+            cuenta = orden_data.get('cuenta')
+            fecha = orden_data.get('fecha')
+            importe = orden_data.get('importe_total')
+            
+            if not cuenta or not importe:
+                self.logger.info(f"❌ Faltan datos: cuenta={cuenta}, importe={importe}")
+                return None
+                
+            # Buscar proveedor por codigo_quiter = cuenta
+            proveedor = Proveedor.get_or_none(Proveedor.codigo_quiter == cuenta)
+            if not proveedor:
+                self.logger.info(f"❌ No se encontró proveedor con codigo_quiter: {cuenta}")
+                return None
+                
+            self.logger.info(f"✅ Proveedor encontrado: {proveedor.nombre} (codigo_quiter: {cuenta})")
+                
+            # Buscar facturas del proveedor con el importe similar (tolerancia 5%)
+            facturas = Factura.select().where(
+                Factura.proveedor == proveedor,
+                (Factura.total >= importe * 0.95) & (Factura.total <= importe * 1.05)
+            )
+            
+            count = facturas.count()
+            self.logger.info(f"🔍 Facturas encontradas con importe similar: {count}")
+            
+            if count == 1:
+                factura = facturas.first()
+                self.logger.info(f"✅ Factura única encontrada: {factura.serie}-{factura.folio} (${factura.total})")
+                return factura
+            elif count > 1:
+                # Si hay múltiples, tomar la primera (podríamos usar fecha como criterio adicional)
+                factura = facturas.first()
+                self.logger.info(f"⚠️ Múltiples facturas encontradas, tomando la primera: {factura.serie}-{factura.folio}")
+                return factura
+            else:
+                self.logger.info(f"❌ No se encontraron facturas del proveedor {proveedor.nombre} con importe ~${importe}")
+                
+        except Exception as e:
+            self.logger.error(f"Error en asociación inteligente: {e}")
+            
+        return None

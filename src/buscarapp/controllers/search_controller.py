@@ -19,7 +19,12 @@ except ImportError:
     from models.search_models import SearchFilters, SearchState, FacturaData
     # Fallback import para Vale
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'src'))
-    from bd.models import Factura, Proveedor, Vale
+    try:
+        from bd.models import Factura, Proveedor, Vale
+    except ImportError:
+        # Último fallback
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        from src.bd.models import Factura, Proveedor, Vale
 
 
 class SearchController:

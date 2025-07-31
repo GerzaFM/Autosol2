@@ -335,6 +335,17 @@ class BuscarAppRefactored(ttk.Frame):
             if 'vale' in details and details['vale'] is not None:
                 self.info_panels_frame.update_vale_info(details['vale'])
             
+            # Actualizar orden de compra
+            if 'orden_compra' in details and details['orden_compra'] is not None:
+                orden_data = {
+                    'importe': float(details['orden_compra'].importe) if details['orden_compra'].importe else 0.0,
+                    'iva': float(details['orden_compra'].iva) if details['orden_compra'].iva else 0.0,
+                    'importe_letras': details['orden_compra'].importe_en_letras or '-',
+                    'cuenta_mayor': details['orden_compra'].cuenta_mayor or '-',
+                    'banco_codigo': details['orden_compra'].codigo_banco or '-'
+                }
+                self.info_panels_frame.update_orden_compra_info(orden_data)
+            
         except Exception as e:
             self.logger.error(f"Error actualizando paneles de detalle: {e}")
     
