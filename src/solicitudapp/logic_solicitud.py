@@ -128,6 +128,8 @@ class SolicitudLogica:
             "comentarios": comentarios.get("comentarios"),
         }
 
-        factura = dbm.guardar_formulario(data)
-        dbm.cerrar()
-        return factura 
+        try:
+            factura = dbm.guardar_formulario(data)
+            return factura
+        finally:
+            dbm.cerrar() 

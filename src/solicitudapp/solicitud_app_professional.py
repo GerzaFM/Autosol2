@@ -68,6 +68,7 @@ class SolicitudApp(tb.Frame):
         self.solicitud_actual: Optional[Solicitud] = None
         self.factura_duplicada = False  # Flag para indicar si la factura está duplicada
         self.folio_interno_manual = None  # Almacenar folio interno ingresado manualmente
+        self.valores_ya_divididos = False  # Flag para indicar si los valores ya fueron divididos
         
         # Componentes UI
         self.proveedor_frame: Optional[ProveedorFrame] = None
@@ -410,6 +411,7 @@ class SolicitudApp(tb.Frame):
 
             self.factura_duplicada = False  # Resetear flag
             self.folio_interno_manual = None  # Resetear folio manual
+            self.valores_ya_divididos = False  # Resetear flag de división
 
             proveedor = Proveedor.get_or_none(Proveedor.rfc == proveedor_rfc)
             if proveedor:
@@ -810,6 +812,7 @@ class SolicitudApp(tb.Frame):
             # Resetear flags de factura duplicada
             self.factura_duplicada = False
             self.folio_interno_manual = None
+            self.valores_ya_divididos = False
             
             # Limpiar frames principales
             self.proveedor_frame.clear_entries()
@@ -1073,14 +1076,65 @@ class SolicitudApp(tb.Frame):
                 messagebox.showerror("Errores de validación", mensaje_error)
                 return
             
-            # Recopilar datos del formulario
+            # Recopilar datos del formulario (excepto conceptos, que se recopilarán después de división)
             proveedor_data = self.proveedor_frame.get_data()
             solicitud_data = self.solicitud_frame.get_data()
-            conceptos = [self.tree.item(item, "values") for item in self.tree.get_children()]
             totales = {k: v.get() for k, v in self.entries_totales.items()}
             categorias = {k: v.get() for k, v in self.entries_categorias.items()}
             comentarios = self.comentarios.get("1.0", "end").strip()
-            logger.info("Datos del formulario recopilados correctamente")
+            logger.info("Datos del formulario recopilados correctamente (conceptos se recopilarán después de división)")
+
+            # Detectar si es la segunda factura (VC) después de dividir
+            dividir_marcado = self.dividir_var.get()
+            dividir_habilitado = str(self.chb_dividir.cget('state')) == "normal"
+            es_segunda_factura = (dividir_marcado and not dividir_habilitado and 
+                                solicitud_data.get("Tipo", "").startswith("VC"))
+            
+            if es_segunda_factura:
+                logger.info("Detectada segunda factura (VC) después de dividir")
+                
+                # Si la factura original estaba duplicada (XML ya existía), 
+                # también pedir folio manual para la segunda factura
+                if self.factura_duplicada:
+                    logger.info("Factura original estaba duplicada, pidiendo folio manual para segunda factura")
+                    
+                    # Usar el folio manual actual como valor inicial para la segunda factura
+                    folio_inicial_segunda = self.folio_interno_manual or "001"
+                    
+                    # Pedir folio manual para la segunda factura
+                    folio_manual_segunda = simpledialog.askstring(
+                        "Folio para Segunda Factura (VC)",
+                        f"El XML original ya existía en la base de datos.\n\n"
+                        f"Ingrese el folio interno para la segunda factura (VC):",
+                        initialvalue=folio_inicial_segunda
+                    )
+                    
+                    if folio_manual_segunda and folio_manual_segunda.strip():
+                        folio_vc = folio_manual_segunda.strip()
+                        # Actualizar el folio interno manual para la segunda factura
+                        self.folio_interno_manual = folio_vc
+                        logger.info(f"Folio manual asignado para segunda factura: {folio_vc}")
+                    else:
+                        logger.warning("Usuario canceló la entrada de folio para segunda factura")
+                        messagebox.showwarning("Advertencia", "Debe ingresar un folio para la segunda factura")
+                        return
+                else:
+                    # Generar folio automático para la segunda factura (caso normal)
+                    folio_original = solicitud_data.get("Folio", "001")
+                    try:
+                        folio_numero = int(folio_original) + 1
+                        folio_vc = str(folio_numero)
+                    except ValueError:
+                        folio_vc = f"{folio_original}_VC"
+                    
+                    logger.info(f"Folio automático generado para segunda factura: {folio_vc}")
+                
+                # Actualizar el folio en el formulario y en los datos
+                folio_widget = self.solicitud_frame.entries["Folio"]
+                folio_widget.delete(0, 'end')
+                folio_widget.insert(0, folio_vc)
+                solicitud_data["Folio"] = folio_vc
+                logger.info(f"Folio actualizado para segunda factura: {folio_vc}")
 
             # Seleccionar ruta de guardado
             ruta = filedialog.asksaveasfilename(
@@ -1095,11 +1149,17 @@ class SolicitudApp(tb.Frame):
                 ruta += ".pdf"
             logger.info(f"Ruta de guardado seleccionada: {ruta}")
 
-            # Dividir totales si el checkbox está marcado y habilitado
+            # Dividir totales si el checkbox está marcado (PRIMERA vez O segunda factura)
             dividir_marcado = self.dividir_var.get()
             dividir_habilitado = str(self.chb_dividir.cget('state')) == "normal"
-            if dividir_marcado and dividir_habilitado:
-                logger.info("Casilla dividir activa, dividiendo totales")
+            es_segunda_factura = (dividir_marcado and not dividir_habilitado and 
+                                solicitud_data.get("Tipo", "").startswith("VC"))
+            
+            # Aplicar división solo si está marcado dividir Y no se ha dividido anteriormente
+            if dividir_marcado and not self.valores_ya_divididos:
+                logger.info("Casilla dividir activa, dividiendo totales y conceptos")
+                
+                # Dividir totales
                 for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
                     try:
                         valor = float(totales.get(k, "0"))
@@ -1109,6 +1169,47 @@ class SolicitudApp(tb.Frame):
                     except (ValueError, TypeError):
                         logger.error(f"Error al dividir el total para {k}")
                         pass
+                logger.info(f"Totales divididos: {totales}")
+                
+                # Dividir conceptos en la tabla (precio unitario y total, cantidad permanece igual)
+                logger.info("Dividiendo conceptos en la tabla")
+                for item_id in self.tree.get_children():
+                    try:
+                        valores_actuales = list(self.tree.item(item_id, "values"))
+                        if len(valores_actuales) >= 4:  # [cantidad, descripcion, precio_unitario, total]
+                            cantidad = valores_actuales[0]  # Cantidad permanece igual
+                            descripcion = valores_actuales[1]  # Descripción permanece igual
+                            precio_unitario = float(valores_actuales[2])
+                            total_actual = float(valores_actuales[3])
+                            
+                            # Dividir precio unitario y total por 2
+                            nuevo_precio = precio_unitario / 2
+                            nuevo_total = total_actual / 2
+                            
+                            # Actualizar valores en la tabla
+                            nuevos_valores = [
+                                cantidad,  # Cantidad igual
+                                descripcion,  # Descripción igual
+                                f"{nuevo_precio:.2f}",  # Precio dividido
+                                f"{nuevo_total:.2f}"  # Total dividido
+                            ]
+                            
+                            self.tree.item(item_id, values=nuevos_valores)
+                            logger.info(f"Concepto dividido: {descripcion} - Precio: {precio_unitario:.2f} → {nuevo_precio:.2f}, Total: {total_actual:.2f} → {nuevo_total:.2f}")
+                        
+                    except (ValueError, TypeError, IndexError) as e:
+                        logger.error(f"Error al dividir concepto {item_id}: {e}")
+                        continue
+                
+                logger.info("División de conceptos completada")
+                
+                # Marcar que los valores ya fueron divididos
+                self.valores_ya_divididos = True
+                logger.info("Flag valores_ya_divididos establecido a True")
+
+            # Recopilar conceptos DESPUÉS de la división (para obtener valores actualizados)
+            conceptos = [self.tree.item(item, "values") for item in self.tree.get_children()]
+            logger.info(f"Conceptos recopilados después de división: {len(conceptos)} conceptos")
 
             data = {
                 "TIPO DE VALE": solicitud_data.get("Tipo", ""),
@@ -1169,6 +1270,7 @@ class SolicitudApp(tb.Frame):
                         "rfc_receptor": "TMM860630PH1"  # Valor por defecto
                     }
                     
+                    # IMPORTANTE: Usar los totales ya divididos si la funcionalidad está activa
                     totales_mapped = {
                         "subtotal": totales.get("Subtotal", ""),
                         "iva_trasladado": totales.get("IVA", ""),
@@ -1207,8 +1309,12 @@ class SolicitudApp(tb.Frame):
                         proveedor_mapped, solicitud_mapped, conceptos_mapped, 
                         totales_mapped, categorias_mapped, comentarios_mapped
                     )
-                    logger.info(f"Factura guardada en la base de datos con folio_interno: {factura.folio_interno}")
-                    data["FOLIO"] = str(factura.folio_interno)
+                    if factura and hasattr(factura, 'folio_interno') and factura.folio_interno:
+                        logger.info(f"Factura guardada en la base de datos con folio_interno: {factura.folio_interno}")
+                        data["FOLIO"] = str(factura.folio_interno)
+                    else:
+                        logger.warning("Factura guardada pero sin folio_interno válido")
+                        data["FOLIO"] = "SIN_FOLIO"
                 
             except Exception as db_error:
                 logger.warning(f"Error al guardar en base de datos: {db_error}")
@@ -1235,15 +1341,55 @@ class SolicitudApp(tb.Frame):
             # Alternar estado del checkbox dividir
             if dividir_habilitado and dividir_marcado:
                 self.chb_dividir.config(state="disabled")
-                # Configurar el tipo de vale según el tipo de widget
-                tipo_widget = self.solicitud_frame.entries["Tipo"]
-                if hasattr(tipo_widget, 'insert'):  # SearchEntry
-                    tipo_widget.delete(0, 'end')
-                    tipo_widget.insert(0, "VC - VALE DE CONTROL")
-                elif hasattr(tipo_widget, 'set'):  # Combobox
-                    tipo_widget.set("VC - VALE DE CONTROL")
-                logger.info("Checkbox dividir deshabilitado y tipo de vale cambiado")
+                
+                # Configurar el tipo de vale a VC (usando la misma lógica que el resto del código)
+                if hasattr(self.solicitud_frame, 'tipo_search') and self.solicitud_frame.tipo_search:
+                    # Es SearchEntry, buscar específicamente el item con clave 'VC'
+                    logger.info("Buscando item VC en SearchEntry")
+                    vc_encontrado = False
+                    for item in self.solicitud_frame.tipo_search.items:
+                        if item.get('clave') == 'VC':
+                            self.solicitud_frame.tipo_search.set_selection(item)
+                            logger.info(f"Tipo VC seleccionado exitosamente: {item}")
+                            vc_encontrado = True
+                            break
+                    
+                    if not vc_encontrado:
+                        logger.warning("No se encontró item VC en SearchEntry")
+                        # Fallback: intentar buscar por descripción
+                        for item in self.solicitud_frame.tipo_search.items:
+                            if 'VALE DE CONTROL' in str(item).upper():
+                                self.solicitud_frame.tipo_search.set_selection(item)
+                                logger.info(f"Tipo VC encontrado por descripción: {item}")
+                                break
+                else:
+                    # Es Combobox tradicional (caso poco probable según la verificación)
+                    logger.info("Usando Combobox tradicional para Tipo")
+                    tipo_widget = self.solicitud_frame.entries["Tipo"]
+                    if hasattr(tipo_widget, 'set'):
+                        tipo_widget.set("VC - VALE DE CONTROL")
+                        logger.info("Tipo VC establecido en Combobox")
+                    else:
+                        logger.warning("Widget Tipo no soporta método set()")
+                        
+                logger.info("Checkbox dividir deshabilitado y tipo de vale cambiado a VC")
+                
+                # Mostrar mensaje al usuario indicando que debe generar nuevamente
+                messagebox.showinfo(
+                    "Segunda Factura Lista", 
+                    f"Primera factura (SC) guardada correctamente.\n\n"
+                    f"El tipo se ha cambiado a 'VC - VALE DE CONTROL'.\n"
+                    f"Haga clic en 'Generar' nuevamente para guardar la segunda factura."
+                )
+                
                 return
+            elif es_segunda_factura:
+                # Es la segunda factura (VC), habilitar nuevamente el checkbox
+                self.chb_dividir.config(state="normal")
+                self.dividir_var.set(False)  # Desmarcar el checkbox
+                self.valores_ya_divididos = False  # Resetear flag de división
+                logger.info("Segunda factura (VC) completada, checkbox dividir habilitado y desmarcado")
+                logger.info("Flag valores_ya_divididos reseteado después de completar división")
             else:
                 self.chb_dividir.config(state="normal")
                 logger.info("Checkbox dividir habilitado")
