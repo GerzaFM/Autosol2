@@ -323,7 +323,7 @@ class SearchEntry(tb.Frame):
             if self.search_fields:
                 display_text = str(selected_item.get(self.search_fields[0], ""))
             
-            self.entry.configure(state="normal", foreground="black")
+            self.entry.configure(state="normal", foreground="white")
             self.entry_var.set(display_text)
             self.entry.configure(state="readonly")
             
@@ -366,6 +366,6 @@ class SearchEntry(tb.Frame):
         self.selected_item = item
         if item and self.search_fields:
             display_text = str(item.get(self.search_fields[0], ""))
-            self.entry.configure(state="normal", foreground="black")
+            self.entry.configure(state="normal", foreground="white")
             self.entry_var.set(display_text)
             self.entry.configure(state="readonly")

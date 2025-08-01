@@ -100,6 +100,8 @@ class SearchFrame:
                 placeholder_text="Seleccionar tipo...",
                 width=25
             )
+            # Configurar fuente blanca para mejor contraste
+            self.tipo_search.entry.configure(foreground="white")
             self.tipo_search.pack(side="left", padx=(0, 15))
         else:
             # Fallback: usar Combobox tradicional
@@ -163,6 +165,8 @@ class SearchFrame:
                 placeholder_text="Seleccionar proveedor...",
                 width=25
             )
+            # Configurar fuente blanca para mejor contraste
+            self.proveedor_search_widget.entry.configure(foreground="white")
             self.proveedor_search_widget.pack(side="left", padx=(0, 15), fill="x", expand=False)
         else:
             # Fallback al combobox anterior
