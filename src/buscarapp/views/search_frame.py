@@ -14,23 +14,23 @@ try:
     SEARCH_ENTRY_AVAILABLE = True
 except ImportError:
     try:
+        # Intento directo desde el mismo directorio padre
         import sys
         import os
-        current_dir = os.path.dirname(__file__)
-        search_comp_path = os.path.join(os.path.dirname(current_dir), 'search_components.py')
-        if os.path.exists(search_comp_path):
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("search_components", search_comp_path)
-            search_components_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(search_components_module)
-            SearchEntry = search_components_module.SearchEntry
+        parent_dir = os.path.dirname(os.path.dirname(__file__))
+        sys.path.insert(0, parent_dir)
+        from search_components import SearchEntry
+        SEARCH_ENTRY_AVAILABLE = True
+    except ImportError:
+        try:
+            # Última opción: importar desde solicitudapp
+            solicitudapp_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'solicitudapp')
+            sys.path.insert(0, solicitudapp_path)
+            from search_components import SearchEntry
             SEARCH_ENTRY_AVAILABLE = True
-        else:
+        except Exception as e:
             SearchEntry = None
             SEARCH_ENTRY_AVAILABLE = False
-    except Exception as e:
-        SearchEntry = None
-        SEARCH_ENTRY_AVAILABLE = False
 
 class SearchFrame:
     """Frame que contiene los controles de búsqueda - COPIA EXACTA DE LA ORIGINAL"""
