@@ -263,6 +263,8 @@ class SolicitudFrame(BaseFrame):
                         placeholder_text="Seleccionar tipo...",
                         width=20
                     )
+                    # Configurar fuente blanca para mejor contraste
+                    self.tipo_search.entry.configure(foreground="white")
                     widget = self.tipo_search
                 else:
                     # Fallback a Combobox tradicional
@@ -270,7 +272,7 @@ class SolicitudFrame(BaseFrame):
                     widget = tb.Combobox(
                         self, 
                         values=tipo_vales_list, 
-                        width=22, 
+                        width=28,  # Aumentado para igualar el ancho visual del SearchEntry
                         bootstyle="dark"
                     )
                     widget.set(tipo_vales_list[0] if tipo_vales_list else "")
@@ -280,7 +282,7 @@ class SolicitudFrame(BaseFrame):
                 widget = tb.Combobox(
                     self, 
                     values=AppConfig.DEPARTAMENTOS, 
-                    width=22, 
+                    width=28,  # Aumentado para igualar el ancho visual del SearchEntry
                     bootstyle="dark",
                     state="readonly"
                 )
@@ -288,11 +290,11 @@ class SolicitudFrame(BaseFrame):
             elif campo == "Fecha":
                 widget = tb.DateEntry(
                     self,
-                    width=19,
+                    width=25,  # Aumentado para igualar el ancho visual del SearchEntry
                     bootstyle="dark"
                 )
             else:
-                widget = tb.Entry(self, width=24, bootstyle="dark")
+                widget = tb.Entry(self, width=30, bootstyle="dark")  # Aumentado para igualar el ancho visual del SearchEntry
             
             widget.grid(row=i, column=1, padx=5, pady=4)
             self.entries[campo] = widget
