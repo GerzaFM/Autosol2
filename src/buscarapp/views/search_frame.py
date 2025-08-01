@@ -47,10 +47,12 @@ class SearchFrame:
         self.solo_cargado_var = ttk.BooleanVar()
         self.no_vale_var = ttk.StringVar()
         self.texto_busqueda_var = ttk.StringVar()
+        self.clase_var = ttk.StringVar()
         
         # Datos para componentes de búsqueda
         self.proveedores_data = []
         self.tipos_data = []
+        self.clases_data = []
         
         # Referencias a widgets
         self.proveedor_search_widget = None
@@ -82,7 +84,7 @@ class SearchFrame:
         self.fecha_inicial_entry.pack(side="left", padx=(0, 15))
         
         # Tipo de Vale
-        ttk.Label(row1_frame, text="Tipo:", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
+        ttk.Label(row1_frame, text="Tipo Vale:  ", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
         
         if SEARCH_ENTRY_AVAILABLE and SearchEntry is not None:
             # Usar SearchEntry para tipos de vale
@@ -111,12 +113,44 @@ class SearchFrame:
             )
             self.tipo_combobox.pack(side="left", padx=(0, 15))
         
-        # Proveedor
-        ttk.Label(row1_frame, text="Proveedor:", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
+        # No Vale
+        ttk.Label(row1_frame, text="No Vale:", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
+        self.no_vale_entry = ttk.Entry(
+            row1_frame,
+            textvariable=self.no_vale_var,
+            font=("Segoe UI", 11),
+            width=15
+        )
+        self.no_vale_entry.pack(side="left", padx=(0, 15))
+        
+        # Solo Cargado (movido a primera fila)
+        self.solo_cargado_check = ttk.Checkbutton(
+            row1_frame,
+            text="Solo Cargado",
+            variable=self.solo_cargado_var,
+            bootstyle="success-round-toggle"
+        )
+        self.solo_cargado_check.pack(side="left", padx=(0, 15))
+        
+        # Segunda fila - Fecha Final, Proveedor y controles
+        row2_frame = ttk.Frame(filters_main)
+        row2_frame.pack(fill="x", pady=(0, 10))
+        
+        # Fecha Final
+        ttk.Label(row2_frame, text="Fecha Final:  ", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
+        self.fecha_final_entry = ttk.DateEntry(
+            row2_frame,
+            dateformat='%Y-%m-%d',
+            width=12
+        )
+        self.fecha_final_entry.pack(side="left", padx=(0, 15))
+        
+        # Proveedor (en segunda fila)
+        ttk.Label(row2_frame, text="Proveedor:", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
         
         if SEARCH_ENTRY_AVAILABLE and SearchEntry is not None:
             self.proveedor_search_widget = SearchEntry(
-                parent=row1_frame,
+                parent=row2_frame,
                 items=self.proveedores_data,
                 search_fields=['nombre', 'rfc'],
                 display_columns=[
@@ -132,42 +166,20 @@ class SearchFrame:
             self.proveedor_search_widget.pack(side="left", padx=(0, 15), fill="x", expand=False)
         else:
             # Fallback al combobox anterior
-            self.proveedor_entry = ttk.Entry(row1_frame, width=25)
+            self.proveedor_entry = ttk.Entry(row2_frame, width=25)
             self.proveedor_entry.pack(side="left", padx=(0, 15))
         
-        # No Vale
-        ttk.Label(row1_frame, text="No Vale:", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
-        self.no_vale_entry = ttk.Entry(
-            row1_frame,
-            textvariable=self.no_vale_var,
+        # Clase (a la derecha del proveedor, debajo de No Vale)
+        ttk.Label(row2_frame, text="Clase:    ", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
+        self.clase_entry = ttk.Entry(
+            row2_frame,
+            textvariable=self.clase_var,
             font=("Segoe UI", 11),
             width=15
         )
-        self.no_vale_entry.pack(side="left", padx=(0, 15))
+        self.clase_entry.pack(side="left", padx=(0, 15))
         
-        # Segunda fila - Fecha Final, Checkboxes y controles
-        row2_frame = ttk.Frame(filters_main)
-        row2_frame.pack(fill="x", pady=(0, 10))
-        
-        # Fecha Final
-        ttk.Label(row2_frame, text="Fecha Final:  ", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
-        self.fecha_final_entry = ttk.DateEntry(
-            row2_frame,
-            dateformat='%Y-%m-%d',
-            width=12
-        )
-        self.fecha_final_entry.pack(side="left", padx=(0, 15))
-        
-        # Solo Cargado
-        self.solo_cargado_check = ttk.Checkbutton(
-            row2_frame,
-            text="Solo Cargado",
-            variable=self.solo_cargado_var,
-            bootstyle="success-round-toggle"
-        )
-        self.solo_cargado_check.pack(side="left", padx=(0, 15))
-        
-        # Solo Pagado
+        # Solo Pagado (en segunda fila, a la derecha de Clase)
         self.solo_pagado_check = ttk.Checkbutton(
             row2_frame,
             text="Solo Pagado",
@@ -184,16 +196,18 @@ class SearchFrame:
         self.buscar_btn = ttk.Button(
             row2_frame,
             text="Buscar",
-            bootstyle="primary",
-            command=self._on_search_clicked
+            bootstyle="success",  # Verde
+            command=self._on_search_clicked,
+            width=15
         )
         self.buscar_btn.pack(side="right", padx=(10, 0))
         
         self.limpiar_btn = ttk.Button(
             row2_frame,
             text="Limpiar Filtros",
-            bootstyle="secondary-outline",
-            command=self._on_clear_clicked
+            bootstyle="danger",  # Rojo
+            command=self._on_clear_clicked,
+            width=15
         )
         self.limpiar_btn.pack(side="right", padx=(10, 0))
         
@@ -256,6 +270,7 @@ class SearchFrame:
             'tipo_filtro': tipo_filtro,
             'proveedor_filtro': proveedor_filtro,
             'no_vale_filtro': self.no_vale_var.get(),
+            'clase_filtro': self.clase_var.get(),
             'solo_cargado': self.solo_cargado_var.get(),
             'solo_pagado': self.solo_pagado_var.get(),
             'texto_busqueda': self.texto_busqueda_var.get()
@@ -277,6 +292,7 @@ class SearchFrame:
             self.proveedor_entry.delete(0, 'end')
         
         self.no_vale_var.set("")
+        self.clase_var.set("")
         self.solo_cargado_var.set(False)
         self.solo_pagado_var.set(False)
         self.texto_busqueda_var.set("")
@@ -292,6 +308,12 @@ class SearchFrame:
         self.tipos_data = tipos
         if hasattr(self, 'tipo_search') and self.tipo_search:
             self.tipo_search.update_items(tipos)
+    
+    def set_clases_data(self, clases: list):
+        """Actualiza los datos de clases"""
+        self.clases_data = clases
+        # Para Entry no necesitamos configurar valores predefinidos
+        # El usuario puede escribir libremente cualquier clase
     
     def set_status(self, message: str, style: str = "info"):
         """Establece el mensaje de estado"""

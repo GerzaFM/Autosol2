@@ -6,7 +6,7 @@ import os
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 # Agregar paths necesarios
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -217,6 +217,7 @@ class BuscarAppRefactored(ttk.Frame):
                 tipo_filtro=filters_dict.get('tipo_filtro', ''),
                 proveedor_filtro=filters_dict.get('proveedor_filtro', ''),
                 no_vale_filtro=filters_dict.get('no_vale_filtro', ''),
+                clase_filtro=filters_dict.get('clase_filtro', ''),
                 solo_cargado=filters_dict.get('solo_cargado', False),
                 solo_pagado=filters_dict.get('solo_pagado', False),
                 texto_busqueda=filters_dict.get('texto_busqueda', '')

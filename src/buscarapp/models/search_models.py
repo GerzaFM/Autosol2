@@ -14,6 +14,7 @@ class SearchFilters:
     tipo_filtro: Optional[str] = None
     proveedor_filtro: Optional[str] = None
     no_vale_filtro: Optional[str] = None
+    clase_filtro: Optional[str] = None
     solo_cargado: bool = False
     solo_pagado: bool = False
     texto_busqueda: Optional[str] = None
@@ -22,7 +23,7 @@ class SearchFilters:
         """Verifica si hay al menos un filtro activo"""
         return any([
             self.fecha_inicial, self.fecha_final, self.tipo_filtro,
-            self.proveedor_filtro, self.no_vale_filtro,
+            self.proveedor_filtro, self.no_vale_filtro, self.clase_filtro,
             self.solo_cargado, self.solo_pagado, self.texto_busqueda
         ])
     
@@ -33,6 +34,7 @@ class SearchFilters:
         self.tipo_filtro = None
         self.proveedor_filtro = None
         self.no_vale_filtro = None
+        self.clase_filtro = None
         self.solo_cargado = False
         self.solo_pagado = False
         self.texto_busqueda = None

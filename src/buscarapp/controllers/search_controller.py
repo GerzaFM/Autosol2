@@ -246,6 +246,12 @@ class SearchController:
                 filters.no_vale_filtro not in folio):
                 return False
         
+        # Filtro por clase
+        if filters.clase_filtro:
+            clase_factura = str(factura.get('clase', '')).lower()
+            if filters.clase_filtro.lower() not in clase_factura:
+                return False
+        
         # Filtro Solo Cargado
         if filters.solo_cargado:
             if not factura.get('cargada_bool', False):
