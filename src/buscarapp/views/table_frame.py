@@ -34,7 +34,7 @@ class TableFrame:
         # Configurar columnas de la tabla
         self.columns = [
             "folio_interno", "tipo", "no_vale", "fecha", "serie_folio",
-            "nombre_emisor", "conceptos", "total", "cargada", "pagada"
+            "nombre_emisor", "conceptos", "total", "clase", "cargada", "pagada"
         ]
         
         self.column_names = {
@@ -46,6 +46,7 @@ class TableFrame:
             "nombre_emisor": "Proveedor",
             "conceptos": "Conceptos",
             "total": "Total",
+            "clase": "Clase",
             "cargada": "Cargada",
             "pagada": "Pagada"
         }
@@ -59,6 +60,7 @@ class TableFrame:
             "nombre_emisor": 200,
             "conceptos": 300,
             "total": 100,
+            "clase": 80,
             "cargada": 80,
             "pagada": 80
         }
