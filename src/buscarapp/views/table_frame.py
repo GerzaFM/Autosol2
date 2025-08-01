@@ -23,6 +23,10 @@ class TableFrame:
         
         self._create_widgets()
         self._current_data = []
+        
+        # Variables para ordenamiento
+        self._sort_column = None
+        self._sort_reverse = False
     
     def _create_widgets(self):
         """Crea todos los widgets del frame de tabla"""
@@ -79,7 +83,7 @@ class TableFrame:
         
         # Configurar columnas
         for col in self.columns:
-            self.tree.heading(col, text=self.column_names[col])
+            self.tree.heading(col, text=self.column_names[col], command=lambda c=col: self._sort_by_column(c))
             self.tree.column(col, width=self.column_widths.get(col, 100), minwidth=60)
         
         # Configurar columna oculta para índice original
@@ -173,6 +177,71 @@ class TableFrame:
         for item in self.tree.get_children():
             self.tree.delete(item)
         self._current_data = []
+    
+    def _sort_by_column(self, column: str):
+        """
+        Ordena la tabla por la columna especificada
+        
+        Args:
+            column: Nombre de la columna por la que ordenar
+        """
+        if not self._current_data:
+            return
+        
+        # Si se hace clic en la misma columna, invertir el orden
+        if self._sort_column == column:
+            self._sort_reverse = not self._sort_reverse
+        else:
+            self._sort_column = column
+            self._sort_reverse = False
+        
+        # Actualizar el texto del header para mostrar el orden
+        for col in self.columns:
+            header_text = self.column_names[col]
+            if col == column:
+                if self._sort_reverse:
+                    header_text += " ▼"
+                else:
+                    header_text += " ▲"
+            self.tree.heading(col, text=header_text)
+        
+        # Ordenar los datos
+        try:
+            def sort_key(item):
+                value = item.get(column, "")
+                
+                # Manejo especial para diferentes tipos de datos
+                if column in ["folio_interno", "no_vale"]:
+                    # Números: intentar convertir a int, si falla usar string
+                    try:
+                        return int(str(value))
+                    except (ValueError, TypeError):
+                        return str(value).lower()
+                elif column == "total":
+                    # Montos: intentar convertir a float
+                    try:
+                        return float(str(value).replace(",", "").replace("$", ""))
+                    except (ValueError, TypeError):
+                        return 0.0
+                elif column == "fecha":
+                    # Fechas: mantener como string para ordenamiento lexicográfico
+                    return str(value)
+                elif column in ["cargada", "pagada"]:
+                    # Booleanos: True antes que False
+                    bool_val = item.get(f"{column}_bool", False)
+                    return not bool_val  # Invertir para que True aparezca primero
+                else:
+                    # Texto: ordenamiento alfabético
+                    return str(value).lower()
+            
+            sorted_data = sorted(self._current_data, key=sort_key, reverse=self._sort_reverse)
+            
+            # Recargar la tabla con los datos ordenados
+            self.clear_table()
+            self.load_data(sorted_data)
+            
+        except Exception as e:
+            self.logger.error(f"Error ordenando por columna {column}: {e}")
     
     def get_selected_data(self) -> Optional[Dict[str, Any]]:
         """
