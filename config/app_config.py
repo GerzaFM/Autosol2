@@ -52,3 +52,5 @@ class AppConfig:
         "departamento": "Administracion",
         "tipo_solicitud": "Compra"
     }
+
+    RUTA_CHEQUE = "FormatosSolicitud/Cheque.pdf"

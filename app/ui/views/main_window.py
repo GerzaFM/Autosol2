@@ -11,6 +11,7 @@ from app.ui.components.sidebar import SidebarComponent
 from app.ui.views.solicitud_view import SolicitudView
 from app.ui.views.user_admin import AdministradorUsuarios
 from app.ui.views.facturas_view import FacturasView
+from app.ui.views.cheques_view import ChequesView
 from app.utils.logger import get_logger
 
 class MainWindow(tb.Window):
@@ -145,6 +146,11 @@ class MainWindow(tb.Window):
             "top"
         )
         self.sidebar.add_menu_item(
+            "Cheques", "🏦", 
+            lambda: self._show_view("cheques"), 
+            "top"
+        )
+        self.sidebar.add_menu_item(
             "Reportes", "📊", 
             lambda: self._show_view("reportes"), 
             "top"
@@ -195,6 +201,7 @@ class MainWindow(tb.Window):
             view_names = {
                 "nueva": "Nueva Solicitud",
                 "buscar": "Buscar",
+                "cheques": "Cheques",
                 "reportes": "Reportes",
                 "pagos": "Pagos",
                 "nueva_vista": "Usuarios",
@@ -211,6 +218,8 @@ class MainWindow(tb.Window):
                 self._show_solicitud_view()
             elif view_name == "buscar":
                 self._show_facturas_view()
+            elif view_name == "cheques":
+                self._show_cheques_view()
             elif view_name == "nueva_vista":
                 self._administrador_usuarios()
             else:
@@ -251,6 +260,22 @@ class MainWindow(tb.Window):
         except Exception as e:
             self.logger.error(f"Error al crear vista de facturas: {e}")
             self._show_error_view(f"Error al cargar facturas: {str(e)}")
+    
+    def _show_cheques_view(self):
+        """Muestra la vista de gestión de cheques."""
+        try:
+            # Limpiar contenido anterior
+            self._clear_content()
+            
+            cheques_view = ChequesView(self.content_frame, self.db_manager)
+            cheques_view.pack(fill=BOTH, expand=True)
+            self.current_view = cheques_view
+            
+            self.logger.info("Vista de cheques mostrada exitosamente")
+            
+        except Exception as e:
+            self.logger.error(f"Error al crear vista de cheques: {e}")
+            self._show_error_view(f"Error al cargar cheques: {str(e)}")
     
     def _administrador_usuarios(self):
         """Muestra el administrador de usuarios."""

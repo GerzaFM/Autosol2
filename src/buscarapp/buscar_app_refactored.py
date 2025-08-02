@@ -7,12 +7,20 @@ import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 import logging
 from typing import Optional, Dict, Any, List
+from tkinter import filedialog
 
 # Agregar paths necesarios
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 sys.path.insert(0, current_dir)
+
+# Importar la clase Cheque
+try:
+    from ctr_cheque import Cheque
+except ImportError:
+    print("Advertencia: No se pudo importar la clase Cheque")
+    Cheque = None
 
 # Intentar imports relativos primero, luego absolutos
 try:
@@ -133,7 +141,8 @@ class BuscarAppRefactored(ttk.Frame):
             on_toggle_cargada_callback=self._on_toggle_cargada,
             on_export_callback=self._on_export,
             on_detalles_callback=self._on_detalles,
-            on_modificar_callback=self._on_modificar
+            on_modificar_callback=self._on_modificar,
+            on_cheque_callback=self._on_cheque
         )
         
         # Frame de paneles de información
@@ -727,6 +736,206 @@ class BuscarAppRefactored(ttk.Frame):
             
         except Exception as e:
             self.logger.error(f"Error refrescando búsqueda: {e}")
+    
+    def _on_cheque(self):
+        """Maneja el evento del botón Cheque"""
+        try:
+            # Obtener elementos seleccionados en la tabla
+            selected_items = self.table_frame.get_selected_data_multiple()
+            
+            if not selected_items:
+                self.dialog_utils.show_warning("Sin Selección", "Debe seleccionar al menos un elemento en la tabla.")
+                return
+            
+            ruta_exportacion = ""
+            
+            if len(selected_items) == 1:
+                # Un solo elemento seleccionado
+                item = selected_items[0]
+                no_vale = str(item.get('no_vale', 'SinVale'))
+                proveedor = str(item.get('nombre_emisor', 'SinProveedor'))
+                folio_factura = str(item.get('folio', 'SinFolio'))  # Solo folio, no serie_folio
+                clase = str(item.get('clase', 'SinClase'))
+                
+                # Limpiar caracteres no válidos para nombres de archivo
+                no_vale = self._limpiar_nombre_archivo(no_vale)
+                proveedor = self._limpiar_nombre_archivo(proveedor)
+                folio_factura = self._limpiar_nombre_archivo(folio_factura)
+                clase = self._limpiar_nombre_archivo(clase)
+                
+                # Crear nombre del archivo
+                nombre_archivo = f"{no_vale} {proveedor} {folio_factura} {clase}.pdf"
+                
+                # Mostrar diálogo para guardar
+                filename = filedialog.asksaveasfilename(
+                    title="Guardar documento de cheque",
+                    defaultextension=".pdf",
+                    filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+                    initialfile=nombre_archivo,
+                    parent=self
+                )
+                
+                if filename:
+                    ruta_exportacion = filename
+                    self.logger.info(f"Ruta de exportación (1 elemento): {ruta_exportacion}")
+            
+            else:
+                # Múltiples elementos seleccionados - verificar que sean del mismo proveedor
+                primer_proveedor = str(selected_items[0].get('nombre_emisor', ''))
+                
+                # Verificar que todos sean del mismo proveedor
+                mismo_proveedor = all(str(item.get('nombre_emisor', '')) == primer_proveedor for item in selected_items)
+                
+                if not mismo_proveedor:
+                    self.dialog_utils.show_warning(
+                        "Proveedores Diferentes", 
+                        "Los elementos seleccionados deben ser del mismo proveedor para crear un cheque conjunto."
+                    )
+                    return
+                
+                # Crear nombre con múltiples vales
+                numeros_vale = []
+                folios_factura = []
+                
+                for item in selected_items:
+                    no_vale = str(item.get('no_vale', 'SinVale'))
+                    folio_factura = str(item.get('folio', 'SinFolio'))  # Solo folio, no serie_folio
+                    
+                    numeros_vale.append(self._limpiar_nombre_archivo(no_vale))
+                    folios_factura.append(self._limpiar_nombre_archivo(folio_factura))
+                
+                # Obtener datos del primer elemento para proveedor y clase
+                proveedor = self._limpiar_nombre_archivo(primer_proveedor)
+                clase = self._limpiar_nombre_archivo(str(selected_items[0].get('clase', 'SinClase')))
+                
+                # Crear nombre del archivo
+                vales_str = " ".join(numeros_vale)  # Unir múltiples vales con guión bajo
+                folios_str = " ".join(folios_factura)  # Unir múltiples folios con guión bajo
+                nombre_archivo = f"{vales_str} {proveedor} {folios_str} {clase}.pdf"
+                
+                # Mostrar diálogo para guardar
+                filename = filedialog.asksaveasfilename(
+                    title="Guardar documento de cheque (múltiples elementos)",
+                    defaultextension=".pdf",
+                    filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+                    initialfile=nombre_archivo,
+                    parent=self
+                )
+                
+                if filename:
+                    ruta_exportacion = filename
+                    self.logger.info(f"Ruta de exportación ({len(selected_items)} elementos): {ruta_exportacion}")
+            
+            # Variable ruta_exportacion ya contiene la ruta seleccionada
+            if ruta_exportacion:
+                self.logger.info(f"Documento de cheque será guardado en: {ruta_exportacion}")
+                
+                # Procesar con la clase Cheque
+                try:
+                    if Cheque is None:
+                        self.dialog_utils.show_error(
+                            "Error", 
+                            "La clase Cheque no está disponible. Verifique la instalación."
+                        )
+                        return
+                    
+                    if len(selected_items) == 1:
+                        # Un solo elemento - usar la primera factura
+                        cheque = Cheque(selected_items[0], ruta_exportacion)
+                        
+                        # Generar el cheque
+                        if cheque.exportar():
+                            self.dialog_utils.show_info(
+                                "Cheque Generado", 
+                                f"El cheque ha sido generado exitosamente:\n{ruta_exportacion}"
+                            )
+                            self.logger.info(f"Cheque generado exitosamente: {ruta_exportacion}")
+                        else:
+                            self.dialog_utils.show_error(
+                                "Error", 
+                                f"Error al generar el cheque en:\n{ruta_exportacion}"
+                            )
+                    else:
+                        # Múltiples elementos - por ahora mostrar mensaje informativo
+                        self.dialog_utils.show_info(
+                            "Funcionalidad en Desarrollo", 
+                            f"La generación de cheques múltiples estará disponible próximamente.\n"
+                            f"Ruta guardada: {ruta_exportacion}\n"
+                            f"Elementos seleccionados: {len(selected_items)}"
+                        )
+                        self.logger.info(f"Cheque múltiple pendiente de implementar: {ruta_exportacion}")
+                        
+                except Exception as cheque_error:
+                    self.logger.error(f"Error procesando cheque: {cheque_error}")
+                    self.dialog_utils.show_error(
+                        "Error Procesando Cheque", 
+                        f"Error al procesar el cheque:\n{str(cheque_error)}"
+                    )
+            
+        except Exception as e:
+            self.logger.error(f"Error en función de cheque: {e}")
+            self.dialog_utils.show_error("Error", f"Error procesando cheque: {str(e)}")
+    
+    def _limpiar_nombre_archivo(self, nombre) -> str:
+        """
+        Limpia un string para que pueda ser usado como nombre de archivo
+        
+        Args:
+            nombre: String o número a limpiar
+            
+        Returns:
+            String limpio para usar como nombre de archivo
+        """
+        # Convertir a string si no lo es
+        if nombre is None:
+            return 'Vacio'
+        
+        nombre_str = str(nombre)
+        
+        if not nombre_str or nombre_str.strip() == '':
+            return 'Vacio'
+        
+        # Reemplazar caracteres no válidos
+        caracteres_invalidos = '<>:"/\\|?*_-'  # Agregado _ y - para quitarlos
+        nombre_limpio = nombre_str
+        
+        for char in caracteres_invalidos:
+            nombre_limpio = nombre_limpio.replace(char, '')  # Reemplazar con vacío en lugar de _
+        
+        # Reemplazar espacios por nada (quitar espacios)
+        #nombre_limpio = nombre_limpio.replace(' ', '')
+        
+        # Si es un folio con serie (contiene guión y la parte después del guión es solo números), 
+        # tomar solo la parte después del guión
+        if '-' in nombre_str:
+            partes = nombre_str.split('-')
+            if len(partes) > 1:
+                ultima_parte = partes[-1]
+                # Solo quitar la serie si la última parte son solo números (típico de folios)
+                if ultima_parte.isdigit():
+                    nombre_limpio = ultima_parte
+                    # Limpiar caracteres especiales de la parte seleccionada
+                    for char in '<>:"/\\|?*_':
+                        nombre_limpio = nombre_limpio.replace(char, '')
+                    nombre_limpio = nombre_limpio.replace(' ', '')
+                else:
+                    # Si no es solo números, mantener todo el nombre pero limpiar caracteres
+                    for char in caracteres_invalidos:
+                        nombre_limpio = nombre_limpio.replace(char, '')
+        else:
+            # No contiene guión, solo limpiar caracteres inválidos
+            for char in caracteres_invalidos:
+                nombre_limpio = nombre_limpio.replace(char, '')
+        
+        # Limitar longitud
+        if len(nombre_limpio) > 30:  # Reducido de 50 a 30 para nombres más cortos
+            nombre_limpio = nombre_limpio[:30]
+        
+        # Si queda vacío después de limpiar, usar valor por defecto
+        if not nombre_limpio:
+            return 'Item'
+        
+        return nombre_limpio
     
     def _update_status_message(self):
         """Actualiza el mensaje de estado de la base de datos en la esquina inferior derecha"""

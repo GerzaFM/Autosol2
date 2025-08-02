@@ -19,7 +19,8 @@ class ActionButtonsFrame:
                  on_abrir_pdf_callback: Optional[Callable] = None,
                  on_export_callback: Optional[Callable] = None,
                  on_detalles_callback: Optional[Callable] = None,
-                 on_modificar_callback: Optional[Callable] = None):
+                 on_modificar_callback: Optional[Callable] = None,
+                 on_cheque_callback: Optional[Callable] = None):
         
         self.parent = parent
         self.on_autocarga_callback = on_autocarga_callback
@@ -31,6 +32,7 @@ class ActionButtonsFrame:
         self.on_export_callback = on_export_callback
         self.on_detalles_callback = on_detalles_callback
         self.on_modificar_callback = on_modificar_callback
+        self.on_cheque_callback = on_cheque_callback
         self.logger = logging.getLogger(__name__)
         
         # Estado actual de la selección
@@ -60,7 +62,18 @@ class ActionButtonsFrame:
         # Botones de acción en el orden exacto del original (todos con el mismo ancho)
         button_width = 12  # Ancho uniforme para todos los botones
         
-        # Botón Cargado (al final)
+        # Botón Cheque (a la derecha del botón Cargado)
+        self.cheque_btn = ttk.Button(
+            right_controls,
+            text="Cheque",
+            command=self._on_cheque_clicked,
+            bootstyle="success",
+            width=button_width,
+            state="disabled"
+        )
+        self.cheque_btn.pack(side="right", padx=(10, 0))
+        
+        # Botón Cargado 
         self.toggle_cargada_btn = ttk.Button(
             right_controls,
             text="Cargado",
@@ -179,6 +192,12 @@ class ActionButtonsFrame:
         if self.on_export_callback:
             self.on_export_callback()
     
+    def _on_cheque_clicked(self):
+        """Maneja el click en Cheque"""
+        self.logger.info("Botón Cheque clickeado")
+        if self.on_cheque_callback:
+            self.on_cheque_callback()
+    
     def set_selected_data(self, data):
         """
         Establece los datos del elemento seleccionado
@@ -206,7 +225,8 @@ class ActionButtonsFrame:
             self.export_btn,
             self.modificar_btn,
             self.detalles_btn,
-            self.toggle_cargada_btn
+            self.toggle_cargada_btn,
+            self.cheque_btn
         ]
         
         state = "normal" if enabled else "disabled"
