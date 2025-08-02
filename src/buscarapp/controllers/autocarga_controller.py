@@ -41,6 +41,7 @@ class AutocargaController:
             codigo_banco = orden_data.get('Codigo_Banco', '')
             folio_factura = orden_data.get('Folio_Factura', '')
             archivo_original = orden_data.get('archivo_original', '')
+            cuentas_mayores = orden_data.get('cuentas_mayores', None)
             
             # Validar datos esenciales
             if not ref_movimiento or not cuenta_str or not nombre:
@@ -56,6 +57,20 @@ class AutocargaController:
                 self.logger.warning(f"Error convirtiendo datos numéricos para orden: {orden_data}")
                 cuenta = 0
                 importe = 0.0
+                
+            # Procesar cuentas mayores (ahora es un string directo)
+            cuenta_mayor = None
+            if cuentas_mayores:
+                if isinstance(cuentas_mayores, str) and cuentas_mayores.isdigit():
+                    cuenta_mayor = int(cuentas_mayores)
+                elif isinstance(cuentas_mayores, int):
+                    cuenta_mayor = cuentas_mayores
+                elif isinstance(cuentas_mayores, (tuple, list)) and len(cuentas_mayores) > 0:
+                    # Compatibilidad con formato anterior (por si acaso)
+                    cuenta_mayor = int(cuentas_mayores[0]) if str(cuentas_mayores[0]).isdigit() else None
+                    
+            if cuenta_mayor:
+                self.logger.info(f"💼 Cuenta mayor encontrada: {cuenta_mayor}")
             
             # Verificar si la orden ya existe (evitar duplicados)
             orden_existente = OrdenCompra.get_or_none(
@@ -100,17 +115,41 @@ class AutocargaController:
                 folio_factura=folio_factura,
                 archivo_original=archivo_original,
                 fecha_procesamiento=date.today(),
+                cuenta_mayor=cuenta_mayor,  # Agregar la cuenta mayor extraída del PDF
                 factura=factura_asociada  # Asociar con la factura si se encontró
             )
+            
+            # Actualizar cuenta_mayor del proveedor si no la tiene
+            if cuenta_mayor:
+                proveedor_para_actualizar = None
+                
+                # Caso 1: Hay factura asociada, usar su proveedor
+                if factura_asociada and factura_asociada.proveedor:
+                    proveedor_para_actualizar = factura_asociada.proveedor
+                    self.logger.info(f"🔗 Usando proveedor de factura asociada: {proveedor_para_actualizar.nombre}")
+                
+                # Caso 2: No hay factura asociada, buscar proveedor por cuenta o nombre
+                else:
+                    proveedor_para_actualizar = self._buscar_proveedor_para_cuenta_mayor(cuenta, nombre)
+                    if proveedor_para_actualizar:
+                        self.logger.info(f"🔍 Proveedor encontrado por búsqueda: {proveedor_para_actualizar.nombre}")
+                
+                # Actualizar cuenta mayor si encontramos un proveedor
+                if proveedor_para_actualizar:
+                    self._actualizar_cuenta_mayor_proveedor(proveedor_para_actualizar, cuenta_mayor, nueva_orden.id)
+                else:
+                    self.logger.info(f"ℹ️ No se pudo determinar el proveedor para actualizar cuenta mayor {cuenta_mayor}")
             
             contadores['ordenes_creadas'] = contadores.get('ordenes_creadas', 0) + 1
             
             if factura_asociada:
                 contadores['ordenes_asociadas'] = contadores.get('ordenes_asociadas', 0) + 1
-                self.logger.info(f"✅ Orden creada y asociada: ID {nueva_orden.id} → Factura {factura_asociada.serie}-{factura_asociada.folio}")
+                mensaje_cuenta_mayor = f" (Cuenta Mayor: {cuenta_mayor})" if cuenta_mayor else ""
+                self.logger.info(f"✅ Orden creada y asociada: ID {nueva_orden.id} → Factura {factura_asociada.serie}-{factura_asociada.folio}{mensaje_cuenta_mayor}")
             else:
                 contadores['ordenes_sin_asociar'] = contadores.get('ordenes_sin_asociar', 0) + 1
-                self.logger.info(f"✅ Orden creada sin asociar: ID {nueva_orden.id}")
+                mensaje_cuenta_mayor = f" (Cuenta Mayor: {cuenta_mayor})" if cuenta_mayor else ""
+                self.logger.info(f"✅ Orden creada sin asociar: ID {nueva_orden.id}{mensaje_cuenta_mayor}")
                 
         except Exception as e:
             self.logger.error(f"Error procesando orden individual: {e}")
@@ -1017,3 +1056,85 @@ class AutocargaController:
             self.logger.error(f"Error en asociación inteligente: {e}")
             
         return None
+
+    def _actualizar_cuenta_mayor_proveedor(self, proveedor, cuenta_mayor, orden_id):
+        """
+        Actualiza la cuenta_mayor del proveedor si no la tiene asignada.
+        
+        Args:
+            proveedor: Instancia del modelo Proveedor
+            cuenta_mayor (int): Cuenta mayor extraída del PDF
+            orden_id (int): ID de la orden de compra para logging
+        """
+        try:
+            # Verificar si el proveedor ya tiene cuenta mayor
+            if proveedor.cuenta_mayor is None or proveedor.cuenta_mayor == 0:
+                # El proveedor no tiene cuenta mayor, asignar la nueva
+                proveedor.cuenta_mayor = cuenta_mayor
+                proveedor.save()
+                
+                self.logger.info(f"🏦 Cuenta mayor {cuenta_mayor} asignada al proveedor '{proveedor.nombre}' (desde orden ID: {orden_id})")
+                
+            else:
+                # El proveedor ya tiene cuenta mayor
+                if proveedor.cuenta_mayor == cuenta_mayor:
+                    self.logger.info(f"✅ Proveedor '{proveedor.nombre}' ya tiene la cuenta mayor correcta: {cuenta_mayor}")
+                else:
+                    self.logger.warning(f"⚠️ Proveedor '{proveedor.nombre}' ya tiene cuenta mayor {proveedor.cuenta_mayor}, no se actualiza con {cuenta_mayor}")
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error actualizando cuenta mayor del proveedor {proveedor.nombre}: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+
+    def _buscar_proveedor_para_cuenta_mayor(self, cuenta, nombre_proveedor):
+        """
+        Busca un proveedor para actualizar su cuenta mayor cuando no hay factura asociada.
+        
+        Args:
+            cuenta (int): Código de cuenta del proveedor
+            nombre_proveedor (str): Nombre del proveedor de la orden
+            
+        Returns:
+            Proveedor: Instancia del proveedor encontrado o None
+        """
+        try:
+            from bd.models import Proveedor
+            
+            # Estrategia 1: Buscar por codigo_quiter
+            proveedor = Proveedor.get_or_none(Proveedor.codigo_quiter == cuenta)
+            if proveedor:
+                self.logger.info(f"✅ Proveedor encontrado por codigo_quiter {cuenta}: {proveedor.nombre}")
+                return proveedor
+            
+            # Estrategia 2: Buscar por nombre (coincidencia parcial)
+            nombre_limpio = nombre_proveedor.upper().replace('SADECV', '').replace('S.A.DE C.V.', '').strip()
+            
+            # Buscar coincidencia exacta primero
+            proveedor = Proveedor.get_or_none(Proveedor.nombre == nombre_proveedor)
+            if proveedor:
+                self.logger.info(f"✅ Proveedor encontrado por nombre exacto: {proveedor.nombre}")
+                return proveedor
+            
+            # Buscar coincidencia parcial
+            proveedores_candidatos = Proveedor.select().where(
+                (Proveedor.nombre.contains(nombre_limpio[:15])) |  # Primeros 15 caracteres
+                (Proveedor.nombre.contains(nombre_limpio.split()[0]))  # Primera palabra
+            )
+            
+            if proveedores_candidatos.count() == 1:
+                proveedor = proveedores_candidatos.first()
+                self.logger.info(f"✅ Proveedor encontrado por coincidencia parcial: {proveedor.nombre}")
+                return proveedor
+            elif proveedores_candidatos.count() > 1:
+                # Si hay múltiples coincidencias, tomar el primero pero avisar
+                proveedor = proveedores_candidatos.first()
+                self.logger.warning(f"⚠️ Múltiples proveedores encontrados, tomando el primero: {proveedor.nombre}")
+                return proveedor
+            
+            self.logger.info(f"❌ No se encontró proveedor para cuenta {cuenta} y nombre '{nombre_proveedor}'")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error buscando proveedor para cuenta mayor: {e}")
+            return None

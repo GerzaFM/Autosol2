@@ -397,6 +397,80 @@ class OrdenDataExtractor:
         
         return table_data
 
+    def extraer_cuentas_mayores(self, pdf_path: str) -> str:
+        """
+        Extrae la primera cuenta mayor de la tabla de cuentas contables del PDF.
+        Optimizado para extraer solo la primera cuenta encontrada.
+        
+        Args:
+            pdf_path (str): Ruta del archivo PDF
+            
+        Returns:
+            str: Primera cuenta mayor encontrada, o None si no se encuentra
+        """
+        try:
+            # Método 1: Extraer usando pdfplumber (mejor para tablas)
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    # Extraer tablas de la página
+                    tables = page.extract_tables()
+                    
+                    for table in tables:
+                        if not table:
+                            continue
+                        
+                        # Buscar el encabezado "C MAYOR" o similar
+                        header_row = None
+                        mayor_col_index = None
+                        
+                        for i, row in enumerate(table):
+                            if row and any(cell and 'MAYOR' in str(cell).upper() for cell in row):
+                                header_row = i
+                                # Encontrar la columna de C MAYOR
+                                for j, cell in enumerate(row):
+                                    if cell and 'MAYOR' in str(cell).upper():
+                                        mayor_col_index = j
+                                        break
+                                break
+                        
+                        # Si encontramos la columna de C MAYOR, extraer solo la primera cuenta
+                        if header_row is not None and mayor_col_index is not None:
+                            for row in table[header_row + 1:]:  # Saltar el encabezado
+                                if row and len(row) > mayor_col_index:
+                                    cuenta = row[mayor_col_index]
+                                    if cuenta and str(cuenta).strip():
+                                        cuenta_str = str(cuenta).strip()
+                                        # Validar que sea una cuenta (11 dígitos)
+                                        if re.match(r'^\d{11}$', cuenta_str):
+                                            return cuenta_str  # Retornar inmediatamente la primera encontrada
+            
+            # Método 2: Si no encontramos con tablas, usar regex en el texto
+            text = self.extract_text_with_pdfplumber(pdf_path)
+            
+            # Buscar patrones de cuentas mayores (11 dígitos) cerca de "MAYOR"
+            lineas = text.split('\n')
+            for i, linea in enumerate(lineas):
+                if 'MAYOR' in linea.upper():
+                    # Buscar en esta línea y las siguientes
+                    for j in range(i, min(i + 10, len(lineas))):
+                        cuentas_en_linea = re.findall(r'\b(\d{11})\b', lineas[j])
+                        if cuentas_en_linea:
+                            return cuentas_en_linea[0]  # Retornar la primera encontrada
+            
+            # Método 3: Si aún no encontramos, buscar el primer número de 11 dígitos válido
+            patron_cuentas = r'\b(\d{11})\b'
+            cuentas_encontradas = re.findall(patron_cuentas, text)
+            
+            # Filtrar y retornar la primera cuenta que parezca válida
+            for cuenta in cuentas_encontradas:
+                if cuenta.startswith(('1', '2', '3', '4', '5')):
+                    return cuenta
+            
+        except Exception as e:
+            print(f"Error al extraer cuenta mayor: {e}")
+        
+        return None  # Retornar None si no se encuentra ninguna cuenta
+
     def extract_all_data(self, pdf_path: str) -> dict:
         """
         Extrae todos los datos de la orden.
@@ -444,6 +518,10 @@ class OrdenDataExtractor:
         
         # Post-procesamiento específico para mejorar los datos
         self.improve_extracted_data(data, combined_text)
+        
+        # Extraer primera cuenta mayor (optimizado)
+        cuenta_mayor = self.extraer_cuentas_mayores(pdf_path)
+        data['cuentas_mayores'] = cuenta_mayor  # Ahora es un string o None
         
         # Agregar información adicional
         data['archivo_original'] = Path(pdf_path).name

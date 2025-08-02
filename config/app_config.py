@@ -54,3 +54,8 @@ class AppConfig:
     }
 
     RUTA_CHEQUE = "FormatosSolicitud/Cheque.pdf"
+
+    CUENTAS_MAYORES = {
+        "Iva_Haber": 12790000000,
+        "Iva_Deber": 12780000000
+    }

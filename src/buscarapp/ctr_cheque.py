@@ -2,6 +2,7 @@ from cheque_form_control import FormPDF
 from datetime import datetime
 import sys
 import os
+from decimal import Decimal
 
 # Agregar path para acceder a los modelos de BD
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -13,6 +14,125 @@ try:
 except ImportError:
     print("Error: No se pudieron importar los modelos de la base de datos")
     Banco = OrdenCompra = Factura = None
+
+
+def numero_a_letras(numero):
+    """
+    Convierte un número a letras en español con formato de centavos x/100
+    
+    Args:
+        numero (float, int, str, Decimal): Número a convertir
+    
+    Returns:
+        str: Número convertido a letras con formato "PESOS XX/100 MN"
+    
+    Ejemplo:
+        numero_a_letras(1234.56) -> "MIL DOSCIENTOS TREINTA Y CUATRO PESOS 56/100 MN"
+        numero_a_letras(100) -> "CIEN PESOS 00/100 MN"
+        numero_a_letras(0.75) -> "CERO PESOS 75/100 MN"
+    """
+    try:
+        # Convertir a Decimal para manejo preciso de decimales
+        if isinstance(numero, str):
+            # Limpiar string (remover comas, espacios, etc.)
+            numero_limpio = numero.replace(',', '').replace(' ', '').strip()
+            num = Decimal(numero_limpio)
+        else:
+            num = Decimal(str(numero))
+        
+        # Separar parte entera y centavos
+        parte_entera = int(num)
+        centavos = int((num - parte_entera) * 100)
+        
+        # Diccionarios para conversión
+        unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"]
+        especiales = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", 
+                     "DIECISIETE", "DIECIOCHO", "DIECINUEVE"]
+        decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", 
+                  "SETENTA", "OCHENTA", "NOVENTA"]
+        centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS",
+                   "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"]
+        
+        def convertir_grupo(num):
+            """Convierte un grupo de 3 dígitos a letras"""
+            if num == 0:
+                return ""
+            
+            resultado = ""
+            
+            # Centenas
+            if num >= 100:
+                if num == 100:
+                    resultado += "CIEN"
+                else:
+                    resultado += centenas[num // 100]
+                num %= 100
+                if num > 0:
+                    resultado += " "
+            
+            # Decenas y unidades
+            if num >= 20:
+                resultado += decenas[num // 10]
+                num %= 10
+                if num > 0:
+                    resultado += " Y " + unidades[num]
+            elif num >= 10:
+                resultado += especiales[num - 10]
+            elif num > 0:
+                resultado += unidades[num]
+            
+            return resultado
+        
+        def numero_completo_a_letras(numero):
+            """Convierte un número completo a letras"""
+            if numero == 0:
+                return "CERO"
+            
+            grupos = []
+            nombres_grupos = ["", "MIL", "MILLONES", "MIL MILLONES"]
+            grupo_idx = 0
+            
+            while numero > 0 and grupo_idx < len(nombres_grupos):
+                grupo = numero % 1000
+                if grupo > 0:
+                    grupo_letras = convertir_grupo(grupo)
+                    
+                    if grupo_idx == 1:  # Miles
+                        if grupo == 1:
+                            grupos.append("MIL")
+                        else:
+                            grupos.append(grupo_letras + " MIL")
+                    elif grupo_idx == 2:  # Millones
+                        if grupo == 1:
+                            grupos.append("UN MILLÓN")
+                        else:
+                            grupos.append(grupo_letras + " MILLONES")
+                    elif grupo_idx == 3:  # Mil millones
+                        grupos.append(grupo_letras + " MIL MILLONES")
+                    else:  # Unidades
+                        grupos.append(grupo_letras)
+                
+                numero //= 1000
+                grupo_idx += 1
+            
+            return " ".join(reversed(grupos))
+        
+        # Convertir parte entera
+        if parte_entera == 0:
+            letras_enteras = "CERO"
+        else:
+            letras_enteras = numero_completo_a_letras(parte_entera)
+        
+        # Formato final con centavos
+        centavos_str = f"{centavos:02d}"  # Asegurar 2 dígitos
+        resultado = f"{letras_enteras} PESOS {centavos_str}/100 MN"
+        
+        return resultado
+        
+    except (ValueError, TypeError, Exception) as e:
+        # En caso de error, devolver formato por defecto
+        return f"ERROR EN CONVERSIÓN: {str(numero)} PESOS 00/100 MN"
+
 
 class Cheque:
     def __init__(self, factura, ruta):
@@ -64,6 +184,10 @@ class Cheque:
                 if orden_compra:
                     importe_letras = orden_compra.importe_en_letras or ""
             
+            # Si no hay importe en letras en la BD, generarlo automáticamente
+            if not importe_letras and total_factura:
+                importe_letras = self.convertir_numero_a_letras(total_factura)
+            
             # Obtener datos del banco BTC23
             if Banco:
                 banco_btc23 = Banco.select().where(
@@ -75,7 +199,9 @@ class Cheque:
                     
         except Exception as e:
             print(f"Error accediendo a la base de datos: {e}")
-            # Los valores por defecto ya están establecidos
+            # Si hay error, generar importe en letras automáticamente
+            if total_factura:
+                importe_letras = self.convertir_numero_a_letras(total_factura)
         
         return {
             "Fecha1_af_date": fecha_actual,
@@ -94,6 +220,18 @@ class Cheque:
             "Parcial": "",
             "Cantidad": str(total_factura),
         }
+    
+    def convertir_numero_a_letras(self, numero):
+        """
+        Método de conveniencia para convertir número a letras usando la función global
+        
+        Args:
+            numero: Número a convertir
+            
+        Returns:
+            str: Número convertido a letras con formato x/100
+        """
+        return numero_a_letras(numero)
     
     def generar_cheque(self):
         """

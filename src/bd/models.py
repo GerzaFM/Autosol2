@@ -16,6 +16,7 @@ class Proveedor(Model):
     email = CharField(null=True)
     nombre_contacto = CharField(null=True)
     codigo_quiter = IntegerField(null=True)
+    cuenta_mayor = IntegerField(null=True)  # Cuenta mayor, deberia ser una tabla de cuentas mayores
 
     class Meta:
         database = db
@@ -131,6 +132,7 @@ class Banco(Model):
     nombre = CharField()
     cuenta = CharField(unique=True)
     codigo = CharField(unique=True)
+    cuenta_mayor = IntegerField(null=True)
 
     class Meta:
         database = db
