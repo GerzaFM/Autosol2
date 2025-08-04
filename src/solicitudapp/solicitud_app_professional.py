@@ -1383,7 +1383,9 @@ class SolicitudApp(tb.Frame):
                         "fecha": solicitud_data.get("Fecha", ""),
                         "tipo": self._get_tipo_value_from_solicitud_frame(),  # Usar método mejorado
                         "nombre_receptor": "TCM MATEHUALA",  # Valor por defecto
-                        "rfc_receptor": "TMM860630PH1"  # Valor por defecto
+                        "rfc_receptor": "TMM860630PH1",  # Valor por defecto
+                        "clase": solicitud_data.get("Clase", ""),  # Campo clase
+                        "departamento": solicitud_data.get("Depa", "")  # Campo departamento
                     }
                     
                     # IMPORTANTE: Usar los totales ya divididos si la funcionalidad está activa

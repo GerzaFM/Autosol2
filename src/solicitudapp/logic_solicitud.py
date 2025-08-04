@@ -105,6 +105,8 @@ class SolicitudLogica:
             "ret_isr": totales.get("ret_isr"),
             "total": totales.get("total"),
             "comentario": comentarios.get("comentario"),
+            "clase": solicitud_data.get("clase"),  # Campo clase
+            "departamento": solicitud_data.get("departamento"),  # Campo departamento
             # Datos de los conceptos
             "conceptos": [
                 {

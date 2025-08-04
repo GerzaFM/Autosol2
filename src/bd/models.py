@@ -48,7 +48,8 @@ class Factura(Model):
     iva_trasladado = DecimalField(null=True)
     total = DecimalField()
     comentario = CharField(null=True)
-    clase = CharField(null=True)  # Campo opcional para la clase de factura
+    clase = CharField(null=True)
+    departamento = CharField(null=True) 
     proveedor = ForeignKeyField(Proveedor, backref='facturas')
     layout = ForeignKeyField(Layout, backref='facturas', null=True)
     cargada = BooleanField(default=False)
