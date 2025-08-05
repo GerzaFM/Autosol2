@@ -233,6 +233,13 @@ class Cheque:
             if total_factura:
                 importe_letras = self.convertir_numero_a_letras(total_factura)
 
+        if total_factura:
+                importe_letras = self.convertir_numero_a_letras(total_factura)
+
+        # Verificar si hay IVA trasladado para determinar qué cuentas incluir
+        iva_trasladado = self.factura.get('iva_trasladado', 0)
+        tiene_iva = bool(iva_trasladado and iva_trasladado > 0)
+
         # Construir campo Nombre con nombres correspondientes
         nombres_lista = []
         
@@ -248,8 +255,8 @@ class Cheque:
         elif banco_cuenta_mayor:
             nombres_lista.append("")  # Placeholder si no hay nombre
         
-        # Nombres para cuentas IVA
-        if AppConfig:
+        # Nombres para cuentas IVA SOLO si hay IVA trasladado
+        if tiene_iva and AppConfig:
             iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
             iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
             
@@ -275,8 +282,8 @@ class Cheque:
         if banco_cuenta_mayor:
             cuentas_lista.append(str(banco_cuenta_mayor))
         
-        # Agregar cuentas IVA desde configuración
-        if AppConfig:
+        # Agregar cuentas IVA desde configuración SOLO si hay IVA trasladado
+        if tiene_iva and AppConfig:
             iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
             iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
             
@@ -300,8 +307,8 @@ class Cheque:
         elif banco_cuenta_mayor:
             subcuentas_lista.append("")  # Placeholder si no hay código
         
-        # Subcuentas IVA: usar codigo_quiter del proveedor también
-        if AppConfig:
+        # Subcuentas IVA: usar codigo_quiter del proveedor también SOLO si hay IVA trasladado
+        if tiene_iva and AppConfig:
             iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
             iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
             
@@ -322,9 +329,11 @@ class Cheque:
                 cuenta_con_ceros = cuenta.zfill(4) + "00000"
                 cuentas_procesadas.append(cuenta_con_ceros)
         
-        # Procesar subcuentas: mantener valores originales sin transformaciones (limitar a 3)
+        # Procesar subcuentas: mantener valores originales sin transformaciones
+        # Limitar a 2 subcuentas si no hay IVA, 3 si hay IVA
+        limite_subcuentas = 2 if not tiene_iva else 3
         subcuentas_procesadas = []
-        for subcuenta in subcuentas_lista[:3]:  # Limitar a solo 3 subcuentas
+        for subcuenta in subcuentas_lista[:limite_subcuentas]:
             if subcuenta:
                 subcuentas_procesadas.append(str(subcuenta))
             else:
@@ -439,7 +448,6 @@ class Cheque:
         
         # Construir campo Debe: factura.total seguido de muchos saltos de línea y luego factura.iva_trasladado
         debe_campo = formatear_moneda(total_factura) if total_factura else ""
-        iva_trasladado = self.factura.get('iva_trasladado', 0)
 
         # Contar renglones del proveedor y banco para ajustar saltos de línea
         renglones_proveedor = contar_renglones_nombre(nombre_proveedor)

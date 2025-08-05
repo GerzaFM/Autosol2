@@ -311,7 +311,7 @@ class AutocargaController:
             facturas_info = f"""
 🎯 FACTURAS SELECCIONADAS PARA ASOCIACIÓN:
 • Total de facturas seleccionadas: {len(facturas_seleccionadas)}
-• Folios seleccionados: {', '.join([f.get('serie_folio', 'N/A') for f in facturas_seleccionadas[:5]])}{'...' if len(facturas_seleccionadas) > 5 else ''}
+• Folios seleccionados: {', '.join([str(f.get('serie_folio', 'N/A')) for f in facturas_seleccionadas[:5]])}{'...' if len(facturas_seleccionadas) > 5 else ''}
 """
         reporte_content = f"""
 🚀 AUTOCARGA COMPLETADA
@@ -827,24 +827,38 @@ class AutocargaController:
             def buscar_factura_asociada(no_documento, facturas_seleccionadas, nombre_vale=""):
                 if not no_documento or not facturas_seleccionadas:
                     return None, None
-                    
+                
+                # Analizar el tipo de No Documento: ¿es "SERIE-FOLIO" o solo "FOLIO"?
+                doc_serie, doc_folio = extraer_serie_folio(no_documento)
                 doc_norm = normalizar_documento(no_documento)
+                
+                if doc_serie and doc_folio:
+                    self.logger.debug(f"🔍 No Documento '{no_documento}' parece ser SERIE-FOLIO: serie='{doc_serie}', folio='{doc_folio}'")
+                    es_serie_folio = True
+                else:
+                    self.logger.debug(f"🔍 No Documento '{no_documento}' parece ser solo FOLIO o formato desconocido")
+                    es_serie_folio = False
+                
                 self.logger.debug(f"🔍 Buscando asociación para vale {nombre_vale}: No Documento '{no_documento}' (normalizado: '{doc_norm}')")
+                self.logger.info(f"📊 DEBUGGING - Total facturas seleccionadas: {len(facturas_seleccionadas)}")
                 
                 for i, factura_data in enumerate(facturas_seleccionadas):
                     try:
+                        # DEBUG: Mostrar datos completos de la factura
+                        self.logger.debug(f"   🔍 FACTURA {i+1}: {factura_data}")
+                        
                         # Obtener datos directamente del diccionario de factura
                         serie_folio = factura_data.get('serie_folio', '')
-                        # IMPORTANTE: Obtener serie y folio directamente del diccionario
                         serie_original = factura_data.get('serie', '')
                         folio_original = factura_data.get('folio', '')
                         
-                        # DEBUG: Mostrar valores originales
-                        self.logger.debug(f"   🔍 Datos originales: serie_original='{serie_original}' (tipo: {type(serie_original)}), folio_original='{folio_original}' (tipo: {type(folio_original)})")
+                        # DEBUG: Mostrar valores RAW antes de procesamiento
+                        self.logger.debug(f"   📋 Valores RAW: serie_folio='{serie_folio}', serie='{serie_original}', folio='{folio_original}'")
                         
                         # Si no tenemos serie y folio directamente, extraerlos del folio_xml
                         if not serie_original or not folio_original:
                             folio_xml = factura_data.get('folio_xml', '')
+                            self.logger.debug(f"   🔄 Extrayendo de folio_xml: '{folio_xml}'")
                             if folio_xml and ' ' in folio_xml:
                                 partes = folio_xml.split(' ', 1)
                                 if len(partes) == 2:
@@ -853,13 +867,15 @@ class AutocargaController:
                                         folio_original = int(partes[1].strip())
                                     except ValueError:
                                         folio_original = partes[1].strip()
+                                    self.logger.debug(f"   ✅ Extraído: serie='{serie_original}', folio='{folio_original}'")
                         
-                        # Convertir a strings para evitar errores de tipo, manejando None y tipos diversos
+                        # Convertir a strings para evitar errores de tipo
                         serie_folio = str(serie_folio).strip() if serie_folio else ''
                         serie = str(serie_original).strip() if serie_original else ''
                         folio_str = str(folio_original).strip() if folio_original not in [None, ''] else ''
                         
-                        self.logger.debug(f"   🔍 Datos procesados: serie='{serie}', folio_str='{folio_str}', serie_folio='{serie_folio}'")
+                        # DEBUG: Mostrar valores procesados
+                        self.logger.debug(f"   🎯 Valores PROCESADOS: serie_folio='{serie_folio}', serie='{serie}', folio_str='{folio_str}'")
                         
                         if not serie_folio:
                             self.logger.debug(f"   ⚠️ Saltando factura sin serie_folio")
@@ -867,61 +883,129 @@ class AutocargaController:
                         
                         self.logger.debug(f"   📋 Verificando factura: '{serie_folio}' - Serie: '{serie}', Folio: '{folio_str}'")
                         
-                        # Normalizar para comparación
-                        serie_folio_norm = normalizar_documento(serie_folio)
-                        
-                        # 1. Coincidencia directa con serie_folio normalizado
-                        if serie_folio_norm == doc_norm:
-                            self.logger.info(f"   ✅ Coincidencia directa serie_folio para vale {nombre_vale}: '{serie_folio}' ~ '{no_documento}'")
-                            try:
-                                if serie and folio_str and folio_str.isdigit():
-                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                    return factura_asociada, "serie_folio_exacto"
-                                else:
-                                    self.logger.warning(f"   ❌ Datos inválidos: serie='{serie}', folio='{folio_str}'")
+                        # ===== CASO 1: No Documento es SERIE-FOLIO (ej: "A-123", "CFDI 456") =====
+                        if es_serie_folio and doc_serie and doc_folio:
+                            self.logger.debug(f"   🔍 CASO 1 - SERIE-FOLIO: Comparando doc_serie='{doc_serie}' con serie='{serie}' y doc_folio='{doc_folio}' con folio_str='{folio_str}'")
+                            
+                            # 1.1. Coincidencia exacta: serie y folio coinciden
+                            if serie == doc_serie and folio_str == doc_folio:
+                                self.logger.info(f"   ✅ Coincidencia exacta SERIE-FOLIO para vale {nombre_vale}: {doc_serie}-{doc_folio} = {serie}-{folio_str}")
+                                try:
+                                    if folio_str.isdigit():
+                                        factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                        return factura_asociada, "serie_folio_exacto"
+                                except Exception as e:
+                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
                                     continue
-                            except Exception as e:
-                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                continue
-                        
-                        # 2. Coincidencia solo con el folio
-                        if folio_str and folio_str == no_documento:
-                            self.logger.info(f"   ✅ Coincidencia por folio para vale {nombre_vale}: folio '{folio_str}' = '{no_documento}'")
-                            try:
-                                if serie and folio_str.isdigit():
-                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                    return factura_asociada, "folio_exacto"
-                                else:
-                                    self.logger.warning(f"   ❌ Datos inválidos para folio: serie='{serie}', folio='{folio_str}'")
+                            else:
+                                self.logger.debug(f"   ❌ NO coincide exacto: serie '{serie}' != '{doc_serie}' O folio '{folio_str}' != '{doc_folio}'")
+                            
+                            # 1.2. Coincidencia normalizada: comparar serie_folio completo normalizado
+                            serie_folio_norm = normalizar_documento(serie_folio)
+                            self.logger.debug(f"   🔍 Comparando normalizado: '{serie_folio_norm}' vs '{doc_norm}'")
+                            if serie_folio_norm == doc_norm:
+                                self.logger.info(f"   ✅ Coincidencia normalizada SERIE-FOLIO para vale {nombre_vale}: '{serie_folio}' ~ '{no_documento}'")
+                                try:
+                                    if serie and folio_str and folio_str.isdigit():
+                                        factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                        return factura_asociada, "serie_folio_normalizado"
+                                except Exception as e:
+                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
                                     continue
-                            except Exception as e:
-                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                continue
+                            else:
+                                self.logger.debug(f"   ❌ NO coincide normalizado: '{serie_folio_norm}' != '{doc_norm}'")
                         
-                        # 3. Coincidencia con serie (menos común)
+                        # ===== CASO 2: No Documento es solo FOLIO (ej: "123", "456") =====
+                        else:
+                            self.logger.debug(f"   🔍 CASO 2 - SOLO FOLIO: Comparando no_documento='{no_documento}' con folio_str='{folio_str}'")
+                            
+                            # 2.1. Coincidencia directa con folio
+                            if folio_str and folio_str == no_documento:
+                                self.logger.info(f"   ✅ Coincidencia exacta FOLIO para vale {nombre_vale}: folio '{folio_str}' = '{no_documento}'")
+                                try:
+                                    if folio_str.isdigit():
+                                        # Buscar factura por folio (con o sin serie)
+                                        if serie and serie.strip():
+                                            # Caso: Factura con serie
+                                            self.logger.debug(f"   🔍 Buscando en BD: serie='{serie}' AND folio={int(folio_str)}")
+                                            factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                        else:
+                                            # Caso: Factura sin serie (solo folio)
+                                            self.logger.debug(f"   🔍 Buscando en BD: folio={int(folio_str)} (sin serie)")
+                                            factura_asociada = Factura.get(Factura.folio == int(folio_str))
+                                        
+                                        self.logger.info(f"   🎯 FACTURA ENCONTRADA EN BD: {factura_asociada.serie}-{factura_asociada.folio}")
+                                        return factura_asociada, "folio_exacto"
+                                    else:
+                                        self.logger.warning(f"   ❌ folio_str no es dígito: '{folio_str}'")
+                                except Exception as e:
+                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                                    self.logger.debug(f"   📍 Intentaba buscar: folio={int(folio_str) if folio_str.isdigit() else 'NO_DIGIT'}, serie='{serie}'")
+                                    continue
+                            else:
+                                self.logger.debug(f"   ❌ NO coincide folio exacto: '{folio_str}' != '{no_documento}'")
+                            
+                            # 2.2. Coincidencia con serie_folio normalizado (por si el folio está dentro)
+                            serie_folio_norm = normalizar_documento(serie_folio)
+                            self.logger.debug(f"   🔍 Verificando si '{no_documento}' está en '{serie_folio_norm}' o termina con él")
+                            if no_documento in serie_folio_norm or serie_folio_norm.endswith(no_documento):
+                                self.logger.info(f"   ✅ Coincidencia FOLIO en serie_folio para vale {nombre_vale}: '{no_documento}' está en '{serie_folio}'")
+                                try:
+                                    if folio_str and folio_str.isdigit():
+                                        # Buscar factura por folio (con o sin serie)
+                                        if serie and serie.strip():
+                                            # Caso: Factura con serie
+                                            self.logger.debug(f"   🔍 Buscando en BD: serie='{serie}' AND folio={int(folio_str)}")
+                                            factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                        else:
+                                            # Caso: Factura sin serie (solo folio)
+                                            self.logger.debug(f"   🔍 Buscando en BD: folio={int(folio_str)} (sin serie)")
+                                            factura_asociada = Factura.get(Factura.folio == int(folio_str))
+                                        
+                                        self.logger.info(f"   🎯 FACTURA ENCONTRADA EN BD: {factura_asociada.serie}-{factura_asociada.folio}")
+                                        return factura_asociada, "folio_en_serie_folio"
+                                    else:
+                                        self.logger.warning(f"   ❌ folio_str no es dígito: '{folio_str}'")
+                                except Exception as e:
+                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
+                                    self.logger.debug(f"   📍 Intentaba buscar: folio={int(folio_str) if folio_str.isdigit() else 'NO_DIGIT'}, serie='{serie}'")
+                                    continue
+                            else:
+                                self.logger.debug(f"   ❌ NO está contenido: '{no_documento}' no está en '{serie_folio_norm}'")
+                        
+                        # ===== CASO 3: Coincidencias adicionales y fallback =====
+                        
+                        # 3.1. Coincidencia con serie (menos común, pero posible)
                         if serie and serie == no_documento:
-                            self.logger.info(f"   ✅ Coincidencia por serie para vale {nombre_vale}: serie '{serie}' = '{no_documento}'")
+                            self.logger.info(f"   ✅ Coincidencia por SERIE para vale {nombre_vale}: serie '{serie}' = '{no_documento}'")
                             try:
                                 if folio_str and folio_str.isdigit():
                                     factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
                                     return factura_asociada, "serie_exacto"
-                                else:
-                                    self.logger.warning(f"   ❌ Datos inválidos para serie: serie='{serie}', folio='{folio_str}'")
-                                    continue
                             except Exception as e:
                                 self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
                                 continue
                         
-                        # 4. Coincidencia parcial (normalizada)
-                        if doc_norm and (doc_norm in serie_folio_norm or serie_folio_norm in doc_norm):
-                            self.logger.info(f"   ✅ Coincidencia parcial para vale {nombre_vale}: '{doc_norm}' <-> '{serie_folio_norm}'")
+                        # 3.2. Coincidencia parcial general (último recurso)
+                        serie_folio_norm = normalizar_documento(serie_folio)
+                        if doc_norm and len(doc_norm) >= 3 and (doc_norm in serie_folio_norm or serie_folio_norm in doc_norm):
+                            self.logger.info(f"   ✅ Coincidencia PARCIAL para vale {nombre_vale}: '{doc_norm}' <-> '{serie_folio_norm}'")
                             try:
-                                if serie and folio_str and folio_str.isdigit():
-                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                if folio_str and folio_str.isdigit():
+                                    # Buscar factura por folio (con o sin serie)
+                                    if serie and serie.strip():
+                                        # Caso: Factura con serie
+                                        self.logger.debug(f"   🔍 Buscando en BD: serie='{serie}' AND folio={int(folio_str)}")
+                                        factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
+                                    else:
+                                        # Caso: Factura sin serie (solo folio)
+                                        self.logger.debug(f"   🔍 Buscando en BD: folio={int(folio_str)} (sin serie)")
+                                        factura_asociada = Factura.get(Factura.folio == int(folio_str))
+                                    
+                                    self.logger.info(f"   🎯 FACTURA ENCONTrada EN BD: {factura_asociada.serie}-{factura_asociada.folio}")
                                     return factura_asociada, "parcial"
                                 else:
-                                    self.logger.warning(f"   ❌ Datos inválidos para coincidencia parcial: serie='{serie}', folio='{folio_str}'")
-                                    continue
+                                    self.logger.warning(f"   ❌ folio_str no es dígito: '{folio_str}'")
                             except Exception as e:
                                 self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
                                 continue
@@ -933,6 +1017,15 @@ class AutocargaController:
                         continue
                 
                 self.logger.info(f"   ⚠️ No se encontró coincidencia para No Documento '{no_documento}' entre {len(facturas_seleccionadas)} facturas")
+                
+                # DEBUG FINAL: Mostrar resumen de todas las facturas que se intentaron comparar
+                self.logger.debug("📋 RESUMEN DE FACTURAS NO COINCIDENTES:")
+                for i, factura_data in enumerate(facturas_seleccionadas):
+                    serie_folio = str(factura_data.get('serie_folio', '')).strip()
+                    serie = str(factura_data.get('serie', '')).strip()
+                    folio = str(factura_data.get('folio', '')).strip()
+                    self.logger.debug(f"   {i+1}. serie_folio='{serie_folio}', serie='{serie}', folio='{folio}'")
+                
                 return None, None
 
             datos_procesados = procesar_datos_vale(vale_data)
