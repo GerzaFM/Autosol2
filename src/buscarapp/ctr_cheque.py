@@ -335,6 +335,35 @@ class Cheque:
         # No limitar los nombres, incluir todos (especialmente la línea 4 con "IVA PAGADO")
         nombres_mayores = "\n\n\n".join(nombres_lista)
         
+        # Función para formatear números como moneda
+        def formatear_moneda(valor):
+            """Formatea un número como moneda con $ y separadores de miles"""
+            if not valor:
+                return ""
+            try:
+                # Convertir a float si es necesario
+                if isinstance(valor, str):
+                    valor = float(valor)
+                # Formatear con 2 decimales y separadores de miles
+                return f"${valor:,.2f}"
+            except (ValueError, TypeError):
+                return f"${valor}"
+        
+        # Construir campo Debe: factura.total seguido de muchos saltos de línea y luego factura.iva_trasladado
+        debe_campo = formatear_moneda(total_factura) if total_factura else ""
+        iva_trasladado = self.factura.get('iva_trasladado', 0)
+        if iva_trasladado:
+            debe_campo += "\n" * 12 + formatear_moneda(iva_trasladado)  # 12 saltos de línea + IVA trasladado
+        
+        # Construir campo Haber: saltos de línea iniciales + factura.total + saltos + iva_trasladado + saltos finales
+        haber_campo = ""
+        if total_factura or iva_trasladado:
+            haber_campo = "\n" * 4  # 4 saltos de línea iniciales
+            if total_factura:
+                haber_campo += formatear_moneda(total_factura) + "\n\n\n"  # Total + 3 saltos de línea
+            if iva_trasladado:
+                haber_campo += formatear_moneda(iva_trasladado)  # IVA trasladado 
+
         return {
             "Fecha1_af_date": fecha_actual,
             "Orden": proveedor,
@@ -345,12 +374,12 @@ class Cheque:
             "area": departamento,  # Campo departamento
             "Costos": tipo_vale,
             "subcuenta": subcuentas_mayores,  # Campo subcuentas con códigos
-            "Debe": "",
-            "Haber": "",
+            "Debe": debe_campo,  # Campo Debe con total y luego IVA trasladado
+            "Haber": haber_campo,  # Campo Haber con estructura específica
             "Cuenta": cuentas_mayores,
             "Nombre": nombres_mayores,  # Campo nombres con proveedores, banco e IVA
             "Parcial": "",
-            "Cantidad": str(total_factura)
+            "Cantidad": formatear_moneda(total_factura)  # Campo Cantidad con formato de moneda
         }
     
     def convertir_numero_a_letras(self, numero):
