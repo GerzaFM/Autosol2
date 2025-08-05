@@ -409,14 +409,21 @@ class Cheque:
         cuentas_con_separadores = []
         subcuentas_con_separadores = []
         
-        # Saltos entre cuentas basados en renglones de nombres
-        saltos_cuenta = [
-            renglones_proveedor + 2,  # Entre cuenta proveedor y banco
-            renglones_banco + 3,      # Entre cuenta banco y siguiente 
-            renglones_proveedor + 3   # Entre cuenta IVA y siguiente
-        ]
+        # Saltos entre cuentas basados en renglones de nombres - DINÁMICO según IVA
+        if tiene_iva:
+            # CON IVA: 4 cuentas (proveedor, banco, IVA Deber, IVA Haber)
+            saltos_cuenta = [
+                renglones_proveedor + 2,  # Entre cuenta proveedor y banco
+                renglones_banco + 3,      # Entre cuenta banco e IVA Deber
+                renglones_proveedor + 3   # Entre IVA Deber e IVA Haber
+            ]
+        else:
+            # SIN IVA: 2 cuentas (proveedor, banco)
+            saltos_cuenta = [
+                renglones_proveedor + 3   # Solo entre cuenta proveedor y banco
+            ]
         
-        # Procesar las 4 cuentas con saltos dinámicos
+        # Procesar cuentas con saltos dinámicos
         for i in range(len(cuentas_procesadas)):
             cuenta = cuentas_procesadas[i]
             
@@ -425,7 +432,7 @@ class Cheque:
                 cuentas_con_separadores.append(cuenta)
             else:
                 # Cuentas siguientes: con saltos según el array
-                saltos = saltos_cuenta[i-1] if i-1 < len(saltos_cuenta) else saltos_cuenta[-1]
+                saltos = saltos_cuenta[i-1]
                 cuentas_con_separadores.append("\n" * saltos + cuenta)
         
         # Procesar las 3 subcuentas con la lógica original mejorada
@@ -436,8 +443,11 @@ class Cheque:
                 # Primera subcuenta: sin saltos iniciales
                 subcuentas_con_separadores.append(subcuenta)
             elif i == 1:
-                # Segunda subcuenta: 2 saltos base + renglones del proveedor
-                saltos = 2 + renglones_proveedor
+                # Segunda subcuenta: ajustar según si hay IVA o no
+                if tiene_iva:
+                    saltos = 2 + renglones_proveedor  # Con IVA: usar 2 (funcionaba bien)
+                else:
+                    saltos = 3 + renglones_proveedor  # Sin IVA: usar 3 (nuevo ajuste)
                 subcuentas_con_separadores.append("\n" * saltos + subcuenta)
             elif i == 2:
                 # Tercera subcuenta: 3 saltos base + renglones del banco
@@ -469,19 +479,23 @@ class Cheque:
         renglones_proveedor = contar_renglones_nombre(nombre_proveedor)
         renglones_banco = contar_renglones_nombre(nombre_banco)
 
+        # Calcular saltos para el campo Debe (siempre, independiente de si hay IVA)
+        saltos_debe = 10
+        saltos_debe += (renglones_proveedor - 1) * 2  # +2 saltos por cada renglón adicional del proveedor
+        saltos_debe += (renglones_banco - 1) * 2  # +2 saltos por cada renglón adicional del banco
+        
+        # Agregar IVA trasladado solo si existe
         if iva_trasladado:
-
-            saltos_debe = 10
-            saltos_debe += (renglones_proveedor - 1) * 2  # +2 saltos por cada renglón adicional del proveedor
-            saltos_debe += (renglones_banco - 1) * 2  # +2 saltos por cada renglón adicional del banco
-            
             debe_campo += "\n" * saltos_debe + formatear_moneda(iva_trasladado)
         
         # Construir campo Haber: saltos de línea iniciales + factura.total + saltos + iva_trasladado + saltos finales
         haber_campo = ""
         if total_factura or iva_trasladado:
-            # Calcular saltos iniciales según renglones del proveedor
-            saltos_haber_iniciales = 2 + renglones_proveedor
+            # Calcular saltos iniciales según renglones del proveedor - ajustar según IVA
+            if tiene_iva:
+                saltos_haber_iniciales = 2 + renglones_proveedor  # Con IVA: usar 2 (funcionaba bien)
+            else:
+                saltos_haber_iniciales = 3 + renglones_proveedor  # Sin IVA: usar 3 (nuevo ajuste)
             saltos_haber = 3 + renglones_banco
             
             haber_campo = "\n" * saltos_haber_iniciales
