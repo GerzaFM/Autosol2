@@ -322,7 +322,7 @@ class Cheque:
                 cuenta_con_ceros = cuenta.zfill(4) + "00000"
                 cuentas_procesadas.append(cuenta_con_ceros)
         
-        # Procesar subcuentas: mantener valores originales sin transformaciones y limitar a 3
+        # Procesar subcuentas: mantener valores originales sin transformaciones (limitar a 3)
         subcuentas_procesadas = []
         for subcuenta in subcuentas_lista[:3]:  # Limitar a solo 3 subcuentas
             if subcuenta:
@@ -331,9 +331,97 @@ class Cheque:
                 # Si no hay subcuenta, agregar string vacío
                 subcuentas_procesadas.append("")
         
-        # Unir todas las cuentas y subcuentas con saltos de línea (sin saltos al inicio)
-        cuentas_mayores = "\n\n\n".join(cuentas_procesadas)
-        subcuentas_mayores = "\n\n\n".join(subcuentas_procesadas)
+        # Función para contar renglones que ocupa un nombre
+        def contar_renglones_nombre(nombre, ancho_linea=25):
+            """
+            Cuenta cuántos renglones ocupará un nombre
+            considerando el ancho de línea y ajuste de palabras
+            
+            Args:
+                nombre (str): Nombre a analizar
+                ancho_linea (int): Ancho máximo de caracteres por línea
+                
+            Returns:
+                int: Número de renglones que ocupará el nombre
+            """
+            if not nombre or not nombre.strip():
+                return 1  # Nombre vacío ocupa 1 renglón
+            
+            # Dividir el nombre en palabras
+            palabras = str(nombre).strip().split()
+            
+            if not palabras:
+                return 1
+            
+            renglones = 1
+            longitud_renglon_actual = 0
+            
+            for i, palabra in enumerate(palabras):
+                # Longitud que tendría si agregamos esta palabra
+                longitud_con_palabra = longitud_renglon_actual
+                
+                # Si no es la primera palabra del renglón, agregar espacio
+                if longitud_renglon_actual > 0:
+                    longitud_con_palabra += 1  # espacio
+                
+                longitud_con_palabra += len(palabra)
+                
+                # Si excede el ancho, la palabra va al siguiente renglón
+                if longitud_con_palabra > ancho_linea and longitud_renglon_actual > 0:
+                    renglones += 1
+                    longitud_renglon_actual = len(palabra)
+                else:
+                    longitud_renglon_actual = longitud_con_palabra
+            
+            return renglones
+        
+        # Construir campos Cuenta y subcuenta con alineación dinámica mejorada
+        # Contar renglones del proveedor y banco para ajustar saltos de línea
+        renglones_proveedor = contar_renglones_nombre(nombre_proveedor) if nombre_proveedor else 1
+        renglones_banco = contar_renglones_nombre(nombre_banco) if nombre_banco else 1
+        
+        # Construir cuentas con separadores dinámicos individuales
+        cuentas_con_separadores = []
+        subcuentas_con_separadores = []
+        
+        # Saltos entre cuentas basados en renglones de nombres
+        saltos_cuenta = [
+            renglones_proveedor + 2,  # Entre cuenta proveedor y banco
+            renglones_banco + 3,      # Entre cuenta banco y siguiente 
+            renglones_proveedor + 3   # Entre cuenta IVA y siguiente
+        ]
+        
+        # Procesar las 4 cuentas con saltos dinámicos
+        for i in range(len(cuentas_procesadas)):
+            cuenta = cuentas_procesadas[i]
+            
+            if i == 0:
+                # Primera cuenta: sin saltos iniciales
+                cuentas_con_separadores.append(cuenta)
+            else:
+                # Cuentas siguientes: con saltos según el array
+                saltos = saltos_cuenta[i-1] if i-1 < len(saltos_cuenta) else saltos_cuenta[-1]
+                cuentas_con_separadores.append("\n" * saltos + cuenta)
+        
+        # Procesar las 3 subcuentas con la lógica original mejorada
+        for i in range(len(subcuentas_procesadas)):
+            subcuenta = subcuentas_procesadas[i]
+            
+            if i == 0:
+                # Primera subcuenta: sin saltos iniciales
+                subcuentas_con_separadores.append(subcuenta)
+            elif i == 1:
+                # Segunda subcuenta: 2 saltos base + renglones del proveedor
+                saltos = 2 + renglones_proveedor
+                subcuentas_con_separadores.append("\n" * saltos + subcuenta)
+            elif i == 2:
+                # Tercera subcuenta: 3 saltos base + renglones del banco
+                saltos = 3 + renglones_banco
+                subcuentas_con_separadores.append("\n" * saltos + subcuenta)
+        
+        # Unir todas las cuentas y subcuentas
+        cuentas_mayores = "".join(cuentas_con_separadores)
+        subcuentas_mayores = "".join(subcuentas_con_separadores)
         
         # Función para formatear números como moneda
         def formatear_moneda(valor):
@@ -352,15 +440,29 @@ class Cheque:
         # Construir campo Debe: factura.total seguido de muchos saltos de línea y luego factura.iva_trasladado
         debe_campo = formatear_moneda(total_factura) if total_factura else ""
         iva_trasladado = self.factura.get('iva_trasladado', 0)
+
+        # Contar renglones del proveedor y banco para ajustar saltos de línea
+        renglones_proveedor = contar_renglones_nombre(nombre_proveedor)
+        renglones_banco = contar_renglones_nombre(nombre_banco)
+
         if iva_trasladado:
-            debe_campo += "\n" * 12 + formatear_moneda(iva_trasladado)  # 12 saltos de línea + IVA trasladado
+
+            saltos_debe = 10
+            saltos_debe += (renglones_proveedor - 1) * 2  # +2 saltos por cada renglón adicional del proveedor
+            saltos_debe += (renglones_banco - 1) * 2  # +2 saltos por cada renglón adicional del banco
+            
+            debe_campo += "\n" * saltos_debe + formatear_moneda(iva_trasladado)
         
         # Construir campo Haber: saltos de línea iniciales + factura.total + saltos + iva_trasladado + saltos finales
         haber_campo = ""
         if total_factura or iva_trasladado:
-            haber_campo = "\n" * 4  # 4 saltos de línea iniciales
+            # Calcular saltos iniciales según renglones del proveedor
+            saltos_haber_iniciales = 2 + renglones_proveedor
+            saltos_haber = 3 + renglones_banco
+            
+            haber_campo = "\n" * saltos_haber_iniciales
             if total_factura:
-                haber_campo += formatear_moneda(total_factura) + "\n\n\n"  # Total + 3 saltos de línea
+                haber_campo += formatear_moneda(total_factura) + "\n" * saltos_haber  # Total + 3 saltos de línea
             if iva_trasladado:
                 haber_campo += formatear_moneda(iva_trasladado)  # IVA trasladado 
 
