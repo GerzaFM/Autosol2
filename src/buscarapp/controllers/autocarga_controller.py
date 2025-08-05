@@ -119,7 +119,7 @@ class AutocargaController:
                 factura=factura_asociada  # Asociar con la factura si se encontró
             )
             
-            # Actualizar cuenta_mayor del proveedor si no la tiene
+            # Actualizar cuenta_mayor del proveedor y factura si no la tienen
             if cuenta_mayor:
                 proveedor_para_actualizar = None
                 
@@ -127,6 +127,14 @@ class AutocargaController:
                 if factura_asociada and factura_asociada.proveedor:
                     proveedor_para_actualizar = factura_asociada.proveedor
                     self.logger.info(f"🔗 Usando proveedor de factura asociada: {proveedor_para_actualizar.nombre}")
+                    
+                    # Actualizar cuenta_mayor de la factura si no la tiene
+                    if not factura_asociada.cuenta_mayor:
+                        factura_asociada.cuenta_mayor = cuenta_mayor
+                        factura_asociada.save()
+                        self.logger.info(f"📄 Factura {factura_asociada.serie}-{factura_asociada.folio} actualizada con cuenta mayor: {cuenta_mayor}")
+                    else:
+                        self.logger.info(f"📄 Factura {factura_asociada.serie}-{factura_asociada.folio} ya tiene cuenta mayor: {factura_asociada.cuenta_mayor}")
                 
                 # Caso 2: No hay factura asociada, buscar proveedor por cuenta o nombre
                 else:
@@ -134,7 +142,7 @@ class AutocargaController:
                     if proveedor_para_actualizar:
                         self.logger.info(f"🔍 Proveedor encontrado por búsqueda: {proveedor_para_actualizar.nombre}")
                 
-                # Actualizar cuenta mayor si encontramos un proveedor
+                # Actualizar cuenta mayor del proveedor si encontramos uno
                 if proveedor_para_actualizar:
                     self._actualizar_cuenta_mayor_proveedor(proveedor_para_actualizar, cuenta_mayor, nueva_orden.id)
                 else:

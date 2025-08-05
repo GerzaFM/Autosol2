@@ -49,7 +49,8 @@ class Factura(Model):
     total = DecimalField()
     comentario = CharField(null=True)
     clase = CharField(null=True)
-    departamento = CharField(null=True) 
+    departamento = CharField(null=True)
+    cuenta_mayor = IntegerField(null=True) # Quitar
     proveedor = ForeignKeyField(Proveedor, backref='facturas')
     layout = ForeignKeyField(Layout, backref='facturas', null=True)
     cargada = BooleanField(default=False)

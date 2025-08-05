@@ -47,6 +47,7 @@ class DBManager:
                     tipo=data.get("tipo", "VC"),  # Agregar campo tipo con valor por defecto
                     clase=data.get("clase"),  # Agregar campo clase
                     departamento=data.get("departamento"),  # Agregar campo departamento
+                    cuenta_mayor=data.get("cuenta_mayor"),  # Agregar campo cuenta_mayor
                     nombre_emisor=data.get("nombre_proveedor"),
                     rfc_emisor=data.get("rfc_proveedor"),
                     nombre_receptor=data.get("nombre_receptor"),

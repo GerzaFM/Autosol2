@@ -85,6 +85,7 @@ class FacturaData:
     ret_iva: Optional[float] = None
     ret_isr: Optional[float] = None
     clase: Optional[str] = None
+    departamento: Optional[str] = None  # AGREGADO: Campo departamento
     cargada: bool = False
     pagada: bool = False
     comentario: Optional[str] = None
@@ -120,9 +121,16 @@ class FacturaData:
             "serie": self.serie or "",  # AGREGADO: Campo serie para asociación
             "folio": self.folio or "",  # AGREGADO: Campo folio para asociación
             "nombre_emisor": self.nombre_emisor or "",
+            "rfc_emisor": self.rfc_emisor or "",  # AGREGADO: Campo RFC emisor para proveedor
             "conceptos": self.conceptos or "",
             "total": self.total or 0,
+            "subtotal": self.subtotal or 0,  # AGREGADO: Campo subtotal
+            "iva_trasladado": self.iva_trasladado or 0,  # AGREGADO: Campo IVA trasladado
+            "ret_iva": self.ret_iva or 0,  # AGREGADO: Campo retención IVA
+            "ret_isr": self.ret_isr or 0,  # AGREGADO: Campo retención ISR
             "clase": self.clase or "",
+            "departamento": self.departamento or "",  # AGREGADO: Campo departamento
+            "comentario": self.comentario or "",  # AGREGADO: Campo comentario
             "cargada": self.cargada_text,
             "pagada": self.pagada_text,
             "cargada_bool": self.cargada,

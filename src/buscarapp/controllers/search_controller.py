@@ -97,6 +97,7 @@ class SearchController:
                     ret_iva=float(factura.ret_iva) if factura.ret_iva else 0.0,
                     ret_isr=float(factura.ret_isr) if factura.ret_isr else 0.0,
                     clase=factura.clase,
+                    departamento=factura.departamento,  # AGREGADO: Campo departamento
                     cargada=bool(factura.cargada),
                     pagada=bool(factura.pagada),
                     comentario=factura.comentario

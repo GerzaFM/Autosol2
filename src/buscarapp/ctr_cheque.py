@@ -10,10 +10,14 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 try:
-    from bd.models import Banco, OrdenCompra, Factura
+    from bd.models import Banco, OrdenCompra, Factura, Proveedor
+    # Importar configuración para cuentas mayores
+    sys.path.insert(0, os.path.join(parent_dir, '..', 'config'))
+    from app_config import AppConfig
 except ImportError:
     print("Error: No se pudieron importar los modelos de la base de datos")
-    Banco = OrdenCompra = Factura = None
+    Banco = OrdenCompra = Factura = Proveedor = None
+    AppConfig = None
 
 
 def numero_a_letras(numero):
@@ -166,6 +170,7 @@ class Cheque:
         tipo_vale = self.factura.get('clase', '')
         total_factura = self.factura.get('total', 0)
         folio_interno = self.factura.get('folio_interno')
+        departamento = self.factura.get('departamento', '')  # Agregar departamento
         
         # Crear concepto: "Factura + número folio"
         concepto = f"Factura {folio_factura}" if folio_factura else "Factura"
@@ -173,6 +178,12 @@ class Cheque:
         # Inicializar valores por defecto
         importe_letras = ""
         cuenta_banco = ""
+        banco_cuenta_mayor = ""  # Variable para cuenta_mayor del banco
+        proveedor_cuenta_mayor = ""  # Variable para cuenta_mayor del proveedor
+        codigo_proveedor = ""  # Variable para codigo_quiter del proveedor
+        codigo_banco = ""  # Variable para código del banco
+        nombre_proveedor = ""  # Variable para nombre del proveedor
+        nombre_banco = ""  # Variable para nombre del banco
         
         try:
             # Obtener datos de la orden de compra si existe
@@ -188,6 +199,22 @@ class Cheque:
             if not importe_letras and total_factura:
                 importe_letras = self.convertir_numero_a_letras(total_factura)
             
+            # Obtener cuenta_mayor y codigo_quiter del proveedor usando el RFC emisor
+            if Proveedor and self.factura.get('rfc_emisor'):
+                rfc_emisor = self.factura.get('rfc_emisor')
+                
+                proveedor_obj = Proveedor.select().where(
+                    Proveedor.rfc == rfc_emisor
+                ).first()
+                
+                if proveedor_obj:
+                    if proveedor_obj.cuenta_mayor:
+                        proveedor_cuenta_mayor = proveedor_obj.cuenta_mayor
+                    if proveedor_obj.codigo_quiter:
+                        codigo_proveedor = proveedor_obj.codigo_quiter
+                    if proveedor_obj.nombre:
+                        nombre_proveedor = proveedor_obj.nombre
+            
             # Obtener datos del banco BTC23
             if Banco:
                 banco_btc23 = Banco.select().where(
@@ -196,12 +223,117 @@ class Cheque:
                 
                 if banco_btc23:
                     cuenta_banco = banco_btc23.cuenta or ""
+                    banco_cuenta_mayor = banco_btc23.cuenta_mayor or ""  # Obtener cuenta_mayor del banco
+                    codigo_banco = banco_btc23.codigo or ""  # Obtener código del banco
+                    nombre_banco = banco_btc23.nombre or ""  # Obtener nombre del banco
                     
         except Exception as e:
             print(f"Error accediendo a la base de datos: {e}")
             # Si hay error, generar importe en letras automáticamente
             if total_factura:
                 importe_letras = self.convertir_numero_a_letras(total_factura)
+
+        # Construir string de cuentas mayores con todas las cuentas necesarias
+        cuentas_lista = []
+        
+        # Usar únicamente cuenta_mayor del proveedor (no de la factura)
+        if proveedor_cuenta_mayor:
+            cuentas_lista.append(str(proveedor_cuenta_mayor))
+        
+        # Agregar cuenta de banco si existe
+        if banco_cuenta_mayor:
+            cuentas_lista.append(str(banco_cuenta_mayor))
+        
+        # Agregar cuentas IVA desde configuración
+        if AppConfig:
+            iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
+            iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
+            
+            if iva_deber:
+                cuentas_lista.append(str(iva_deber))
+            if iva_haber:
+                cuentas_lista.append(str(iva_haber))
+        
+        # Construir string de subcuentas con códigos correspondientes
+        subcuentas_lista = []
+        
+        # Subcuenta del proveedor: usar codigo_quiter del proveedor
+        if proveedor_cuenta_mayor and codigo_proveedor:
+            subcuentas_lista.append(str(codigo_proveedor))
+        elif proveedor_cuenta_mayor:
+            subcuentas_lista.append("")  # Placeholder si no hay código
+        
+        # Subcuenta del banco: usar código del banco
+        if banco_cuenta_mayor and codigo_banco:
+            subcuentas_lista.append(str(codigo_banco))
+        elif banco_cuenta_mayor:
+            subcuentas_lista.append("")  # Placeholder si no hay código
+        
+        # Subcuentas IVA: usar codigo_quiter del proveedor también
+        if AppConfig:
+            iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
+            iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
+            
+            if iva_deber:
+                subcuentas_lista.append(str(codigo_proveedor) if codigo_proveedor else "")
+            if iva_haber:
+                subcuentas_lista.append(str(codigo_proveedor) if codigo_proveedor else "")
+        
+        # Procesar cuentas: tomar primeros 4 dígitos y agregar 5 ceros
+        cuentas_procesadas = []
+        for cuenta in cuentas_lista:
+            if len(cuenta) >= 4:
+                primeros_4_digitos = cuenta[:4]  # Tomar primeros 4 dígitos
+                cuenta_procesada = primeros_4_digitos + "00000"  # Agregar 5 ceros
+                cuentas_procesadas.append(cuenta_procesada)
+            else:
+                # Si tiene menos de 4 dígitos, agregar ceros al inicio hasta tener 4, luego agregar 5 ceros
+                cuenta_con_ceros = cuenta.zfill(4) + "00000"
+                cuentas_procesadas.append(cuenta_con_ceros)
+        
+        # Procesar subcuentas: mantener valores originales sin transformaciones y limitar a 3
+        subcuentas_procesadas = []
+        for subcuenta in subcuentas_lista[:3]:  # Limitar a solo 3 subcuentas
+            if subcuenta:
+                subcuentas_procesadas.append(str(subcuenta))
+            else:
+                # Si no hay subcuenta, agregar string vacío
+                subcuentas_procesadas.append("")
+        
+        # Unir todas las cuentas y subcuentas con saltos de línea (sin saltos al inicio)
+        cuentas_mayores = "\n\n\n".join(cuentas_procesadas)
+        subcuentas_mayores = "\n\n\n".join(subcuentas_procesadas)
+        
+        # Construir campo Nombre con nombres correspondientes
+        nombres_lista = []
+        
+        # Nombre del proveedor
+        if proveedor_cuenta_mayor and nombre_proveedor:
+            nombres_lista.append(nombre_proveedor)
+        elif proveedor_cuenta_mayor:
+            nombres_lista.append("")  # Placeholder si no hay nombre
+        
+        # Nombre del banco
+        if banco_cuenta_mayor and nombre_banco:
+            nombres_lista.append(nombre_banco)
+        elif banco_cuenta_mayor:
+            nombres_lista.append("")  # Placeholder si no hay nombre
+        
+        # Nombres para cuentas IVA
+        if AppConfig:
+            iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
+            iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
+            
+            if iva_deber:
+                # Para IVA Deber: nombre_proveedor + "IVA ACREDITABLE"
+                nombre_iva_deber = f"{nombre_proveedor}\nIVA ACREDITABLE" if nombre_proveedor else "IVA ACREDITABLE"
+                nombres_lista.append(nombre_iva_deber)
+            if iva_haber:
+                # Para IVA Haber: "IVA PAGADO"
+                nombres_lista.append("IVA PAGADO")
+        
+        # No limitar los nombres, incluir todos (especialmente la línea 4 con "IVA PAGADO")
+        nombres_mayores = "\n\n\n".join(nombres_lista)
         
         return {
             "Fecha1_af_date": fecha_actual,
@@ -210,15 +342,15 @@ class Cheque:
             "cuenta": cuenta_banco,
             "cheque": str(numero_vale),
             "Concepto": concepto,
-            "area": "",
+            "area": departamento,  # Campo departamento
             "Costos": tipo_vale,
-            "subcuenta": "",
+            "subcuenta": subcuentas_mayores,  # Campo subcuentas con códigos
             "Debe": "",
             "Haber": "",
-            "Cuenta": cuenta_banco,  # Mismo valor que "cuenta"
-            "Nombre": "",
+            "Cuenta": cuentas_mayores,
+            "Nombre": nombres_mayores,  # Campo nombres con proveedores, banco e IVA
             "Parcial": "",
-            "Cantidad": str(total_factura),
+            "Cantidad": str(total_factura)
         }
     
     def convertir_numero_a_letras(self, numero):

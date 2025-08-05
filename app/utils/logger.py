@@ -53,6 +53,10 @@ def setup_logging(level: str = "INFO", log_file: str = None):
     root_logger.addHandler(console_handler)
     if file_handler:
         root_logger.addHandler(file_handler)
+    
+    # Suprimir warnings específicos de pypdf
+    logging.getLogger('pypdf._reader').setLevel(logging.ERROR)
+    logging.getLogger('pypdf').setLevel(logging.ERROR)
 
 def get_logger(name: str) -> logging.Logger:
     """
