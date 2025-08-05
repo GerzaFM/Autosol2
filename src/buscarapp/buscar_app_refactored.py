@@ -763,8 +763,11 @@ class BuscarAppRefactored(ttk.Frame):
                 folio_factura = self._limpiar_nombre_archivo(folio_factura)
                 clase = self._limpiar_nombre_archivo(clase)
                 
-                # Crear nombre del archivo
-                nombre_archivo = f"{no_vale} {proveedor} {folio_factura} {clase}.pdf"
+                # Crear nombre del archivo - solo incluir clase si no está vacía
+                if clase and clase not in ['Vacio', 'SinClase', 'Item']:
+                    nombre_archivo = f"{no_vale} {proveedor} {folio_factura} {clase}.pdf"
+                else:
+                    nombre_archivo = f"{no_vale} {proveedor} {folio_factura}.pdf"
                 
                 # Mostrar diálogo para guardar
                 filename = filedialog.asksaveasfilename(
@@ -823,10 +826,14 @@ class BuscarAppRefactored(ttk.Frame):
                 proveedor = self._limpiar_nombre_archivo(primer_proveedor)
                 clase = self._limpiar_nombre_archivo(str(selected_items[0].get('clase', 'SinClase')))
                 
-                # Crear nombre del archivo
+                # Crear nombre del archivo - solo incluir clase si no está vacía
                 vales_str = " ".join(numeros_vale)  # Unir múltiples vales con guión bajo
                 folios_str = " ".join(folios_factura)  # Unir múltiples folios con guión bajo
-                nombre_archivo = f"{vales_str} {proveedor} {folios_str} {clase}.pdf"
+                
+                if clase and clase not in ['Vacio', 'SinClase', 'Item']:
+                    nombre_archivo = f"{vales_str} {proveedor} {folios_str} {clase}.pdf"
+                else:
+                    nombre_archivo = f"{vales_str} {proveedor} {folios_str}.pdf"
                 
                 # Mostrar diálogo para guardar
                 filename = filedialog.asksaveasfilename(

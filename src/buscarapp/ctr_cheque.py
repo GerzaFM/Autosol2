@@ -346,10 +346,11 @@ class Cheque:
             iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
             iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
             
-            if iva_deber:
-                cuentas_lista.append(str(iva_deber))
+            
             if iva_haber:
                 cuentas_lista.append(str(iva_haber))
+            if iva_deber:
+                cuentas_lista.append(str(iva_deber))
         
         # Construir string de subcuentas con códigos correspondientes
         subcuentas_lista = []
