@@ -738,7 +738,7 @@ class BuscarAppRefactored(ttk.Frame):
             self.logger.error(f"Error refrescando búsqueda: {e}")
     
     def _on_cheque(self):
-        """Maneja el evento del botón Cheque"""
+        """Maneja el evento del botón Cheque - Genera cheques individuales o múltiples consolidados"""
         try:
             # Obtener elementos seleccionados en la tabla
             selected_items = self.table_frame.get_selected_data_multiple()
@@ -789,7 +789,22 @@ class BuscarAppRefactored(ttk.Frame):
                 if not mismo_proveedor:
                     self.dialog_utils.show_warning(
                         "Proveedores Diferentes", 
-                        "Los elementos seleccionados deben ser del mismo proveedor para crear un cheque conjunto."
+                        "Los elementos seleccionados deben ser del mismo proveedor para crear un cheque conjunto.\n\n"
+                        "Facturas seleccionadas por proveedor:\n" +
+                        "\n".join([f"• {item.get('nombre_emisor', 'Sin proveedor')}: Vale {item.get('no_vale', 'N/A')}" 
+                                 for item in selected_items])
+                    )
+                    return
+                
+                # Verificar que todas las facturas tengan totales válidos
+                facturas_sin_total = [item for item in selected_items if not item.get('total') or float(item.get('total', 0)) <= 0]
+                if facturas_sin_total:
+                    folios_problematicos = [item.get('folio', 'N/A') for item in facturas_sin_total]
+                    self.dialog_utils.show_warning(
+                        "Facturas sin Total", 
+                        f"Las siguientes facturas no tienen un total válido y no pueden ser procesadas:\n" +
+                        f"Folios: {', '.join(folios_problematicos)}\n\n"
+                        "Por favor, seleccione solo facturas con importes válidos."
                     )
                     return
                 
@@ -856,14 +871,64 @@ class BuscarAppRefactored(ttk.Frame):
                                 f"Error al generar el cheque en:\n{ruta_exportacion}"
                             )
                     else:
-                        # Múltiples elementos - por ahora mostrar mensaje informativo
-                        self.dialog_utils.show_info(
-                            "Funcionalidad en Desarrollo", 
-                            f"La generación de cheques múltiples estará disponible próximamente.\n"
-                            f"Ruta guardada: {ruta_exportacion}\n"
-                            f"Elementos seleccionados: {len(selected_items)}"
-                        )
-                        self.logger.info(f"Cheque múltiple pendiente de implementar: {ruta_exportacion}")
+                        # Múltiples elementos - usar la funcionalidad de facturas múltiples
+                        self.logger.info(f"Iniciando generación de cheque múltiple para {len(selected_items)} facturas del proveedor: {primer_proveedor}")
+                        
+                        # DEBUG: Mostrar datos de cada factura seleccionada
+                        self.logger.info("DEBUG - Facturas seleccionadas:")
+                        for i, item in enumerate(selected_items, 1):
+                            self.logger.info(f"  {i}. Vale: {item.get('no_vale', 'N/A')}, Folio: {item.get('folio', 'N/A')}, Total: {item.get('total', 'N/A')}")
+                        
+                        try:
+                            cheque = Cheque.crear_multiple(selected_items, ruta_exportacion)
+                            
+                            # DEBUG: Verificar datos del formulario antes de generar
+                            datos_formulario = cheque.get_datos_formulario()
+                            campo_costos_debug = datos_formulario.get('Costos', '')
+                            self.logger.info(f"DEBUG - Campo Costos generado: '{campo_costos_debug}' (longitud: {len(campo_costos_debug)})")
+                            
+                            # Generar el cheque consolidado
+                            if cheque.exportar():
+                                # Calcular estadísticas para el mensaje
+                                total_consolidado = sum(float(item.get('total', 0)) for item in selected_items)
+                                iva_consolidado = sum(float(item.get('iva_trasladado', 0)) for item in selected_items)
+                                
+                                mensaje_detalle = (
+                                    f"Cheque múltiple generado exitosamente:\n"
+                                    f"Archivo: {ruta_exportacion}\n\n"
+                                    f"Resumen:\n"
+                                    f"• Facturas consolidadas: {len(selected_items)}\n"
+                                    f"• Proveedor: {primer_proveedor}\n"
+                                    f"• Total consolidado: ${total_consolidado:,.2f}\n"
+                                    f"• IVA consolidado: ${iva_consolidado:,.2f}\n"
+                                    f"• Vales: {', '.join(numeros_vale)}\n"
+                                    f"• Folios: {', '.join(folios_factura)}"
+                                )
+                                
+                                self.dialog_utils.show_info("Cheque Múltiple Generado", mensaje_detalle)
+                                self.logger.info(f"Cheque múltiple generado exitosamente: {ruta_exportacion} - {len(selected_items)} facturas consolidadas - Total: ${total_consolidado:,.2f}")
+                            else:
+                                self.logger.error(f"Error generando cheque múltiple en: {ruta_exportacion}")
+                                self.dialog_utils.show_error(
+                                    "Error", 
+                                    f"Error al generar el cheque múltiple en:\n{ruta_exportacion}\n\n"
+                                    "Verifique que la ruta sea válida y tenga permisos de escritura."
+                                )
+                        
+                        except ValueError as ve:
+                            self.logger.error(f"Error de validación en cheque múltiple: {ve}")
+                            self.dialog_utils.show_error(
+                                "Error de Validación", 
+                                f"Error validando datos para el cheque múltiple:\n{str(ve)}"
+                            )
+                        
+                        except Exception as me:
+                            self.logger.error(f"Error inesperado generando cheque múltiple: {me}")
+                            self.dialog_utils.show_error(
+                                "Error Inesperado", 
+                                f"Error inesperado al generar el cheque múltiple:\n{str(me)}\n\n"
+                                "Revise el log para más detalles."
+                            )
                         
                 except Exception as cheque_error:
                     self.logger.error(f"Error procesando cheque: {cheque_error}")

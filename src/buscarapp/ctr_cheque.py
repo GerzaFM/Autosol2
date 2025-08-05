@@ -156,6 +156,30 @@ class Cheque:
         # Inicializar formulario con datos de la factura
         self.form_info = self._llenar_formulario_factura()
     
+    @classmethod
+    def crear_multiple(cls, facturas, ruta):
+        """
+        Método de clase para crear un cheque con múltiples facturas
+        
+        Args:
+            facturas: Lista de diccionarios con datos de facturas
+            ruta: Ruta donde se guardará el PDF del cheque
+            
+        Returns:
+            Cheque: Instancia de Cheque con facturas consolidadas
+        """
+        if not facturas:
+            raise ValueError("La lista de facturas no puede estar vacía")
+        
+        # Crear instancia temporal para usar el método de consolidación
+        instancia_temp = cls(facturas[0], ruta)
+        
+        # Consolidar facturas
+        factura_consolidada = instancia_temp._consolidar_facturas(facturas)
+        
+        # Crear instancia final con factura consolidada
+        return cls(factura_consolidada, ruta)
+    
     def _llenar_formulario_factura(self):
         """
         Llena el formulario con los datos de una sola factura
@@ -182,8 +206,30 @@ class Cheque:
         elif tipo_vale_codigo:
             tipo_vale = tipo_vale_codigo  # Si no hay SolicitudAppConfig, usar el código original
         
-        # Crear concepto: "Factura + número folio"
-        concepto = f"Factura {folio_factura}" if folio_factura else "Factura"
+        # Crear concepto: usar concepto consolidado si existe, sino crear normal
+        if self.factura.get('concepto_consolidado'):
+            concepto = self.factura.get('concepto_consolidado')
+        else:
+            concepto = f"FACTURA {folio_factura}" if folio_factura else "FACTURA"
+        
+        # Crear campo Costos: debe mostrar el TIPO de vale, no el número
+        campo_costos = ""
+        if self.factura.get('vales_consolidados'):
+            # Cheque múltiple: usar el tipo de vale del primer vale (factura base)
+            if tipo_vale:
+                campo_costos = tipo_vale
+            elif tipo_vale_codigo:
+                campo_costos = tipo_vale_codigo
+            else:
+                campo_costos = ""
+        else:
+            # Cheque individual: mostrar tipo de vale
+            if tipo_vale:
+                campo_costos = tipo_vale
+            elif tipo_vale_codigo:
+                campo_costos = tipo_vale_codigo
+            else:
+                campo_costos = ""
         
         # Inicializar valores por defecto
         importe_letras = ""
@@ -504,15 +550,29 @@ class Cheque:
             if iva_trasladado:
                 haber_campo += formatear_moneda(iva_trasladado)  # IVA trasladado 
 
+        # Crear campo cheque: usar todos los vales si es múltiple, sino el individual
+        campo_cheque = ""
+        if self.factura.get('vales_consolidados'):
+            # Cheque múltiple: mostrar todos los vales
+            vales_lista = self.factura.get('vales_consolidados', [])
+            if len(vales_lista) == 1:
+                campo_cheque = str(vales_lista[0])
+            else:
+                # Para el campo cheque, usar formato más compacto
+                campo_cheque = ", ".join(vales_lista)
+        else:
+            # Cheque individual: usar el número de vale actual
+            campo_cheque = str(numero_vale) if numero_vale else ""
+
         return {
             "Fecha1_af_date": fecha_actual,
             "Orden": proveedor,
             "Moneda": importe_letras,
             "cuenta": cuenta_banco,
-            "cheque": str(numero_vale),
+            "cheque": campo_cheque,  # Campo cheque con vales individuales o múltiples
             "Concepto": concepto,
             "area": departamento,  # Campo departamento
-            "Costos": tipo_vale,
+            "Costos": campo_costos,  # Campo Costos con vales individuales o múltiples
             "subcuenta": subcuentas_mayores,  # Campo subcuentas con códigos
             "Debe": debe_campo,  # Campo Debe con total y luego IVA trasladado
             "Haber": haber_campo,  # Campo Haber con estructura específica
@@ -557,12 +617,94 @@ class Cheque:
 
     def generar_multiple_cheques(self, facturas):
         """
-        Método para generar cheques con múltiples facturas (a implementar después)
+        Método para generar cheques con múltiples facturas
         
         Args:
             facturas: Lista de facturas para el cheque múltiple
+            
+        Returns:
+            bool: True si se generó correctamente, False en caso contrario
         """
-        pass
+        try:
+            # Combinar todas las facturas en una factura consolidada
+            factura_consolidada = self._consolidar_facturas(facturas)
+            
+            # Actualizar la factura del objeto con la consolidada
+            self.factura = factura_consolidada
+            
+            # Regenerar el formulario con los datos consolidados
+            self.form_info = self._llenar_formulario_factura()
+            
+            # Generar el cheque con los datos consolidados
+            return self.generar_cheque()
+            
+        except Exception as e:
+            print(f"Error generando cheque múltiple: {str(e)}")
+            return False
+    
+    def _consolidar_facturas(self, facturas):
+        """
+        Consolida múltiples facturas en una sola para el cheque
+        
+        Args:
+            facturas: Lista de diccionarios con datos de facturas
+            
+        Returns:
+            dict: Factura consolidada con totales sumados
+        """
+        if not facturas:
+            return {}
+            
+        # Usar la primera factura como base
+        factura_base = facturas[0].copy()
+        
+        # Sumar totales e IVAs de todas las facturas
+        total_consolidado = 0
+        iva_consolidado = 0
+        folios_facturas = []
+        vales_consolidados = []
+        
+        for factura in facturas:
+            # Sumar total
+            total_factura = factura.get('total', 0)
+            if total_factura:
+                total_consolidado += float(total_factura)
+            
+            # Sumar IVA trasladado
+            iva_factura = factura.get('iva_trasladado', 0)
+            if iva_factura:
+                iva_consolidado += float(iva_factura)
+            
+            # Recopilar folios para el concepto
+            folio = factura.get('folio', '')
+            if folio:
+                folios_facturas.append(str(folio))
+            
+            # Recopilar números de vale para el campo Costos
+            no_vale = factura.get('no_vale', '')
+            if no_vale:
+                vales_consolidados.append(str(no_vale))
+        
+        # Actualizar la factura base con los totales consolidados
+        factura_base['total'] = total_consolidado
+        factura_base['iva_trasladado'] = iva_consolidado if iva_consolidado > 0 else 0
+        
+        # Crear concepto con múltiples folios
+        if folios_facturas:
+            if len(folios_facturas) == 1:
+                concepto_folios = f"FACTURA {folios_facturas[0]} "
+            else:
+                concepto_folios = f"FACTURAS {' '.join(folios_facturas)}"
+        else:
+            concepto_folios = f"FACTURAS ({len(facturas)} facturas)"
+
+        # Actualizar concepto en la factura base
+        factura_base['concepto_consolidado'] = concepto_folios
+        
+        # Agregar lista de vales consolidados para el campo Costos
+        factura_base['vales_consolidados'] = vales_consolidados
+        
+        return factura_base
 
     def exportar(self):
         """
