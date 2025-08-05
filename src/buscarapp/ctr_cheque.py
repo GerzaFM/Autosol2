@@ -14,10 +14,13 @@ try:
     # Importar configuración para cuentas mayores
     sys.path.insert(0, os.path.join(parent_dir, '..', 'config'))
     from app_config import AppConfig
+    # Importar TIPO_VALE desde solicitudapp
+    from solicitudapp.config.app_config import AppConfig as SolicitudAppConfig
 except ImportError:
     print("Error: No se pudieron importar los modelos de la base de datos")
     Banco = OrdenCompra = Factura = Proveedor = None
     AppConfig = None
+    SolicitudAppConfig = None
 
 
 def numero_a_letras(numero):
@@ -167,10 +170,17 @@ class Cheque:
         proveedor = self.factura.get('nombre_emisor', '')
         numero_vale = self.factura.get('no_vale', '')
         folio_factura = self.factura.get('folio', '')
-        tipo_vale = self.factura.get('clase', '')
+        tipo_vale_codigo = self.factura.get('tipo', '')  # Código del tipo de vale (ej: "AL", "VM")
         total_factura = self.factura.get('total', 0)
         folio_interno = self.factura.get('folio_interno')
         departamento = self.factura.get('departamento', '')  # Agregar departamento
+        
+        # Obtener descripción del tipo de vale desde configuración
+        tipo_vale = ""
+        if tipo_vale_codigo and SolicitudAppConfig:
+            tipo_vale = SolicitudAppConfig.TIPO_VALE.get(tipo_vale_codigo, tipo_vale_codigo)  # Si no encuentra el código, usar el código original
+        elif tipo_vale_codigo:
+            tipo_vale = tipo_vale_codigo  # Si no hay SolicitudAppConfig, usar el código original
         
         # Crear concepto: "Factura + número folio"
         concepto = f"Factura {folio_factura}" if folio_factura else "Factura"
@@ -243,10 +253,10 @@ class Cheque:
         # Construir campo Nombre con nombres correspondientes
         nombres_lista = []
         
-        # Nombre del proveedor
-        if proveedor_cuenta_mayor and nombre_proveedor:
+        # Nombre del proveedor - SIEMPRE incluir si tenemos el nombre, aunque no tenga cuenta_mayor
+        if nombre_proveedor:
             nombres_lista.append(nombre_proveedor)
-        elif proveedor_cuenta_mayor:
+        elif proveedor_cuenta_mayor:  # Solo si tiene cuenta_mayor pero no nombre
             nombres_lista.append("")  # Placeholder si no hay nombre
         
         # Nombre del banco
@@ -274,9 +284,12 @@ class Cheque:
         # Construir string de cuentas mayores con todas las cuentas necesarias
         cuentas_lista = []
         
-        # Usar únicamente cuenta_mayor del proveedor (no de la factura)
+        # SIEMPRE incluir cuenta del proveedor si existe, aunque sea vacía o por defecto
         if proveedor_cuenta_mayor:
             cuentas_lista.append(str(proveedor_cuenta_mayor))
+        elif nombre_proveedor:  # Si tenemos proveedor pero no cuenta_mayor, usar cuenta por defecto
+            # Podríamos usar una cuenta por defecto o dejar vacío, por ahora usar "1200" como cuenta de proveedores
+            cuentas_lista.append("1200")  # Cuenta por defecto para proveedores
         
         # Agregar cuenta de banco si existe
         if banco_cuenta_mayor:
@@ -295,11 +308,14 @@ class Cheque:
         # Construir string de subcuentas con códigos correspondientes
         subcuentas_lista = []
         
-        # Subcuenta del proveedor: usar codigo_quiter del proveedor
-        if proveedor_cuenta_mayor and codigo_proveedor:
+        # SIEMPRE incluir subcuenta del proveedor si tenemos codigo o nombre
+        if codigo_proveedor:
             subcuentas_lista.append(str(codigo_proveedor))
-        elif proveedor_cuenta_mayor:
-            subcuentas_lista.append("")  # Placeholder si no hay código
+        elif nombre_proveedor:  # Si tenemos proveedor pero no codigo, usar nombre truncado o por defecto
+            # Usar una subcuenta por defecto o parte del nombre
+            subcuentas_lista.append("PROV")  # Subcuenta por defecto
+        elif nombre_proveedor:  # Si tenemos proveedor pero no codigo, usar subcuenta por defecto
+            subcuentas_lista.append("")  # Placeholder si no hay código pero sí proveedor
         
         # Subcuenta del banco: usar código del banco
         if banco_cuenta_mayor and codigo_banco:
