@@ -233,6 +233,37 @@ class Cheque:
             if total_factura:
                 importe_letras = self.convertir_numero_a_letras(total_factura)
 
+        # Construir campo Nombre con nombres correspondientes
+        nombres_lista = []
+        
+        # Nombre del proveedor
+        if proveedor_cuenta_mayor and nombre_proveedor:
+            nombres_lista.append(nombre_proveedor)
+        elif proveedor_cuenta_mayor:
+            nombres_lista.append("")  # Placeholder si no hay nombre
+        
+        # Nombre del banco
+        if banco_cuenta_mayor and nombre_banco:
+            nombres_lista.append(nombre_banco)
+        elif banco_cuenta_mayor:
+            nombres_lista.append("")  # Placeholder si no hay nombre
+        
+        # Nombres para cuentas IVA
+        if AppConfig:
+            iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
+            iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
+            
+            if iva_deber:
+                # Para IVA Deber: nombre_proveedor + "IVA ACREDITABLE"
+                nombre_iva_deber = f"{nombre_proveedor}\nIVA ACREDITABLE" if nombre_proveedor else "IVA ACREDITABLE"
+                nombres_lista.append(nombre_iva_deber)
+            if iva_haber:
+                # Para IVA Haber: "IVA PAGADO"
+                nombres_lista.append("IVA PAGADO")
+        
+        # No limitar los nombres, incluir todos (especialmente la línea 4 con "IVA PAGADO")
+        nombres_mayores = "\n\n\n".join(nombres_lista)
+
         # Construir string de cuentas mayores con todas las cuentas necesarias
         cuentas_lista = []
         
@@ -303,37 +334,6 @@ class Cheque:
         # Unir todas las cuentas y subcuentas con saltos de línea (sin saltos al inicio)
         cuentas_mayores = "\n\n\n".join(cuentas_procesadas)
         subcuentas_mayores = "\n\n\n".join(subcuentas_procesadas)
-        
-        # Construir campo Nombre con nombres correspondientes
-        nombres_lista = []
-        
-        # Nombre del proveedor
-        if proveedor_cuenta_mayor and nombre_proveedor:
-            nombres_lista.append(nombre_proveedor)
-        elif proveedor_cuenta_mayor:
-            nombres_lista.append("")  # Placeholder si no hay nombre
-        
-        # Nombre del banco
-        if banco_cuenta_mayor and nombre_banco:
-            nombres_lista.append(nombre_banco)
-        elif banco_cuenta_mayor:
-            nombres_lista.append("")  # Placeholder si no hay nombre
-        
-        # Nombres para cuentas IVA
-        if AppConfig:
-            iva_deber = AppConfig.CUENTAS_MAYORES.get('Iva_Deber', '')
-            iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
-            
-            if iva_deber:
-                # Para IVA Deber: nombre_proveedor + "IVA ACREDITABLE"
-                nombre_iva_deber = f"{nombre_proveedor}\nIVA ACREDITABLE" if nombre_proveedor else "IVA ACREDITABLE"
-                nombres_lista.append(nombre_iva_deber)
-            if iva_haber:
-                # Para IVA Haber: "IVA PAGADO"
-                nombres_lista.append("IVA PAGADO")
-        
-        # No limitar los nombres, incluir todos (especialmente la línea 4 con "IVA PAGADO")
-        nombres_mayores = "\n\n\n".join(nombres_lista)
         
         # Función para formatear números como moneda
         def formatear_moneda(valor):
