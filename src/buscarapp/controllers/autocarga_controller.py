@@ -1032,7 +1032,25 @@ class AutocargaController:
             try:
                 vale_existente = Vale.get(Vale.noVale == datos_procesados['noVale'])
                 self.logger.info(f"Vale {datos_procesados['noVale']} ya existe en BD")
-                if facturas_seleccionadas and not vale_existente.factura:
+                
+                # Verificar de manera segura si el vale tiene factura asociada
+                tiene_factura = vale_existente.factura_id is not None
+                factura_valida = False
+                
+                if tiene_factura:
+                    try:
+                        # Intentar acceder a la factura para verificar que existe
+                        _ = vale_existente.factura
+                        factura_valida = True
+                    except Factura.DoesNotExist:
+                        # La factura referenciada no existe, tratar como si no tuviera factura
+                        self.logger.warning(f"Vale {datos_procesados['noVale']} tiene referencia a factura inexistente, limpiando referencia")
+                        vale_existente.factura = None
+                        vale_existente.save()
+                        tiene_factura = False
+                        factura_valida = False
+                
+                if facturas_seleccionadas and not tiene_factura:
                     self.logger.info(f"🔄 Vale {datos_procesados['noVale']} existe pero SIN ASOCIAR - intentando asociar con facturas seleccionadas")
                     no_documento = datos_procesados.get('noDocumento', '').strip()
                     factura_asociada, tipo_coincidencia = buscar_factura_asociada(no_documento, facturas_seleccionadas, datos_procesados['noVale'])
@@ -1046,7 +1064,7 @@ class AutocargaController:
                             self.logger.error(f"      ❌ Error asociando vale existente: {e}")
                     else:
                         self.logger.info(f"      ⚠️ Vale existente {datos_procesados['noVale']} - No se encontró coincidencia con facturas seleccionadas")
-                elif facturas_seleccionadas and vale_existente.factura:
+                elif facturas_seleccionadas and tiene_factura and factura_valida:
                     self.logger.info(f"✅ Vale {datos_procesados['noVale']} ya existe y YA ESTÁ ASOCIADO con {vale_existente.factura.serie}-{vale_existente.factura.folio}")
                 self._actualizar_codigo_proveedor(datos_procesados)
                 return
