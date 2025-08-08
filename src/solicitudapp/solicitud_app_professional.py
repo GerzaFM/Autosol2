@@ -203,7 +203,7 @@ class SolicitudApp(tb.Frame):
             text="1/2",
             width=btn_width,
             command=self.dividir_totales_conceptos,
-            bootstyle="secondary"
+            bootstyle="info"
         ).pack(side=RIGHT, padx=(0, 5))
 
         # Botón calcular
