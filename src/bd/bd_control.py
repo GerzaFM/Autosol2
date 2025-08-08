@@ -18,14 +18,24 @@ class DBManager:
     def guardar_formulario(self, data):
         try:
             with db.atomic():  # Usar transacción atómica
-                # Verificar si la factura ya existe
+                # Preparar serie para la factura ANTES de validar duplicados
+                serie_original = data.get("serie")
+                
+                # Si es la segunda factura dividida, agregar prefijo DIV-
+                if data.get("es_segunda_factura_dividida", False):
+                    serie_factura = f"DIV-{serie_original}"
+                    print(f"📋 Segunda factura dividida detectada - Serie modificada: {serie_original} → {serie_factura}")
+                else:
+                    serie_factura = serie_original
+                
+                # Verificar si la factura ya existe (usando la serie ya modificada)
                 factura_existente = Factura.get_or_none(
-                    (Factura.serie == data.get("serie")) & 
+                    (Factura.serie == serie_factura) & 
                     (Factura.folio == data.get("folio"))
                 )
                 
                 if factura_existente:
-                    raise ValueError(f"La factura {data.get('serie')}-{data.get('folio')} ya está registrada en la base de datos")
+                    raise ValueError(f"La factura {serie_factura}-{data.get('folio')} ya está registrada en la base de datos")
                 
                 # BÚSQUEDA INTELIGENTE DE PROVEEDORES
                 proveedor = None
@@ -160,7 +170,7 @@ class DBManager:
 
                 # Guardar factura
                 factura = Factura.create(
-                    serie=data.get("serie"),
+                    serie=serie_factura,
                     folio=data.get("folio"),
                     fecha=data.get("fecha"),
                     fecha_emision=data.get("fecha", data.get("fecha_emision")),  # Usar fecha como fallback

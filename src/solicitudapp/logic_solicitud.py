@@ -107,6 +107,7 @@ class SolicitudLogica:
             "comentario": comentarios.get("comentario"),
             "clase": solicitud_data.get("clase"),  # Campo clase
             "departamento": solicitud_data.get("departamento"),  # Campo departamento
+            "es_segunda_factura_dividida": solicitud_data.get("es_segunda_factura_dividida", False),  # Flag para segunda factura
             # Datos de los conceptos
             "conceptos": [
                 {

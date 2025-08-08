@@ -1192,15 +1192,11 @@ class SolicitudApp(tb.Frame):
                         messagebox.showwarning("Advertencia", "Debe ingresar un folio para la segunda factura")
                         return
                 else:
-                    # Generar folio automático para la segunda factura (caso normal)
+                    # Para facturas divididas, mantener el mismo folio que la primera factura
                     folio_original = solicitud_data.get("Folio", "001")
-                    try:
-                        folio_numero = int(folio_original) + 1
-                        folio_vc = str(folio_numero)
-                    except ValueError:
-                        folio_vc = f"{folio_original}_VC"
+                    folio_vc = folio_original  # Mantener el mismo folio
                     
-                    logger.info(f"Folio automático generado para segunda factura: {folio_vc}")
+                    logger.info(f"Folio mantenido para segunda factura dividida: {folio_vc}")
                 
                 # Actualizar el folio en el formulario y en los datos
                 folio_widget = self.solicitud_frame.entries["Folio"]
@@ -1385,7 +1381,8 @@ class SolicitudApp(tb.Frame):
                         "nombre_receptor": "TCM MATEHUALA",  # Valor por defecto
                         "rfc_receptor": "TMM860630PH1",  # Valor por defecto
                         "clase": solicitud_data.get("Clase", ""),  # Campo clase
-                        "departamento": solicitud_data.get("Depa", "")  # Campo departamento
+                        "departamento": solicitud_data.get("Depa", ""),  # Campo departamento
+                        "es_segunda_factura_dividida": es_segunda_factura  # Agregar flag para la segunda factura
                     }
                     
                     # IMPORTANTE: Usar los totales ya divididos si la funcionalidad está activa

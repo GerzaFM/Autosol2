@@ -35,7 +35,7 @@ class Layout(Model):
 class Factura(Model):
     folio_interno = IntegerField(primary_key=True)
     serie = CharField()  # Cambiado de IntegerField a CharField para manejar "CC", "OLEK", etc.
-    folio = IntegerField()
+    folio = IntegerField() # Cambiar a CharField
     fecha = DateField()
     fecha_emision = DateField()
     tipo = CharField()
