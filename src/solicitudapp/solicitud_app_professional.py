@@ -72,6 +72,10 @@ class SolicitudApp(tb.Frame):
         self.valores_ya_divididos = False  # Flag para indicar si los valores ya fueron divididos
         self.division_con_duplicado = False  # Flag para indicar división con factura duplicada
         
+        # Valores originales para calcular complementos
+        self.valores_originales_totales = {}  # Almacenar totales originales del XML
+        self.valores_originales_conceptos = []  # Almacenar conceptos originales del XML
+        
         # Componentes UI
         self.proveedor_frame: Optional[ProveedorFrame] = None
         self.solicitud_frame: Optional[SolicitudFrame] = None
@@ -191,6 +195,15 @@ class SolicitudApp(tb.Frame):
             width=btn_width,
             command=self.editar_concepto_seleccionado,
             bootstyle="warning"
+        ).pack(side=RIGHT, padx=(0, 5))
+
+        # Botón dividir
+        tb.Button(
+            frame_btn_tabla,
+            text="1/2",
+            width=btn_width,
+            command=self.dividir_totales_conceptos,
+            bootstyle="secondary"
         ).pack(side=RIGHT, padx=(0, 5))
 
         # Botón calcular
@@ -568,16 +581,28 @@ class SolicitudApp(tb.Frame):
     def _rellenar_totales(self, datos):
         """Rellena los campos de totales."""
         try:
-            self.entries_totales["Subtotal"].delete(0, "end")
-            self.entries_totales["Subtotal"].insert(0, getattr(datos, "subtotal", ""))
+            # Guardar valores originales para cálculos de complemento
+            self.valores_originales_totales = {
+                "Subtotal": str(getattr(datos, "subtotal", "")),
+                "IVA": str(getattr(datos, "iva", "")),
+                "TOTAL": str(getattr(datos, "total", ""))
+            }
             
-            # Calcular retenciones
+            # Calcular retenciones originales
             try:
                 iva_ret = float(getattr(datos, "iva_ret", 0))
                 isr_ret = float(getattr(datos, "isr_ret", 0))
                 ret_total = str(iva_ret + isr_ret)
+                self.valores_originales_totales["Ret"] = ret_total
             except (ValueError, TypeError):
                 ret_total = ""
+                self.valores_originales_totales["Ret"] = ret_total
+            
+            logger.info(f"Valores originales guardados: {self.valores_originales_totales}")
+            
+            # Rellenar campos en la interfaz
+            self.entries_totales["Subtotal"].delete(0, "end")
+            self.entries_totales["Subtotal"].insert(0, getattr(datos, "subtotal", ""))
             
             self.entries_totales["Ret"].delete(0, "end")
             self.entries_totales["Ret"].insert(0, ret_total)
@@ -594,6 +619,19 @@ class SolicitudApp(tb.Frame):
     def rellenar_conceptos(self, conceptos):
         """Rellena la tabla de conceptos."""
         try:
+            # Guardar conceptos originales para cálculos de complemento
+            self.valores_originales_conceptos = []
+            for concepto in conceptos:
+                if len(concepto) >= 4:  # [cantidad, descripcion, precio_unitario, total]
+                    self.valores_originales_conceptos.append({
+                        "cantidad": concepto[0],
+                        "descripcion": concepto[1], 
+                        "precio_unitario": float(concepto[2]) if concepto[2] else 0.0,
+                        "total": float(concepto[3]) if concepto[3] else 0.0
+                    })
+            
+            logger.info(f"Conceptos originales guardados: {len(self.valores_originales_conceptos)} conceptos")
+            
             # Limpiar tabla
             self.borrar_conceptos()
             
@@ -802,10 +840,174 @@ class SolicitudApp(tb.Frame):
             self.entries_totales["TOTAL"].delete(0, "end")
             self.entries_totales["TOTAL"].insert(0, f"{total:.2f}")
 
+            # Resetear el flag de división al recalcular
+            if hasattr(self, 'valores_ya_divididos'):
+                self.valores_ya_divididos = False
+                logger.info("Flag valores_ya_divididos reseteado a False")
+
             logger.info(f"Totales calculados: Subtotal={subtotal:.2f}, IVA={iva:.2f}, Total={total:.2f}")
         except Exception as e:
             logger.error(f"Error al calcular totales: {e}")
             messagebox.showerror("Error", f"Error al calcular totales: {str(e)}")
+    
+    def dividir_totales_conceptos(self):
+        """Divide totales y conceptos a la mitad."""
+        try:
+            logger.info("Iniciando división manual de totales y conceptos")
+            
+            # Verificar si ya se dividieron los valores
+            if hasattr(self, 'valores_ya_divididos') and self.valores_ya_divididos:
+                messagebox.showwarning("Advertencia", "Los valores ya han sido divididos. Use 'Calcular' para restaurar los valores originales antes de dividir nuevamente.")
+                return
+            
+            # Obtener totales actuales
+            totales = {k: v.get() for k, v in self.entries_totales.items()}
+            
+            # Dividir totales
+            for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
+                try:
+                    valor = float(totales.get(k, "0"))
+                    nuevo_valor = valor / 2
+                    totales[k] = f"{nuevo_valor:.2f}"
+                    self.entries_totales[k].delete(0, "end")
+                    self.entries_totales[k].insert(0, totales[k])
+                except (ValueError, TypeError):
+                    logger.error(f"Error al dividir el total para {k}")
+                    pass
+            logger.info(f"Totales divididos: {totales}")
+            
+            # Dividir conceptos en la tabla (precio unitario y total, cantidad permanece igual)
+            logger.info("Dividiendo conceptos en la tabla")
+            for item_id in self.tree.get_children():
+                try:
+                    valores_actuales = list(self.tree.item(item_id, "values"))
+                    if len(valores_actuales) >= 4:  # [cantidad, descripcion, precio_unitario, total]
+                        cantidad = valores_actuales[0]  # Cantidad permanece igual
+                        descripcion = valores_actuales[1]  # Descripción permanece igual
+                        precio_unitario = float(valores_actuales[2])
+                        total_actual = float(valores_actuales[3])
+                        
+                        # Dividir precio unitario y total por 2
+                        nuevo_precio = precio_unitario / 2
+                        nuevo_total = total_actual / 2
+                        
+                        # Actualizar valores en la tabla
+                        nuevos_valores = [
+                            cantidad,  # Cantidad igual
+                            descripcion,  # Descripción igual
+                            f"{nuevo_precio:.2f}",  # Precio dividido
+                            f"{nuevo_total:.2f}"  # Total dividido
+                        ]
+                        
+                        self.tree.item(item_id, values=nuevos_valores)
+                        logger.info(f"Concepto dividido: {descripcion} - Precio: {precio_unitario:.2f} → {nuevo_precio:.2f}, Total: {total_actual:.2f} → {nuevo_total:.2f}")
+                    
+                except (ValueError, TypeError, IndexError) as e:
+                    logger.error(f"Error al dividir concepto {item_id}: {e}")
+                    continue
+            
+            logger.info("División de conceptos completada")
+            
+            # Marcar que los valores ya fueron divididos
+            self.valores_ya_divididos = True
+            logger.info("Flag valores_ya_divididos establecido a True")
+            
+            messagebox.showinfo("División Completada", "Los totales y conceptos han sido divididos a la mitad.")
+            
+        except Exception as e:
+            logger.error(f"Error al dividir totales y conceptos: {e}")
+            messagebox.showerror("Error", f"Error al dividir: {str(e)}")
+    
+    def calcular_valores_complementarios(self):
+        """Calcula los valores complementarios para la segunda factura dividida."""
+        try:
+            logger.info("Iniciando cálculo de valores complementarios")
+            
+            # Verificar que tengamos valores originales guardados
+            if not hasattr(self, 'valores_originales_totales') or not self.valores_originales_totales:
+                logger.error("No se encontraron valores originales para calcular complementos")
+                messagebox.showerror("Error", "No se encontraron valores originales. Cargue el XML nuevamente.")
+                return
+            
+            # Obtener valores actuales de la primera factura desde la interfaz
+            totales_primera = {k: v.get() for k, v in self.entries_totales.items()}
+            logger.info(f"Totales primera factura: {totales_primera}")
+            logger.info(f"Valores originales: {self.valores_originales_totales}")
+            
+            # Calcular complementos para totales
+            for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
+                try:
+                    valor_original = float(self.valores_originales_totales.get(k, "0"))
+                    valor_primera = float(totales_primera.get(k, "0"))
+                    valor_complemento = valor_original - valor_primera
+                    
+                    # Actualizar en la interfaz
+                    self.entries_totales[k].delete(0, "end")
+                    self.entries_totales[k].insert(0, f"{valor_complemento:.2f}")
+                    
+                    logger.info(f"{k}: Original={valor_original:.2f}, Primera={valor_primera:.2f}, Complemento={valor_complemento:.2f}")
+                    
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error al calcular complemento para {k}: {e}")
+                    continue
+            
+            # Calcular complementos para conceptos
+            logger.info("Calculando complementos para conceptos")
+            conceptos_primera = []
+            for item_id in self.tree.get_children():
+                try:
+                    valores = list(self.tree.item(item_id, "values"))
+                    if len(valores) >= 4:
+                        conceptos_primera.append({
+                            "cantidad": valores[0],
+                            "descripcion": valores[1],
+                            "precio_unitario": float(valores[2]),
+                            "total": float(valores[3])
+                        })
+                except (ValueError, TypeError, IndexError) as e:
+                    logger.error(f"Error al procesar concepto {item_id}: {e}")
+                    continue
+            
+            # Verificar que tengamos conceptos originales
+            if not hasattr(self, 'valores_originales_conceptos') or not self.valores_originales_conceptos:
+                logger.error("No se encontraron conceptos originales")
+                return
+            
+            # Calcular complementos para cada concepto
+            for i, (concepto_original, concepto_primera) in enumerate(zip(self.valores_originales_conceptos, conceptos_primera)):
+                try:
+                    # Precio unitario complementario
+                    precio_original = concepto_original["precio_unitario"]
+                    precio_primera = concepto_primera["precio_unitario"]
+                    precio_complemento = precio_original - precio_primera
+                    
+                    # Total complementario
+                    total_original = concepto_original["total"]
+                    total_primera = concepto_primera["total"]
+                    total_complemento = total_original - total_primera
+                    
+                    # Actualizar en la tabla (cantidad y descripción permanecen iguales)
+                    item_id = list(self.tree.get_children())[i]
+                    nuevos_valores = [
+                        concepto_original["cantidad"],  # Cantidad igual
+                        concepto_original["descripcion"],  # Descripción igual
+                        f"{precio_complemento:.2f}",  # Precio complementario
+                        f"{total_complemento:.2f}"  # Total complementario
+                    ]
+                    
+                    self.tree.item(item_id, values=nuevos_valores)
+                    logger.info(f"Concepto {i+1}: {concepto_original['descripcion']} - "
+                              f"Precio complemento: {precio_complemento:.2f}, Total complemento: {total_complemento:.2f}")
+                    
+                except (ValueError, TypeError, IndexError) as e:
+                    logger.error(f"Error al calcular complemento para concepto {i}: {e}")
+                    continue
+            
+            logger.info("Cálculo de valores complementarios completado")
+            
+        except Exception as e:
+            logger.error(f"Error al calcular valores complementarios: {e}")
+            messagebox.showerror("Error", f"Error al calcular complementos: {str(e)}")
     
     def comprobar_numero_conceptos(self):
         """Comprueba si hay demasiados conceptos."""
@@ -1205,66 +1407,9 @@ class SolicitudApp(tb.Frame):
                 solicitud_data["Folio"] = folio_vc
                 logger.info(f"Folio actualizado para segunda factura: {folio_vc}")
 
-            # Dividir totales si el checkbox está marcado (PRIMERA vez O segunda factura)
-            dividir_marcado = self.dividir_var.get()
-            dividir_habilitado = str(self.chb_dividir.cget('state')) == "normal"
-            # Nota: es_segunda_factura ya fue definida anteriormente
-            
-            # Aplicar división solo si está marcado dividir Y no se ha dividido anteriormente
-            if dividir_marcado and not self.valores_ya_divididos:
-                logger.info("Casilla dividir activa, dividiendo totales y conceptos")
-                
-                # Dividir totales
-                for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
-                    try:
-                        valor = float(totales.get(k, "0"))
-                        totales[k] = f"{valor / 2:.2f}"
-                        self.entries_totales[k].delete(0, "end")
-                        self.entries_totales[k].insert(0, totales[k])
-                    except (ValueError, TypeError):
-                        logger.error(f"Error al dividir el total para {k}")
-                        pass
-                logger.info(f"Totales divididos: {totales}")
-                
-                # Dividir conceptos en la tabla (precio unitario y total, cantidad permanece igual)
-                logger.info("Dividiendo conceptos en la tabla")
-                for item_id in self.tree.get_children():
-                    try:
-                        valores_actuales = list(self.tree.item(item_id, "values"))
-                        if len(valores_actuales) >= 4:  # [cantidad, descripcion, precio_unitario, total]
-                            cantidad = valores_actuales[0]  # Cantidad permanece igual
-                            descripcion = valores_actuales[1]  # Descripción permanece igual
-                            precio_unitario = float(valores_actuales[2])
-                            total_actual = float(valores_actuales[3])
-                            
-                            # Dividir precio unitario y total por 2
-                            nuevo_precio = precio_unitario / 2
-                            nuevo_total = total_actual / 2
-                            
-                            # Actualizar valores en la tabla
-                            nuevos_valores = [
-                                cantidad,  # Cantidad igual
-                                descripcion,  # Descripción igual
-                                f"{nuevo_precio:.2f}",  # Precio dividido
-                                f"{nuevo_total:.2f}"  # Total dividido
-                            ]
-                            
-                            self.tree.item(item_id, values=nuevos_valores)
-                            logger.info(f"Concepto dividido: {descripcion} - Precio: {precio_unitario:.2f} → {nuevo_precio:.2f}, Total: {total_actual:.2f} → {nuevo_total:.2f}")
-                        
-                    except (ValueError, TypeError, IndexError) as e:
-                        logger.error(f"Error al dividir concepto {item_id}: {e}")
-                        continue
-                
-                logger.info("División de conceptos completada")
-                
-                # Marcar que los valores ya fueron divididos
-                self.valores_ya_divididos = True
-                logger.info("Flag valores_ya_divididos establecido a True")
-
-            # Recopilar conceptos DESPUÉS de la división (para obtener valores actualizados)
+            # Recopilar conceptos (ya no hay división automática)
             conceptos = [self.tree.item(item, "values") for item in self.tree.get_children()]
-            logger.info(f"Conceptos recopilados después de división: {len(conceptos)} conceptos")
+            logger.info(f"Conceptos recopilados: {len(conceptos)} conceptos")
 
             data = {
                 "TIPO DE VALE": solicitud_data.get("Tipo", ""),
@@ -1492,11 +1637,16 @@ class SolicitudApp(tb.Frame):
                         
                 logger.info("Checkbox dividir deshabilitado y tipo de vale cambiado a VC")
                 
+                # CALCULAR VALORES COMPLEMENTARIOS INMEDIATAMENTE
+                logger.info("Calculando valores complementarios para la segunda factura")
+                self.calcular_valores_complementarios()
+                
                 # Mostrar mensaje al usuario indicando que debe generar nuevamente
                 messagebox.showinfo(
                     "Segunda Factura Lista", 
                     f"Primera factura (SC) guardada correctamente.\n\n"
                     f"El tipo se ha cambiado a 'VC - VALE DE CONTROL'.\n"
+                    f"Los valores complementarios han sido calculados automáticamente.\n\n"
                     f"Haga clic en 'Generar' nuevamente para guardar la segunda factura."
                 )
                 
