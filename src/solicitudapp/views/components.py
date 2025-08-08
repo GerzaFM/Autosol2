@@ -146,9 +146,14 @@ class ProveedorFrame(BaseFrame):
             proveedores_data = []
             
             for proveedor in proveedores:
+                # Usar nombre_en_quiter si nombre es None o "None"
+                nombre_display = proveedor.nombre
+                if not nombre_display or nombre_display == "None":
+                    nombre_display = getattr(proveedor, 'nombre_en_quiter', '') or ''
+                
                 proveedores_data.append({
                     'id': proveedor.id,
-                    'nombre': proveedor.nombre or '',
+                    'nombre': nombre_display,
                     'rfc': proveedor.rfc or '',
                     'telefono': proveedor.telefono or '',
                     'email': proveedor.email or '',

@@ -105,7 +105,7 @@ class InvoiceController:
                 },
                 'proveedor': {
                     'id': factura.proveedor.id,
-                    'nombre': factura.proveedor.nombre,
+                    'nombre': factura.proveedor.nombre_en_quiter if (not factura.proveedor.nombre or factura.proveedor.nombre == "None") else factura.proveedor.nombre,
                     'rfc': factura.proveedor.rfc,
                     'telefono': factura.proveedor.telefono,
                     'email': factura.proveedor.email,

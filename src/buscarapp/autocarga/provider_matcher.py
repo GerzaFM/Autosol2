@@ -1,3 +1,24 @@
+
+def safe_get_strip(data, key, default=''):
+    """
+    Función helper para obtener un valor de un dict y hacer strip de manera segura
+    
+    Args:
+        data: Diccionario
+        key: Clave a buscar
+        default: Valor por defecto si la clave no existe
+        
+    Returns:
+        str: Valor limpio (sin espacios) o string vacío
+    """
+    value = data.get(key, default)
+    if value is None:
+        return ''
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
 """
 Utilidad para comparar y actualizar proveedores basado en datos extraídos de PDFs.
 Maneja la lógica de:
@@ -179,8 +200,8 @@ class ProviderMatcher:
         Returns:
             Tuple[Optional[Proveedor], bool]: (proveedor_encontrado, fue_actualizado)
         """
-        nombre = vale_data.get('Nombre', '').strip()
-        cuenta = vale_data.get('Cuenta', '').strip()
+        nombre = safe_get_strip(vale_data, 'Nombre')
+        cuenta = safe_get_strip(vale_data, 'Cuenta')
         
         if not nombre and not cuenta:
             return None, False
@@ -216,7 +237,7 @@ class ProviderMatcher:
         Returns:
             Optional[Proveedor]: Proveedor encontrado o None
         """
-        nombre = orden_data.get('Nombre', '').strip()
+        nombre = safe_get_strip(orden_data, 'Nombre')
         
         if not nombre:
             return None

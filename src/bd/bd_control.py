@@ -27,16 +27,136 @@ class DBManager:
                 if factura_existente:
                     raise ValueError(f"La factura {data.get('serie')}-{data.get('folio')} ya está registrada en la base de datos")
                 
-                # Guardar proveedor
-                proveedor, _ = Proveedor.get_or_create(
-                    rfc=data.get("rfc_proveedor"),
-                    defaults={
-                        "nombre": data.get("nombre_proveedor"),
-                        "telefono": data.get("telefono_proveedor"),
-                        "email": data.get("email_proveedor"),
-                        "nombre_contacto": data.get("nombre_contacto_proveedor"),
-                    }
-                )
+                # BÚSQUEDA INTELIGENTE DE PROVEEDORES
+                proveedor = None
+                rfc_proveedor = data.get("rfc_proveedor", "").strip()
+                nombre_proveedor = data.get("nombre_proveedor", "").strip()
+                
+                # PASO 1: Buscar por RFC exacto
+                if rfc_proveedor:
+                    proveedor = Proveedor.get_or_none(
+                        Proveedor.rfc == rfc_proveedor
+                    )
+                    if proveedor:
+                        print(f"✅ Proveedor encontrado por RFC: {proveedor.nombre}")
+                
+                # PASO 2: Si no encontró por RFC, búsqueda inteligente por nombre
+                if not proveedor and nombre_proveedor:
+                    def limpiar_nombre(nombre):
+                        """Limpia nombre para comparación más flexible"""
+                        if not nombre or nombre == "None":
+                            return ""
+                        # Convertir a mayúsculas y quitar caracteres especiales
+                        import re
+                        nombre_limpio = re.sub(r'[^A-Z0-9\s]', '', nombre.upper())
+                        # Quitar palabras comunes
+                        palabras_comunes = {'SA', 'DE', 'CV', 'SC', 'RL', 'SRL', 'SDERL', 'SADECV'}
+                        palabras = [p for p in nombre_limpio.split() if p not in palabras_comunes]
+                        return ' '.join(palabras).strip()
+                    
+                    def calcular_similitud(nombre1, nombre2):
+                        """Calcula similitud entre nombres"""
+                        nombre1_limpio = limpiar_nombre(nombre1)
+                        nombre2_limpio = limpiar_nombre(nombre2)
+                        
+                        if not nombre1_limpio or not nombre2_limpio:
+                            return 0
+                        
+                        # Buscar palabras en común
+                        palabras1 = set(nombre1_limpio.split())
+                        palabras2 = set(nombre2_limpio.split())
+                        
+                        if len(palabras1) == 0 or len(palabras2) == 0:
+                            return 0
+                        
+                        # Calcular intersección
+                        comunes = palabras1.intersection(palabras2)
+                        total = palabras1.union(palabras2)
+                        
+                        if len(total) == 0:
+                            return 0
+                        
+                        # Bonus si las primeras palabras coinciden
+                        primera_palabra_coincide = (list(palabras1)[0] == list(palabras2)[0]) if len(palabras1) > 0 and len(palabras2) > 0 else False
+                        
+                        similitud_base = len(comunes) / len(total)
+                        if primera_palabra_coincide:
+                            similitud_base += 0.3  # Bonus por primera palabra
+                        
+                        return min(similitud_base, 1.0)
+                    
+                    # Buscar en todos los proveedores
+                    mejor_proveedor = None
+                    mejor_similitud = 0.0
+                    
+                    for prov_candidato in Proveedor.select():
+                        # Comparar con nombre
+                        if prov_candidato.nombre and prov_candidato.nombre != "None":
+                            similitud = calcular_similitud(nombre_proveedor, prov_candidato.nombre)
+                            if similitud > mejor_similitud and similitud >= 0.5:  # Mínimo 50% similitud
+                                mejor_proveedor = prov_candidato
+                                mejor_similitud = similitud
+                        
+                        # Comparar con nombre_en_quiter
+                        if prov_candidato.nombre_en_quiter:
+                            similitud = calcular_similitud(nombre_proveedor, prov_candidato.nombre_en_quiter)
+                            if similitud > mejor_similitud and similitud >= 0.5:  # Mínimo 50% similitud
+                                mejor_proveedor = prov_candidato
+                                mejor_similitud = similitud
+                    
+                    if mejor_proveedor:
+                        proveedor = mejor_proveedor
+                        print(f"✅ Proveedor encontrado por similitud ({mejor_similitud:.2f}): {proveedor.nombre or proveedor.nombre_en_quiter}")
+                
+                # PASO 3: Actualizar datos del proveedor encontrado
+                if proveedor:
+                    # Actualizar campos con datos del formulario/XML
+                    actualizado = False
+                    
+                    # Actualizar nombre con el del XML si viene
+                    if nombre_proveedor and (not proveedor.nombre or proveedor.nombre == "None"):
+                        proveedor.nombre = nombre_proveedor
+                        actualizado = True
+                        print(f"📝 Actualizando nombre: '{proveedor.nombre}'")
+                    
+                    # Actualizar RFC si no lo tenía
+                    if rfc_proveedor and (not proveedor.rfc or proveedor.rfc == "None"):
+                        proveedor.rfc = rfc_proveedor
+                        actualizado = True
+                        print(f"📝 Agregando RFC {rfc_proveedor} al proveedor")
+                    
+                    # Actualizar teléfono del formulario
+                    if data.get("telefono_proveedor"):
+                        proveedor.telefono = data.get("telefono_proveedor")
+                        actualizado = True
+                        print(f"📝 Actualizando teléfono: {proveedor.telefono}")
+                    
+                    # Actualizar email del formulario  
+                    if data.get("email_proveedor"):
+                        proveedor.email = data.get("email_proveedor")
+                        actualizado = True
+                        print(f"📝 Actualizando email: {proveedor.email}")
+                    
+                    # Actualizar contacto del formulario
+                    if data.get("nombre_contacto_proveedor"):
+                        proveedor.nombre_contacto = data.get("nombre_contacto_proveedor")
+                        actualizado = True
+                        print(f"📝 Actualizando contacto: {proveedor.nombre_contacto}")
+                    
+                    if actualizado:
+                        proveedor.save()
+                        print(f"📝 Datos del proveedor actualizados")
+                
+                # PASO 4: Si no existe, crear nuevo proveedor
+                if not proveedor:
+                    print(f"🆕 Creando nuevo proveedor: {nombre_proveedor}")
+                    proveedor = Proveedor.create(
+                        nombre=nombre_proveedor,
+                        rfc=rfc_proveedor,
+                        telefono=data.get("telefono_proveedor"),
+                        email=data.get("email_proveedor"),
+                        nombre_contacto=data.get("nombre_contacto_proveedor")
+                    )
 
                 # Guardar factura
                 factura = Factura.create(

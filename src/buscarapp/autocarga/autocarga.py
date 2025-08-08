@@ -1,3 +1,24 @@
+
+def safe_get_strip(data, key, default=''):
+    """
+    Función helper para obtener un valor de un dict y hacer strip de manera segura
+    
+    Args:
+        data: Diccionario
+        key: Clave a buscar
+        default: Valor por defecto si la clave no existe
+        
+    Returns:
+        str: Valor limpio (sin espacios) o string vacío
+    """
+    value = data.get(key, default)
+    if value is None:
+        return ''
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
 """
 AutoCarga - Sistema Unificado de Extracción de PDFs
 ====================================================
@@ -396,8 +417,8 @@ class AutoCarga:
         actualizaciones = []
         
         for vale_id, vale_data in self.vales.items():
-            nombre = vale_data.get('Nombre', '').strip()
-            cuenta = vale_data.get('Cuenta', '').strip()
+            nombre = safe_get_strip(vale_data, 'Nombre')
+            cuenta = safe_get_strip(vale_data, 'Cuenta')
             
             if nombre and cuenta:
                 # Buscar si existe el proveedor sin código

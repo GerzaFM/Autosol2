@@ -56,13 +56,13 @@ except ImportError:
 
 # Intentar importar base de datos
 try:
-    from bd.bd_control import BDControl
+    from bd.bd_control import DBManager
     from bd.models import Factura, Proveedor, Concepto, Vale, Reparto
     BD_AVAILABLE = True
 except ImportError as e:
     print(f"Advertencia: No se pudo importar base de datos: {e}")
     BD_AVAILABLE = False
-    BDControl = None
+    DBManager = None
     Factura = Proveedor = Concepto = Vale = Reparto = None
 
 
@@ -103,7 +103,7 @@ class BuscarAppRefactored(ttk.Frame):
         """Inicializa la conexión a la base de datos"""
         try:
             if BD_AVAILABLE:
-                self.bd_control = BDControl()
+                self.bd_control = DBManager()
                 self.logger.info("Conexión a base de datos establecida")
             else:
                 self.bd_control = None

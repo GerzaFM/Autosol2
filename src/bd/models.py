@@ -10,13 +10,14 @@ db = SqliteDatabase(db_path)
 
 class Proveedor(Model):
     id = IntegerField(primary_key=True)  # Primary key autoincremental
-    nombre = CharField()
-    rfc = CharField(unique=True)
+    nombre = CharField(null=True)  # Permitir NULL - se llenará al procesar facturas
+    rfc = CharField(null=True)     # Permitir NULL y quitar unique - se llenará al procesar facturas
     telefono = CharField(null=True)
     email = CharField(null=True)
     nombre_contacto = CharField(null=True)
     codigo_quiter = IntegerField(null=True)
     cuenta_mayor = IntegerField(null=True)  # Cuenta mayor, deberia ser una tabla de cuentas mayores
+    nombre_en_quiter = CharField(null=True)  # Nombre del proveedor en el sistema Quiter
 
     class Meta:
         database = db

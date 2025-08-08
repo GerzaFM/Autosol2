@@ -121,12 +121,13 @@ class AutocargaController:
             
             # Actualizar cuenta_mayor del proveedor y factura si no la tienen
             if cuenta_mayor:
+                self.logger.info(f"💼 Procesando cuenta mayor {cuenta_mayor} para orden {nueva_orden.id}")
                 proveedor_para_actualizar = None
                 
                 # Caso 1: Hay factura asociada, usar su proveedor
                 if factura_asociada and factura_asociada.proveedor:
                     proveedor_para_actualizar = factura_asociada.proveedor
-                    self.logger.info(f"🔗 Usando proveedor de factura asociada: {proveedor_para_actualizar.nombre}")
+                    self.logger.info(f"🔗 Usando proveedor de factura asociada: {proveedor_para_actualizar.nombre or proveedor_para_actualizar.nombre_en_quiter}")
                     
                     # Actualizar cuenta_mayor de la factura si no la tiene
                     if not factura_asociada.cuenta_mayor:
@@ -138,9 +139,12 @@ class AutocargaController:
                 
                 # Caso 2: No hay factura asociada, buscar proveedor por cuenta o nombre
                 else:
+                    self.logger.info(f"🔍 No hay factura asociada. Buscando proveedor por cuenta={cuenta} nombre='{nombre}'")
                     proveedor_para_actualizar = self._buscar_proveedor_para_cuenta_mayor(cuenta, nombre)
                     if proveedor_para_actualizar:
-                        self.logger.info(f"🔍 Proveedor encontrado por búsqueda: {proveedor_para_actualizar.nombre}")
+                        self.logger.info(f"✅ Proveedor encontrado por búsqueda: {proveedor_para_actualizar.nombre or proveedor_para_actualizar.nombre_en_quiter}")
+                    else:
+                        self.logger.warning(f"❌ NO se encontró proveedor para cuenta={cuenta} nombre='{nombre}'")
                 
                 # Actualizar cuenta mayor del proveedor si encontramos uno
                 if proveedor_para_actualizar:
@@ -1220,20 +1224,41 @@ class AutocargaController:
         try:
             from bd.models import Proveedor
             
+            self.logger.info(f"🔍 Buscando proveedor: cuenta={cuenta}, nombre='{nombre_proveedor}'")
+            
             # Estrategia 1: Buscar por codigo_quiter
-            proveedor = Proveedor.get_or_none(Proveedor.codigo_quiter == cuenta)
-            if proveedor:
-                self.logger.info(f"✅ Proveedor encontrado por codigo_quiter {cuenta}: {proveedor.nombre}")
-                return proveedor
+            if cuenta:
+                proveedor = Proveedor.get_or_none(Proveedor.codigo_quiter == cuenta)
+                if proveedor:
+                    self.logger.info(f"✅ Proveedor encontrado por codigo_quiter {cuenta}: ID={proveedor.id} nombre='{proveedor.nombre or proveedor.nombre_en_quiter}'")
+                    return proveedor
+                else:
+                    self.logger.info(f"❌ No se encontró proveedor con codigo_quiter={cuenta}")
             
-            # Estrategia 2: Buscar por nombre (coincidencia parcial)
-            nombre_limpio = nombre_proveedor.upper().replace('SADECV', '').replace('S.A.DE C.V.', '').strip()
+            # Estrategia 2: Buscar por nombre si no hay cuenta
+            if nombre_proveedor:
+                self.logger.info(f"🔍 Buscando por nombre: '{nombre_proveedor}'")
+                
+                # Buscar coincidencia exacta primero
+                proveedor = Proveedor.get_or_none(Proveedor.nombre == nombre_proveedor)
+                if proveedor:
+                    self.logger.info(f"✅ Proveedor encontrado por nombre exacto: ID={proveedor.id} nombre='{proveedor.nombre}'")
+                    return proveedor
+                
+                # Buscar en nombre_en_quiter
+                proveedor = Proveedor.get_or_none(Proveedor.nombre_en_quiter == nombre_proveedor)
+                if proveedor:
+                    self.logger.info(f"✅ Proveedor encontrado por nombre_en_quiter exacto: ID={proveedor.id} quiter='{proveedor.nombre_en_quiter}'")
+                    return proveedor
+                
+                self.logger.info(f"❌ No se encontró proveedor con nombre exacto '{nombre_proveedor}'")
             
-            # Buscar coincidencia exacta primero
-            proveedor = Proveedor.get_or_none(Proveedor.nombre == nombre_proveedor)
-            if proveedor:
-                self.logger.info(f"✅ Proveedor encontrado por nombre exacto: {proveedor.nombre}")
-                return proveedor
+            self.logger.warning(f"❌ NO SE ENCONTRÓ proveedor para cuenta={cuenta} nombre='{nombre_proveedor}'")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error buscando proveedor para cuenta mayor: {e}")
+            return None
             
             # Buscar coincidencia parcial
             proveedores_candidatos = Proveedor.select().where(

@@ -146,9 +146,14 @@ class SearchController:
             
             self.state.proveedores_data = []
             for p in proveedores:
+                # Usar nombre_en_quiter si nombre es None o "None"
+                nombre_display = p.nombre
+                if not nombre_display or nombre_display == "None":
+                    nombre_display = getattr(p, 'nombre_en_quiter', '') or ''
+                
                 proveedor_data = {
                     'id': p.id,
-                    'nombre': p.nombre,
+                    'nombre': nombre_display,
                     'rfc': p.rfc,
                     'telefono': p.telefono or '',
                     'email': p.email or '',

@@ -191,7 +191,7 @@ class Cheque:
         fecha_actual = datetime.now().strftime("%d/%m/%y")
         
         # Extraer datos básicos de la factura
-        proveedor = self.factura.get('nombre_emisor', '')
+        proveedor = self.factura.get('nombre_en_quiter', '')
         numero_vale = self.factura.get('no_vale', '')
         folio_factura = self.factura.get('folio', '')
         tipo_vale_codigo = self.factura.get('tipo', '')  # Código del tipo de vale (ej: "AL", "VM")
@@ -270,6 +270,15 @@ class Cheque:
                         codigo_proveedor = proveedor_obj.codigo_quiter
                     if proveedor_obj.nombre:
                         nombre_proveedor = proveedor_obj.nombre
+                    # Usar nombre_en_quiter para el campo Orden del cheque si existe
+                    if proveedor_obj.nombre_en_quiter:
+                        proveedor = proveedor_obj.nombre_en_quiter
+                    elif proveedor_obj.nombre:
+                        proveedor = proveedor_obj.nombre
+                else:
+                    # Si no se encuentra el proveedor por RFC, usar nombre_emisor como fallback
+                    if not proveedor:
+                        proveedor = self.factura.get('nombre_emisor', '')
             
             # Obtener datos del banco BTC23
             if Banco:
@@ -285,12 +294,19 @@ class Cheque:
                     
         except Exception as e:
             print(f"Error accediendo a la base de datos: {e}")
+            # Si hay error y no tenemos proveedor, usar nombre_emisor como fallback
+            if not proveedor:
+                proveedor = self.factura.get('nombre_emisor', '')
             # Si hay error, generar importe en letras automáticamente
             if total_factura:
                 importe_letras = self.convertir_numero_a_letras(total_factura)
 
         if total_factura:
                 importe_letras = self.convertir_numero_a_letras(total_factura)
+
+        # Fallback final: asegurar que proveedor tenga un valor
+        if not proveedor:
+            proveedor = self.factura.get('nombre_emisor', '')
 
         # Verificar si hay IVA trasladado para determinar qué cuentas incluir
         iva_trasladado = self.factura.get('iva_trasladado', 0)
@@ -299,9 +315,9 @@ class Cheque:
         # Construir campo Nombre con nombres correspondientes
         nombres_lista = []
         
-        # Nombre del proveedor - SIEMPRE incluir si tenemos el nombre, aunque no tenga cuenta_mayor
-        if nombre_proveedor:
-            nombres_lista.append(nombre_proveedor)
+        # Nombre del proveedor - usar el mismo nombre que aparece en Orden (proveedor = nombre_en_quiter o fallback)
+        if proveedor:  # Usar la variable proveedor que ya tiene el nombre correcto (nombre_en_quiter o fallback)
+            nombres_lista.append(proveedor)
         elif proveedor_cuenta_mayor:  # Solo si tiene cuenta_mayor pero no nombre
             nombres_lista.append("")  # Placeholder si no hay nombre
         
@@ -317,8 +333,8 @@ class Cheque:
             iva_haber = AppConfig.CUENTAS_MAYORES.get('Iva_Haber', '')
             
             if iva_deber:
-                # Para IVA Deber: nombre_proveedor + "IVA ACREDITABLE"
-                nombre_iva_deber = f"{nombre_proveedor}\nIVA ACREDITABLE" if nombre_proveedor else "IVA ACREDITABLE"
+                # Para IVA Deber: proveedor (nombre_en_quiter) + "IVA ACREDITABLE"
+                nombre_iva_deber = f"{proveedor}\nIVA ACREDITABLE" if proveedor else "IVA ACREDITABLE"
                 nombres_lista.append(nombre_iva_deber)
             if iva_haber:
                 # Para IVA Haber: "IVA PAGADO"
@@ -449,7 +465,7 @@ class Cheque:
         
         # Construir campos Cuenta y subcuenta con alineación dinámica mejorada
         # Contar renglones del proveedor y banco para ajustar saltos de línea
-        renglones_proveedor = contar_renglones_nombre(nombre_proveedor) if nombre_proveedor else 1
+        renglones_proveedor = contar_renglones_nombre(proveedor) if proveedor else 1
         renglones_banco = contar_renglones_nombre(nombre_banco) if nombre_banco else 1
         
         # Construir cuentas con separadores dinámicos individuales
@@ -523,7 +539,7 @@ class Cheque:
         debe_campo = formatear_moneda(total_factura) if total_factura else ""
 
         # Contar renglones del proveedor y banco para ajustar saltos de línea
-        renglones_proveedor = contar_renglones_nombre(nombre_proveedor)
+        renglones_proveedor = contar_renglones_nombre(proveedor)
         renglones_banco = contar_renglones_nombre(nombre_banco)
 
         # Calcular saltos para el campo Debe (siempre, independiente de si hay IVA)
