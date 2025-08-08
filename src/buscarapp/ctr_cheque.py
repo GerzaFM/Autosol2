@@ -52,7 +52,7 @@ def numero_a_letras(numero):
         centavos = int((num - parte_entera) * 100)
         
         # Diccionarios para conversión
-        unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"]
+        unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"]
         especiales = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", 
                      "DIECISIETE", "DIECIOCHO", "DIECINUEVE"]
         decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", 
@@ -596,7 +596,7 @@ class Cheque:
             "Cuenta": cuentas_mayores,
             "Nombre": nombres_mayores,  # Campo nombres con proveedores, banco e IVA
             "Parcial": "",
-            "Cantidad": formatear_moneda(total_factura)  # Campo Cantidad con formato de moneda
+            "Cantidad": f"{total_factura:,.2f}" if total_factura else ""  # Campo Cantidad sin símbolo $ pero con formato de número
         }
     
     def convertir_numero_a_letras(self, numero):
