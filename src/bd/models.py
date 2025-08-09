@@ -31,6 +31,17 @@ class Layout(Model):
     class Meta:
         database = db
 
+class Cheque(Model):
+    id = AutoField()  # Primary key autoincremental
+    fecha = DateField()
+    vale = CharField()
+    folio = CharField()
+    proveedor = CharField()  # Nombre del proveedor
+    monto = DecimalField()
+    banco = CharField()
+
+    class Meta:
+        database = db
 
 class Factura(Model):
     folio_interno = IntegerField(primary_key=True)
@@ -51,9 +62,9 @@ class Factura(Model):
     comentario = CharField(null=True)
     clase = CharField(null=True)
     departamento = CharField(null=True)
-    cuenta_mayor = IntegerField(null=True) # Quitar
     proveedor = ForeignKeyField(Proveedor, backref='facturas')
     layout = ForeignKeyField(Layout, backref='facturas', null=True)
+    cheque = ForeignKeyField(Cheque, backref='facturas', null=True)
     cargada = BooleanField(default=False)
     pagada = BooleanField(default=False)
     

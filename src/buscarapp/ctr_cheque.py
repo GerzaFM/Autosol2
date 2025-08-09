@@ -10,7 +10,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 try:
-    from bd.models import Banco, OrdenCompra, Factura, Proveedor
+    from bd.models import Banco, OrdenCompra, Factura, Proveedor, Cheque as ChequeModel
     # Importar configuración para cuentas mayores
     sys.path.insert(0, os.path.join(parent_dir, '..', 'config'))
     from app_config import AppConfig
@@ -18,6 +18,7 @@ try:
     from solicitudapp.config.app_config import AppConfig as SolicitudAppConfig
 except ImportError:
     print("Error: No se pudieron importar los modelos de la base de datos")
+    Banco = OrdenCompra = Factura = Proveedor = ChequeModel = None
     Banco = OrdenCompra = Factura = Proveedor = None
     AppConfig = None
     SolicitudAppConfig = None
@@ -256,7 +257,12 @@ class Cheque:
         factura_consolidada = instancia_temp._consolidar_facturas(facturas)
         
         # Crear instancia final con factura consolidada
-        return cls(factura_consolidada, ruta)
+        instancia_final = cls(factura_consolidada, ruta)
+        
+        # Guardar las facturas originales para poder asociarlas en la BD
+        instancia_final._facturas_originales = facturas
+        
+        return instancia_final
     
     def _llenar_formulario_factura(self):
         """
@@ -654,7 +660,7 @@ class Cheque:
                 campo_cheque = str(vales_lista[0])
             else:
                 # Para el campo cheque, usar formato más compacto
-                campo_cheque = ", ".join(vales_lista)
+                campo_cheque = " ".join(vales_lista)
         else:
             # Cheque individual: usar el número de vale actual
             campo_cheque = str(numero_vale) if numero_vale else ""
@@ -803,12 +809,131 @@ class Cheque:
 
     def exportar(self):
         """
-        Método de exportación principal que genera el cheque
+        Método de exportación principal que genera el cheque y lo guarda en la BD
         
         Returns:
             bool: True si se exportó correctamente, False en caso contrario
         """
-        return self.generar_cheque()
+        # Primero generar el PDF del cheque
+        if self.generar_cheque():
+            # Si el PDF se generó exitosamente, guardar en la base de datos
+            try:
+                self._guardar_cheque_en_bd()
+                return True
+            except Exception as e:
+                print(f"Advertencia: PDF generado pero error guardando en BD: {e}")
+                return True  # PDF ya se generó, no fallar por BD
+        else:
+            return False
+    
+    def _guardar_cheque_en_bd(self):
+        """
+        Guarda el registro del cheque en la base de datos
+        """
+        if not ChequeModel:
+            print("Modelo Cheque no disponible, saltando guardado en BD")
+            return
+        
+        try:
+            from datetime import date
+            
+            # Obtener datos del formulario
+            campo_cheque = self.form_info.get('cheque', '')
+            proveedor = self.form_info.get('Orden', '')
+            total_factura = self.factura.get('total', 0)
+            
+            # Obtener folios de las facturas
+            if self.factura.get('vales_consolidados'):
+                # Cheque múltiple: obtener folios de todas las facturas
+                folios_facturas = []
+                if hasattr(self, '_facturas_originales'):
+                    for factura in self._facturas_originales:
+                        folio = factura.get('folio', '')
+                        if folio:
+                            folios_facturas.append(str(folio))
+                    folios_str = ' '.join(folios_facturas) if folios_facturas else 'MULTIPLE'
+                else:
+                    folios_str = 'MULTIPLE'
+            else:
+                # Cheque individual: usar folio de la factura actual
+                folios_str = str(self.factura.get('folio', ''))
+            
+            # Obtener código del banco (buscar BTC23 o usar por defecto)
+            codigo_banco = ""
+            try:
+                if Banco:
+                    banco_btc23 = Banco.select().where(Banco.codigo == "BTC23").first()
+                    if banco_btc23:
+                        codigo_banco = banco_btc23.codigo
+                    else:
+                        # Si no hay BTC23, usar el primer banco disponible
+                        primer_banco = Banco.select().first()
+                        if primer_banco:
+                            codigo_banco = primer_banco.codigo
+            except Exception as e:
+                print(f"Error obteniendo banco: {e}")
+                codigo_banco = "BTC23"  # Valor por defecto
+            
+            # Crear registro del cheque
+            cheque_bd = ChequeModel.create(
+                fecha=date.today(),
+                vale=campo_cheque,
+                folio=folios_str,
+                proveedor=proveedor,
+                monto=float(total_factura),  # Guardar como número, no como string formateado
+                banco=codigo_banco
+            )
+            
+            print(f"✅ Cheque guardado en BD: ID {cheque_bd.id}, Vale: {campo_cheque}, Proveedor: {proveedor}")
+            
+            # Si hay facturas, asociarlas al cheque
+            self._asociar_facturas_a_cheque(cheque_bd)
+            
+        except Exception as e:
+            print(f"Error guardando cheque en BD: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    def _asociar_facturas_a_cheque(self, cheque_bd):
+        """
+        Asocia las facturas al cheque en la base de datos
+        
+        Args:
+            cheque_bd: Instancia del cheque creado en la BD
+        """
+        if not Factura:
+            return
+        
+        try:
+            # Obtener folio_interno de la factura base
+            folio_interno = self.factura.get('folio_interno')
+            
+            if folio_interno:
+                # Buscar la factura en la BD y asociarla al cheque
+                try:
+                    factura_bd = Factura.get(Factura.folio_interno == folio_interno)
+                    factura_bd.cheque = cheque_bd
+                    factura_bd.save()
+                    print(f"✅ Factura {folio_interno} asociada al cheque {cheque_bd.id}")
+                except Factura.DoesNotExist:
+                    print(f"⚠️  Factura {folio_interno} no encontrada en BD")
+            
+            # Si es cheque múltiple y tenemos las facturas originales, asociar todas
+            if hasattr(self, '_facturas_originales'):
+                for factura_data in self._facturas_originales:
+                    folio_interno_orig = factura_data.get('folio_interno')
+                    if folio_interno_orig and folio_interno_orig != folio_interno:
+                        try:
+                            factura_bd = Factura.get(Factura.folio_interno == folio_interno_orig)
+                            factura_bd.cheque = cheque_bd
+                            factura_bd.save()
+                            print(f"✅ Factura {folio_interno_orig} asociada al cheque {cheque_bd.id}")
+                        except Factura.DoesNotExist:
+                            print(f"⚠️  Factura {folio_interno_orig} no encontrada en BD")
+            
+        except Exception as e:
+            print(f"Error asociando facturas al cheque: {e}")
     
     def get_datos_formulario(self):
         """
