@@ -219,7 +219,7 @@ class ReporteChequeMultiple:
         num_filas = len(data)
         tabla.setStyle(TableStyle([
             # Estilo del encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.gray),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -237,8 +237,8 @@ class ReporteChequeMultiple:
             ('ALIGN', (1, 1), (1, num_filas-2), 'LEFT'),
             
             # Estilo especial para la fila de totales
-            ('BACKGROUND', (0, num_filas-1), (-1, num_filas-1), colors.black),
-            ('TEXTCOLOR', (0, num_filas-1), (-1, num_filas-1), colors.white),
+            ('BACKGROUND', (0, num_filas-1), (-1, num_filas-1), colors.white),
+            ('TEXTCOLOR', (0, num_filas-1), (-1, num_filas-1), colors.black),
             ('FONTNAME', (0, num_filas-1), (-1, num_filas-1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, num_filas-1), (-1, num_filas-1), 9),
         ]))
@@ -282,18 +282,19 @@ class ReporteChequeMultiple:
         titulo = Paragraph(nombre_proveedor, self.styles['TituloReporte'])
         story.append(titulo)
         story.append(Spacer(1, 0.5*cm))
-        
+        """"
         # Información adicional (opcional)
         fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
         if self.info_cheque and 'numero_cheque' in self.info_cheque:
             info_cheque = Paragraph(f"<b>Cheque:</b> {self.info_cheque['numero_cheque']} - <b>Fecha:</b> {fecha_actual}", self.styles['InfoGeneral'])
             story.append(info_cheque)
             story.append(Spacer(1, 0.3*cm))
-        
+        """
         # Tabla de facturas con totales incluidos
         tabla_facturas = self._crear_tabla_facturas()
         story.append(tabla_facturas)
-        
+
+        """
         # Pie de página con información adicional
         story.append(Spacer(1, 1*cm))
         pie_info = Paragraph(
@@ -302,6 +303,7 @@ class ReporteChequeMultiple:
             self.styles['InfoGeneral']
         )
         story.append(pie_info)
+        """
         
         # Generar el PDF
         try:

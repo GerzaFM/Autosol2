@@ -176,7 +176,15 @@ class Cheque:
         if generar_reporte and len(facturas) > 1:
             try:
                 print(f"🔄 Iniciando generación de relación de vales para {len(facturas)} facturas...")
-                from .ctr_reporte_chequemultiple import generar_reporte_cheque_multiple
+                
+                # Importar el módulo de reportes
+                import sys
+                import os
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                sys.path.insert(0, current_dir)
+                
+                import ctr_reporte_chequemultiple
+                generar_reporte_cheque_multiple = ctr_reporte_chequemultiple.generar_reporte_cheque_multiple
                 
                 # Generar nombre del reporte basado en la ruta del cheque
                 import os
