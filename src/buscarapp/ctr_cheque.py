@@ -157,19 +157,89 @@ class Cheque:
         self.form_info = self._llenar_formulario_factura()
     
     @classmethod
-    def crear_multiple(cls, facturas, ruta):
+    def crear_multiple(cls, facturas, ruta, generar_reporte=True):
         """
         Método de clase para crear un cheque con múltiples facturas
         
         Args:
             facturas: Lista de diccionarios con datos de facturas
             ruta: Ruta donde se guardará el PDF del cheque
+            generar_reporte: Si True, genera reporte PDF de las facturas (default: True)
             
         Returns:
             Cheque: Instancia de Cheque con facturas consolidadas
         """
         if not facturas:
             raise ValueError("La lista de facturas no puede estar vacía")
+        
+        # Generar reporte PDF de las facturas múltiples
+        if generar_reporte and len(facturas) > 1:
+            try:
+                print(f"🔄 Iniciando generación de relación de vales para {len(facturas)} facturas...")
+                from .ctr_reporte_chequemultiple import generar_reporte_cheque_multiple
+                
+                # Generar nombre del reporte basado en la ruta del cheque
+                import os
+                nombre_cheque = os.path.splitext(os.path.basename(ruta))[0]
+                
+                # Crear directorio de reportes si no existe
+                directorio_base = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                directorio_reportes = os.path.join(directorio_base, "reportes")
+                if not os.path.exists(directorio_reportes):
+                    os.makedirs(directorio_reportes, exist_ok=True)
+                
+                # Ruta del reporte en la carpeta reportes
+                ruta_reporte = os.path.join(directorio_reportes, f"{nombre_cheque} Relacion de Vales.pdf")
+                
+                print(f"📂 Directorio de reportes: {directorio_reportes}")
+                print(f"📄 Nombre del cheque: {nombre_cheque}")
+                print(f"📊 Ruta de relación: {ruta_reporte}")
+                
+                # Preparar información adicional del cheque
+                info_cheque = {
+                    'numero_cheque': nombre_cheque,
+                    'proveedor': facturas[0].get('nombre_emisor', 'No especificado'),
+                    'archivo_cheque': os.path.basename(ruta)
+                }
+                
+                # Generar reporte
+                resultado = generar_reporte_cheque_multiple(
+                    facturas_data=facturas, 
+                    ruta_pdf=ruta_reporte,
+                    info_cheque=info_cheque,
+                    abrir_automaticamente=False  # No abrir automáticamente para no interrumpir el flujo
+                )
+                
+                print(f"✅ Relación de vales generada: {resultado}")
+                existe = os.path.exists(resultado)
+                print(f"📁 ¿Archivo existe? {'SÍ' if existe else 'NO'}")
+                
+                # MOSTRAR MENSAJE VISIBLE AL USUARIO
+                if existe:
+                    try:
+                        import tkinter as tk
+                        from tkinter import messagebox
+                        
+                        # Crear ventana temporal para mostrar mensaje
+                        root = tk.Tk()
+                        root.withdraw()  # Ocultar ventana principal
+                        
+                        mensaje = f"✅ REPORTE GENERADO EXITOSAMENTE\n\n"
+                        mensaje += f"📄 Archivo: {os.path.basename(resultado)}\n"
+                        mensaje += f"📂 Ubicación: {os.path.dirname(resultado)}\n"
+                        mensaje += f"📁 Carpeta: reportes/\n\n"
+                        mensaje += f"El reporte contiene {len(facturas)} facturas."
+                        
+                        messagebox.showinfo("Reporte de Vales Generado", mensaje)
+                        root.destroy()
+                    except Exception as e:
+                        print(f"⚠️ No se pudo mostrar el mensaje gráfico: {e}")
+                
+            except Exception as e:
+                print(f"❌ Error al generar relación de vales: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continuar sin fallar aunque el reporte tenga errores
         
         # Crear instancia temporal para usar el método de consolidación
         instancia_temp = cls(facturas[0], ruta)

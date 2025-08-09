@@ -846,6 +846,7 @@ class BuscarAppRefactored(ttk.Frame):
                 
                 if filename:
                     ruta_exportacion = filename
+                    print(f"🔄 [DEBUG] Usuario seleccionó ruta para {len(selected_items)} elementos: {ruta_exportacion}")
                     self.logger.info(f"Ruta de exportación ({len(selected_items)} elementos): {ruta_exportacion}")
             
             # Variable ruta_exportacion ya contiene la ruta seleccionada
@@ -887,6 +888,7 @@ class BuscarAppRefactored(ttk.Frame):
                             self.logger.info(f"  {i}. Vale: {item.get('no_vale', 'N/A')}, Folio: {item.get('folio', 'N/A')}, Total: {item.get('total', 'N/A')}")
                         
                         try:
+                            print(f"🔄 [DEBUG] Llamando crear_multiple con ruta: {ruta_exportacion}")
                             cheque = Cheque.crear_multiple(selected_items, ruta_exportacion)
                             
                             # DEBUG: Verificar datos del formulario antes de generar
