@@ -10,14 +10,35 @@ import logging
 import sys
 import os
 
+# Configurar logging primero
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Importar la clase de base de datos de cheques
 try:
-    from cheque_database import ChequeDatabase
+    # Intentar importación relativa (cuando se ejecuta desde main_app)
+    from src.chequeapp.cheque_database import ChequeDatabase
+    DATABASE_IMPORT_SUCCESS = True
 except ImportError:
-    # Fallback si no se puede importar
-    class ChequeDatabase:
-        def search_cheques(self, **kwargs):
-            return []
+    try:
+        # Intentar importación local (cuando se ejecuta de forma independiente)
+        from cheque_database import ChequeDatabase
+        DATABASE_IMPORT_SUCCESS = True
+    except ImportError:
+        try:
+            # Intentar agregar ruta y importar
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            if current_dir not in sys.path:
+                sys.path.insert(0, current_dir)
+            from cheque_database import ChequeDatabase
+            DATABASE_IMPORT_SUCCESS = True
+        except ImportError as e:
+            logger.warning(f"Error importando ChequeDatabase: {e}")
+            DATABASE_IMPORT_SUCCESS = False
+            # Fallback si no se puede importar
+            class ChequeDatabase:
+                def search_cheques(self, **kwargs):
+                    return []
 
 # Importar utilidades seguras si están disponibles
 try:
@@ -25,12 +46,28 @@ try:
     from config.settings import WINDOW_SIZES
     UI_HELPERS_AVAILABLE = True
 except ImportError:
-    UI_HELPERS_AVAILABLE = False
-    logging.warning("Utilidades de UI no disponibles, usando métodos básicos")
-
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+    try:
+        # Intentar importación absoluta desde la raíz del proyecto
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        from app.utils.ui_helpers import safe_set_geometry, get_safe_window_size, center_window_on_parent
+        from config.settings import WINDOW_SIZES
+        UI_HELPERS_AVAILABLE = True
+    except ImportError:
+        UI_HELPERS_AVAILABLE = False
+        WINDOW_SIZES = {"cheque_app": "1300x700"}
+        logging.warning("Utilidades de UI no disponibles, usando métodos básicos")
+        
+        # Definir funciones de fallback
+        def center_window_on_parent(window, parent=None):
+            pass
+        
+        def safe_set_geometry(window, geometry):
+            window.geometry(geometry)
+            
+        def get_safe_window_size(key, default="800x600"):
+            return WINDOW_SIZES.get(key, default)
 
 
 class ChequeAppProfessional(tb.Frame):
@@ -54,7 +91,16 @@ class ChequeAppProfessional(tb.Frame):
         self.initialized = False
         
         # Inicializar base de datos
-        self.cheque_db = ChequeDatabase()
+        try:
+            if DATABASE_IMPORT_SUCCESS:
+                self.cheque_db = ChequeDatabase()
+                self.logger.info("Base de datos de cheques inicializada correctamente")
+            else:
+                self.cheque_db = ChequeDatabase()  # Fallback class
+                self.logger.warning("Usando base de datos fallback")
+        except Exception as e:
+            self.logger.error(f"Error inicializando base de datos: {e}")
+            self.cheque_db = ChequeDatabase()  # Fallback class
         
         # Referencias a widgets para acceso posterior
         self.initial_date = None
@@ -127,24 +173,26 @@ class ChequeAppProfessional(tb.Frame):
             right_frame.pack(side=LEFT, fill=BOTH, expand=True)
 
             # Trees de los cheques a cargar
-            columns = ["fecha", "vale", "folio", "proveedor", "monto", "banco"]
+            columns = ["id", "fecha", "vale", "folio", "proveedor", "monto", "banco"]
             self.cheque_table = tb.Treeview(left_frame, columns=columns, show="headings")
             self.cheque_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-            cargar_table = tb.Treeview(right_frame, columns=columns, show="headings")
-            cargar_table.pack(fill=BOTH, expand=True, padx=10, pady=10)     
+            self.cargar_table = tb.Treeview(right_frame, columns=columns, show="headings")
+            self.cargar_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
             for col in columns:
                 self.cheque_table.heading(col, text=col.capitalize(), anchor=W)
                 self.cheque_table.column(col, anchor=W)
 
-                cargar_table.heading(col, text=col.capitalize(), anchor=W)
-                cargar_table.column(col, anchor=W)
+                self.cargar_table.heading(col, text=col.capitalize(), anchor=W)
+                self.cargar_table.column(col, anchor=W)
 
             # Definir ancho de columnas (opcional)
+            c_smallest = 30
             c_small = 65
             c_medium = 100
             c_large = 200
+            self.cheque_table.column("id", width=c_smallest)
             self.cheque_table.column("fecha", width=c_small)
             self.cheque_table.column("vale", width=c_small)
             self.cheque_table.column("folio", width=c_small)
@@ -152,12 +200,13 @@ class ChequeAppProfessional(tb.Frame):
             self.cheque_table.column("monto", width=c_small+5)
             self.cheque_table.column("banco", width=c_small)
 
-            cargar_table.column("fecha", width=c_small)
-            cargar_table.column("vale", width=c_small)
-            cargar_table.column("folio", width=c_small)
-            cargar_table.column("proveedor", width=c_medium)
-            cargar_table.column("monto", width=c_small+5)
-            cargar_table.column("banco", width=c_small)
+            self.cargar_table.column("id", width=c_smallest)
+            self.cargar_table.column("fecha", width=c_small)
+            self.cargar_table.column("vale", width=c_small)
+            self.cargar_table.column("folio", width=c_small)
+            self.cargar_table.column("proveedor", width=c_medium)
+            self.cargar_table.column("monto", width=c_small+5)
+            self.cargar_table.column("banco", width=c_small)
 
             #cheque_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
             #cargar_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
@@ -186,15 +235,16 @@ class ChequeAppProfessional(tb.Frame):
             layout_right_frame.pack(side=RIGHT, fill=BOTH, expand=True, padx=10)
 
             # Frame de layout
-            columns = ["fecha", "nombre", "monto"]
+            columns = ["id", "fecha", "nombre", "monto"]
             self.layout_table = tb.Treeview(layout_left_frame, columns=columns, show="headings")
             self.layout_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
             
             for col in columns:
                 self.layout_table.heading(col, text=col.capitalize(), anchor=W)
                 self.layout_table.column(col, anchor=W)
-                
-            self.layout_table.column("fecha", width=c_small)
+
+            self.layout_table.column("id", width=c_smallest)
+            self.layout_table.column("fecha", width=c_smallest)
             self.layout_table.column("nombre", width=c_large)
             self.layout_table.column("monto", width=c_small)
             
@@ -210,7 +260,7 @@ class ChequeAppProfessional(tb.Frame):
             button_eliminar = tb.Button(frame_control_layout, text="Eliminar", command=self.on_eliminar, width=10)
             button_eliminar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
-            columns = ["fecha", "vale", "folio", "proveedor", "Total"]
+            columns = ["id", "fecha", "vale", "folio", "proveedor", "Total"]
             layout_facturas = tb.Treeview(layout_right_frame, columns=columns, show="headings")
             layout_facturas.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
@@ -218,6 +268,7 @@ class ChequeAppProfessional(tb.Frame):
                 layout_facturas.heading(col, text=col.capitalize(), anchor=W)
                 layout_facturas.column(col, anchor=W)
 
+            layout_facturas.column("id", width=c_smallest)
             layout_facturas.column("fecha", width=c_small)
             layout_facturas.column("vale", width=c_small)
             layout_facturas.column("folio", width=c_small)
@@ -307,6 +358,7 @@ class ChequeAppProfessional(tb.Frame):
             # Llenar tabla con resultados
             for cheque in cheques:
                 self.cheque_table.insert("", "end", values=(
+                    cheque.get("id", ""),
                     cheque.get("fecha", ""),
                     cheque.get("vale", ""),
                     cheque.get("folio", ""),
@@ -320,23 +372,6 @@ class ChequeAppProfessional(tb.Frame):
         except Exception as e:
             self.logger.error(f"Error en búsqueda: {e}")
             # En caso de error, mostrar datos de ejemplo
-            self._load_sample_data()
-    
-    def _load_sample_data(self):
-        """Cargar datos de ejemplo en la tabla"""
-        sample_data = [
-            ("2024-01-15", "V001", "CH001", "Proveedor A", "$1,000.00", "Banco A"),
-            ("2024-01-16", "V002", "CH002", "Proveedor B", "$2,500.00", "Banco B"),
-            ("2024-01-17", "V003", "CH003", "Proveedor C", "$1,800.00", "Banco C")
-        ]
-        
-        # Limpiar tabla
-        for item in self.cheque_table.get_children():
-            self.cheque_table.delete(item)
-        
-        # Insertar datos de ejemplo
-        for data in sample_data:
-            self.cheque_table.insert("", "end", values=data)
 
     def on_search_layout(self):
         """Manejador del botón de búsqueda en layout."""
@@ -371,22 +406,56 @@ class ChequeAppProfessional(tb.Frame):
     def on_agregar(self):
         """Manejador del botón de agregar cheque."""
         try:
-            # Aquí se implementaría la lógica para agregar un nuevo cheque
-            self.logger.info("Agregar cheque (lógica no implementada)")
-            # Simulación de agregar cheque
-            tb.messagebox.showinfo("Agregar Cheque", "Funcionalidad de agregar cheque aún no implementada.")
+            # Obtener los itmes seleccionados en la tabla de cheques
+            selected_items = self.cheque_table.selection()
+            if not selected_items:
+                tb.messagebox.showwarning("Agregar Cheque", "Por favor, seleccione al menos un cheque para agregar.")
+                return
             
+            # Para cada item seleccionado, obtener valores y agregarlos a tabla de cargados
+            for item in selected_items:
+                values = self.cheque_table.item(item, "values")
+                # Evitar duplicados en cargar_table
+                exists = False
+                for cargar_item in self.cargar_table.get_children():
+                    if self.cargar_table.item(cargar_item, "values") == values:
+                        exists = True
+                        break
+                if not exists:
+                    self.cargar_table.insert("", "end", values=values)
+
+                # Eliminar el item de la tabla de cheques
+                self.cheque_table.delete(item)
+
+            self.logger.info(f"Agregados {len(selected_items)} cheques a la tabla de cargados")
+
         except Exception as e:
             self.logger.error(f"Error al agregar cheque: {e}")
 
     def on_quitar(self):
         """Manejador del botón de quitar cheque."""
         try:
-            # Aquí se implementaría la lógica para quitar un cheque seleccionado
-            self.logger.info("Quitar cheque (lógica no implementada)")
-            # Simulación de quitar cheque
-            tb.messagebox.showinfo("Quitar Cheque", "Funcionalidad de quitar cheque aún no implementada.")
-            
+            # Obtener los items seleccionados en cargar_table
+            selected_items = self.cargar_table.selection()
+            if not selected_items:
+                tb.messagebox.showwarning("Quitar Cheque", "Por favor, seleccione al menos un cheque para quitar.")
+                return
+
+            for item in selected_items:
+                values = self.cargar_table.item(item, "values")
+                # Eliminar el item de cargar_table
+                self.cargar_table.delete(item)
+                # Verificar que no exista ya en cheque_table antes de insertarlo
+                exists = False
+                for cheque_item in self.cheque_table.get_children():
+                    if self.cheque_table.item(cheque_item, "values") == values:
+                        exists = True
+                        break
+                if not exists:
+                    self.cheque_table.insert("", "end", values=values)
+
+            self.logger.info(f"Quitados {len(selected_items)} cheques de la tabla de cargados y regresados a la tabla de cheques")
+
         except Exception as e:
             self.logger.error(f"Error al quitar cheque: {e}")
 
