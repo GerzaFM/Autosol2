@@ -3,12 +3,43 @@ Aplicación principal de Cheques - Nueva Arquitectura
 Frame vacío simplificado que sigue el patrón de solicitud_app_professional.py
 """
 import tkinter as tk
+from tkinter import simpledialog, messagebox
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 from typing import Optional
 import logging
 import sys
 import os
+from datetime import date
+
+# Importar LayoutExporter con manejo de rutas
+try:
+    # Intentar importación relativa (cuando se ejecuta desde main_app)
+    from src.chequeapp.exportar_layout import LayoutExporter
+    LAYOUT_EXPORTER_AVAILABLE = True
+except ImportError:
+    try:
+        # Intentar importación local (cuando se ejecuta de forma independiente)
+        from exportar_layout import LayoutExporter
+        LAYOUT_EXPORTER_AVAILABLE = True
+    except ImportError:
+        try:
+            # Intentar agregar ruta y importar
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            if current_dir not in sys.path:
+                sys.path.insert(0, current_dir)
+            from exportar_layout import LayoutExporter
+            LAYOUT_EXPORTER_AVAILABLE = True
+        except ImportError as e:
+            print(f"Warning: No se pudo importar LayoutExporter: {e}")
+            LAYOUT_EXPORTER_AVAILABLE = False
+            # Fallback class
+            class LayoutExporter:
+                def __init__(self, layout):
+                    self.layout = layout
+                def exportar_layout_excel(self, ruta_archivo=None):
+                    print("LayoutExporter no disponible - usando fallback")
+                    return None
 
 # Configurar logging primero
 logging.basicConfig(level=logging.INFO)
@@ -376,16 +407,39 @@ class ChequeAppProfessional(tb.Frame):
     def on_search_layout(self):
         """Manejador del botón de búsqueda en layout."""
         try:
-            # Aquí se implementaría la lógica de búsqueda en layout
+            # Obtener valores de los filtros del search_frame
+            fecha_inicial = self.initial_date.entry.get()
+            fecha_final = self.final_date.entry.get()
+            clase = self.class_entry.get().strip()
+            solo_no_cargados = self.only_uncharged_var.get()
+
             self.logger.info("Búsqueda en layout iniciada")
-            # Simulación de búsqueda en layout
-            search_params = {
-                'initial_date': self.initial_date.get(),
-                'final_date': self.final_date.get(),
-                'class': self.class_entry.get(),
-                'only_uncharged': self.only_uncharged_var.get()
+
+            # Construir filtros
+            filters = {
+                'fecha_inicial': fecha_inicial if fecha_inicial else None,
+                'fecha_final': fecha_final if fecha_final else None,
+                'clase': clase if clase else None,
+                'solo_no_cargados': solo_no_cargados
             }
-            self.logger.info(f"Parámetros de búsqueda en layout: {search_params}")
+
+            # Buscar layouts en base de datos
+            layouts = self.cheque_db.search_layouts(filters)
+
+            # Limpiar tabla
+            for item in self.layout_table.get_children():
+                self.layout_table.delete(item)
+
+            # Llenar tabla con resultados
+            for layout in layouts:
+                self.layout_table.insert("", "end", values=(
+                    layout.get("id", ""),
+                    layout.get("fecha", ""),
+                    layout.get("nombre", ""),
+                    f"${float(layout.get('monto', 0)):,.2f}"
+                ))
+
+            self.logger.info(f"Layout table actualizada con {len(layouts)} layouts encontrados")
 
         except Exception as e:
             self.logger.error(f"Error en búsqueda en layout: {e}")
@@ -409,7 +463,7 @@ class ChequeAppProfessional(tb.Frame):
             # Obtener los itmes seleccionados en la tabla de cheques
             selected_items = self.cheque_table.selection()
             if not selected_items:
-                tb.messagebox.showwarning("Agregar Cheque", "Por favor, seleccione al menos un cheque para agregar.")
+                messagebox.showwarning("Agregar Cheque", "Por favor, seleccione al menos un cheque para agregar.")
                 return
             
             # Para cada item seleccionado, obtener valores y agregarlos a tabla de cargados
@@ -438,7 +492,7 @@ class ChequeAppProfessional(tb.Frame):
             # Obtener los items seleccionados en cargar_table
             selected_items = self.cargar_table.selection()
             if not selected_items:
-                tb.messagebox.showwarning("Quitar Cheque", "Por favor, seleccione al menos un cheque para quitar.")
+                messagebox.showwarning("Quitar Cheque", "Por favor, seleccione al menos un cheque para quitar.")
                 return
 
             for item in selected_items:
@@ -462,24 +516,220 @@ class ChequeAppProfessional(tb.Frame):
     def on_exportar(self):
         """Manejador del botón de exportar cheques."""
         try:
-            # Aquí se implementaría la lógica para exportar cheques
-            self.logger.info("Exportar cheques (lógica no implementada)")
-            # Simulación de exportar cheques
-            tb.messagebox.showinfo("Exportar Cheques", "Funcionalidad de exportar cheques aún no implementada.")
+            # Verificar que hay elementos en cargar_table
+            items_to_export = self.cargar_table.get_children()
+            if not items_to_export:
+                messagebox.showwarning("Exportar Layout", "No hay cheques para exportar en la tabla de cargados.")
+                return
+
+            # Pedir al usuario un nombre para el layout
+            layout_name = simpledialog.askstring(
+                "Nombre del Layout",
+                "Ingrese un nombre para el nuevo layout:",
+                initialvalue=f"Layout {date.today().strftime('%Y-%m-%d')}"
+            )
+            
+            if not layout_name or not layout_name.strip():
+                messagebox.showwarning("Exportar Layout", "Debe proporcionar un nombre válido para el layout.")
+                return
+            
+            layout_name = layout_name.strip()
+            
+            # Obtener fecha de hoy en formato string
+            fecha_hoy = date.today().strftime('%Y-%m-%d')
+            
+            # Crear el nuevo layout en la base de datos
+            self.logger.info(f"Creando layout: {layout_name}")
+            layout_id = self.cheque_db.create_layout(
+                nombre=layout_name,
+                fecha=fecha_hoy,
+                monto=0.0
+            )
+            
+            if not layout_id:
+                messagebox.showerror("Error", "No se pudo crear el layout en la base de datos.")
+                return
+            
+            # Obtener los IDs de los cheques en cargar_table
+            cheque_ids = []
+            monto_total = 0.0
+            
+            for item in items_to_export:
+                values = self.cargar_table.item(item, "values")
+                # Suponiendo que el ID está en la primera columna (índice 0)
+                try:
+                    cheque_id = int(values[0])  # ID del cheque
+                    cheque_ids.append(cheque_id)
+                    
+                    # Sumar al monto total (monto está en índice 5)
+                    try:
+                        monto_str = str(values[5]).replace('$', '').replace(',', '')
+                        monto = float(monto_str)
+                        monto_total += monto
+                    except (ValueError, IndexError):
+                        self.logger.warning(f"No se pudo parsear el monto del cheque {cheque_id}")
+                        
+                except (ValueError, IndexError):
+                    self.logger.warning(f"No se pudo obtener el ID del cheque en item: {values}")
+                    continue
+            
+            if not cheque_ids:
+                messagebox.showerror("Error", "No se pudieron obtener los IDs de los cheques.")
+                return
+            
+            # Asignar los cheques al layout
+            self.logger.info(f"Asignando {len(cheque_ids)} cheques al layout {layout_id}")
+            success = self.cheque_db.assign_cheques_to_layout(layout_id, cheque_ids)
+            
+            if not success:
+                messagebox.showerror("Error", "No se pudieron asignar los cheques al layout.")
+                return
+            
+            # Borrar todos los items de cargar_table
+            for item in items_to_export:
+                self.cargar_table.delete(item)
+            
+            self.logger.info("Items eliminados de cargar_table")
+            
+            # Actualizar layout_table con los layouts de hoy
+            self._refresh_layout_table()
+            
+            # Mostrar mensaje de éxito
+            messagebox.showinfo(
+                "Éxito", 
+                f"Layout '{layout_name}' creado exitosamente con {len(cheque_ids)} cheques.\n"
+                f"Monto total: ${monto_total:,.2f}"
+            )
+            
+            self.logger.info(f"Layout '{layout_name}' exportado exitosamente con {len(cheque_ids)} cheques")
+
+            # Generar Excel y abrir archivo
+            ruta_archivo = self.layout_a_excel(layout_id)
+            if ruta_archivo:
+                try:
+                    import os
+                    import subprocess
+                    import platform
+                    
+                    # Abrir el archivo según el sistema operativo
+                    if platform.system() == "Windows":
+                        os.startfile(ruta_archivo)
+                    elif platform.system() == "Darwin":  # macOS
+                        subprocess.call(["open", ruta_archivo])
+                    else:  # Linux
+                        subprocess.call(["xdg-open", ruta_archivo])
+                    
+                    self.logger.info(f"Archivo Excel abierto automáticamente: {ruta_archivo}")
+                except Exception as e:
+                    self.logger.warning(f"No se pudo abrir el archivo automáticamente: {e}")
 
         except Exception as e:
             self.logger.error(f"Error al exportar cheques: {e}")
+            messagebox.showerror("Error", f"Error inesperado al exportar layout: {str(e)}")
+
+    def layout_a_excel(self, layout_id):
+        layout_obj = self.cheque_db.get_layout_by_id(layout_id)
+        if layout_obj:
+            exportador = LayoutExporter(layout_obj)
+            ruta_archivo = exportador.exportar_layout_excel()
+            return ruta_archivo
+        return None
+
+    def _refresh_layout_table(self):
+        """Actualiza la tabla de layouts con los layouts de hoy"""
+        try:
+            # Limpiar la tabla actual
+            for item in self.layout_table.get_children():
+                self.layout_table.delete(item)
+            
+            # Obtener la fecha de hoy
+            fecha_hoy = date.today().strftime('%Y-%m-%d')
+            
+            # Buscar layouts de hoy
+            filters = {
+                'fecha_inicial': fecha_hoy,
+                'fecha_final': fecha_hoy
+            }
+            
+            layouts = self.cheque_db.search_layouts(filters)
+            
+            # Agregar layouts a la tabla
+            for layout in layouts:
+                self.layout_table.insert("", "end", values=(
+                    layout.get("id", ""),
+                    layout.get("fecha", ""),
+                    layout.get("nombre", ""),
+                    f"${float(layout.get('monto', 0)):,.2f}"
+                ))
+            
+            self.logger.info(f"Layout table actualizada con {len(layouts)} layouts de hoy")
+            
+        except Exception as e:
+            self.logger.error(f"Error actualizando layout_table: {e}")
     
     def on_generar(self):
-        """Manejador del botón de generar layout."""
+        """Manejador del botón de generar layout - Exporta layout seleccionado a Excel."""
         try:
-            # Aquí se implementaría la lógica para generar el layout
-            self.logger.info("Generar layout (lógica no implementada)")
-            # Simulación de generar layout
-            tb.messagebox.showinfo("Generar Layout", "Funcionalidad de generar layout aún no implementada.")
+            # Verificar que hay un layout seleccionado en layout_table
+            selected_items = self.layout_table.selection()
+            if not selected_items:
+                messagebox.showwarning("Generar Layout", "Por favor, seleccione un layout de la tabla para exportar a Excel.")
+                return
+            
+            # Obtener el primer item seleccionado
+            selected_item = selected_items[0]
+            values = self.layout_table.item(selected_item, "values")
+            
+            # El ID del layout está en la primera columna (índice 0)
+            try:
+                layout_id = int(values[0])
+                layout_nombre = values[2]  # Nombre está en índice 2
+            except (ValueError, IndexError):
+                messagebox.showerror("Error", "No se pudo obtener el ID del layout seleccionado.")
+                return
+            
+            self.logger.info(f"Generando Excel para layout: {layout_nombre} (ID: {layout_id})")
+            
+            # Usar el método layout_a_excel existente y obtener la ruta del archivo
+            ruta_archivo = self.layout_a_excel(layout_id)
+            
+            if ruta_archivo:
+                # Abrir el archivo Excel generado
+                try:
+                    import os
+                    import subprocess
+                    import platform
+                    
+                    # Abrir el archivo según el sistema operativo
+                    if platform.system() == "Windows":
+                        os.startfile(ruta_archivo)
+                    elif platform.system() == "Darwin":  # macOS
+                        subprocess.call(["open", ruta_archivo])
+                    else:  # Linux
+                        subprocess.call(["xdg-open", ruta_archivo])
+                    
+                    self.logger.info(f"Archivo Excel abierto: {ruta_archivo}")
+                    
+                    # Mostrar mensaje de éxito
+                    messagebox.showinfo(
+                        "Layout Generado", 
+                        f"El layout '{layout_nombre}' ha sido exportado a Excel exitosamente.\n"
+                        f"El archivo se ha abierto automáticamente."
+                    )
+                except Exception as e:
+                    self.logger.warning(f"No se pudo abrir el archivo automáticamente: {e}")
+                    # Mostrar mensaje de éxito sin el auto-abrir
+                    messagebox.showinfo(
+                        "Layout Generado", 
+                        f"El layout '{layout_nombre}' ha sido exportado a Excel exitosamente.\n"
+                        f"Archivo guardado en: {ruta_archivo}"
+                    )
+            else:
+                messagebox.showerror("Error", "No se pudo generar el archivo Excel.")
             
         except Exception as e:
             self.logger.error(f"Error al generar layout: {e}")
+            messagebox.showerror("Error", f"Error inesperado al generar layout: {str(e)}")
 
     def on_modificar(self):
         """Manejador del botón de modificar cheque."""
@@ -487,7 +737,7 @@ class ChequeAppProfessional(tb.Frame):
             # Aquí se implementaría la lógica para modificar un cheque seleccionado
             self.logger.info("Modificar cheque (lógica no implementada)")
             # Simulación de modificar cheque
-            tb.messagebox.showinfo("Modificar Cheque", "Funcionalidad de modificar cheque aún no implementada.")
+            messagebox.showinfo("Modificar Cheque", "Funcionalidad de modificar cheque aún no implementada.")
 
         except Exception as e:
             self.logger.error(f"Error al modificar cheque: {e}")
@@ -498,7 +748,7 @@ class ChequeAppProfessional(tb.Frame):
             # Aquí se implementaría la lógica para eliminar un cheque seleccionado
             self.logger.info("Eliminar cheque (lógica no implementada)")
             # Simulación de eliminar cheque
-            tb.messagebox.showinfo("Eliminar Cheque", "Funcionalidad de eliminar cheque aún no implementada.")
+            messagebox.showinfo("Eliminar Cheque", "Funcionalidad de eliminar cheque aún no implementada.")
 
         except Exception as e:
             self.logger.error(f"Error al eliminar cheque: {e}")
@@ -509,7 +759,7 @@ class ChequeAppProfessional(tb.Frame):
             # Aquí se implementaría la lógica para desenlazar una factura seleccionada
             self.logger.info("Desenlazar factura (lógica no implementada)")
             # Simulación de desenlazar factura
-            tb.messagebox.showinfo("Desenlazar Factura", "Funcionalidad de desenlazar factura aún no implementada.")
+            messagebox.showinfo("Desenlazar Factura", "Funcionalidad de desenlazar factura aún no implementada.")
 
         except Exception as e:
             self.logger.error(f"Error al desenlazar factura: {e}")
@@ -534,7 +784,7 @@ def main():
         
         # Centrar ventana si las utilidades están disponibles
         if UI_HELPERS_AVAILABLE:
-            center_window_on_parent(root)
+            center_window_on_parent(root, None)
         
         # Iniciar loop principal
         root.mainloop()

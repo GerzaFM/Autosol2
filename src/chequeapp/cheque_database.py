@@ -14,10 +14,11 @@ try:
     sys.path.insert(0, bd_path)
     
     from models import Cheque, Proveedor, Layout
+    from peewee import fn
     DATABASE_AVAILABLE = True
     DATABASE_AVAILABLE = True
 except ImportError as e:
-    Cheque = Proveedor = Layout = None
+    Cheque = Proveedor = Layout = fn = None
     DATABASE_AVAILABLE = False
 
 
@@ -92,7 +93,9 @@ class ChequeDatabase:
                     'folio': cheque.folio or '',
                     'proveedor': cheque.proveedor or '',
                     'monto': str(cheque.monto) if cheque.monto else '0.00',
-                    'banco': cheque.banco or ''
+                    'banco': cheque.banco or '',
+                    'layout': cheque.layout.id if cheque.layout else None,
+                    'layout_nombre': cheque.layout.nombre if cheque.layout else None
                 })
             
             self.logger.info(f"Búsqueda completada: {len(cheques)} cheques encontrados")
@@ -168,55 +171,6 @@ class ChequeDatabase:
             self.logger.error(f"Error parseando fecha {date_str}: {e}")
             return None
     
-    def _get_sample_cheques(self) -> List[Dict[str, Any]]:
-        """Retorna datos de ejemplo para cheques cuando la BD no está disponible"""
-        return [
-            {
-                'id': 1,
-                'fecha': '2024-08-10',
-                'vale': 'V156486',
-                'folio': '12456',
-                'proveedor': 'Servicio Nava Medrano',
-                'monto': '100000.00',
-                'banco': 'BTC23'
-            },
-            {
-                'id': 2,
-                'fecha': '2024-08-09',
-                'vale': 'V156487',
-                'folio': '12457',
-                'proveedor': 'Transportes González',
-                'monto': '75000.00',
-                'banco': 'BBVA'
-            },
-            {
-                'id': 3,
-                'fecha': '2024-08-08',
-                'vale': 'V156488',
-                'folio': '12458',
-                'proveedor': 'Materiales Construcción SA',
-                'monto': '125000.00',
-                'banco': 'Santander'
-            }
-        ]
-    
-    def _get_sample_layouts(self) -> List[Dict[str, Any]]:
-        """Retorna datos de ejemplo para layouts cuando la BD no está disponible"""
-        return [
-            {
-                'id': 1,
-                'fecha': '2024-08-10',
-                'nombre': 'Layout Agosto Semana 1',
-                'monto': '300000.00'
-            },
-            {
-                'id': 2,
-                'fecha': '2024-08-03',
-                'nombre': 'Layout Julio Semana 4',
-                'monto': '250000.00'
-            }
-        ]
-    
     def is_available(self) -> bool:
         """Retorna True si la base de datos está disponible"""
         return self.db_available
@@ -229,3 +183,146 @@ class ChequeDatabase:
             'layout_model': Layout is not None,
             'connection_status': 'connected' if self.db_available else 'disconnected'
         }
+    
+    def create_layout(self, nombre: str, fecha: str, monto: float = 0.0) -> Optional[int]:
+        """
+        Crea un nuevo layout
+        
+        Args:
+            nombre: Nombre del layout
+            fecha: Fecha del layout en formato YYYY-MM-DD
+            monto: Monto total del layout
+            
+        Returns:
+            ID del layout creado o None si hay error
+        """
+        if not self.db_available:
+            self.logger.warning("Base de datos no disponible para crear layout")
+            return None
+        
+        try:
+            fecha_obj = self._parse_date(fecha)
+            if not fecha_obj:
+                self.logger.error(f"Fecha inválida: {fecha}")
+                return None
+            
+            layout = Layout.create(
+                nombre=nombre,
+                fecha=fecha_obj,
+                monto=monto
+            )
+            
+            self.logger.info(f"Layout creado con ID: {layout.id}")
+            return layout.id
+            
+        except Exception as e:
+            self.logger.error(f"Error creando layout: {e}")
+            return None
+    
+    def assign_cheques_to_layout(self, layout_id: int, cheque_ids: List[int]) -> bool:
+        """
+        Asigna una lista de cheques a un layout
+        
+        Args:
+            layout_id: ID del layout
+            cheque_ids: Lista de IDs de cheques
+            
+        Returns:
+            True si la asignación fue exitosa
+        """
+        if not self.db_available:
+            self.logger.warning("Base de datos no disponible para asignar cheques")
+            return False
+        
+        try:
+            # Verificar que el layout existe
+            layout = Layout.get_by_id(layout_id)
+            
+            # Actualizar los cheques
+            updated_count = 0
+            for cheque_id in cheque_ids:
+                try:
+                    cheque = Cheque.get_by_id(cheque_id)
+                    cheque.layout = layout
+                    cheque.save()
+                    updated_count += 1
+                except Exception as e:
+                    self.logger.warning(f"Error asignando cheque {cheque_id}: {e}")
+            
+            # Actualizar el monto total del layout
+            total_monto = Cheque.select(fn.SUM(Cheque.monto)).where(Cheque.layout == layout).scalar() or 0
+            layout.monto = total_monto
+            layout.save()
+            
+            self.logger.info(f"Asignados {updated_count} cheques al layout {layout_id}")
+            return updated_count > 0
+            
+        except Exception as e:
+            self.logger.error(f"Error asignando cheques al layout: {e}")
+            return False
+    
+    def remove_cheques_from_layout(self, cheque_ids: List[int]) -> bool:
+        """
+        Remueve cheques de su layout asignado
+        
+        Args:
+            cheque_ids: Lista de IDs de cheques
+            
+        Returns:
+            True si la remoción fue exitosa
+        """
+        if not self.db_available:
+            self.logger.warning("Base de datos no disponible para remover cheques")
+            return False
+        
+        try:
+            updated_count = 0
+            for cheque_id in cheque_ids:
+                try:
+                    cheque = Cheque.get_by_id(cheque_id)
+                    old_layout = cheque.layout
+                    cheque.layout = None
+                    cheque.save()
+                    
+                    # Actualizar el monto del layout anterior si existe
+                    if old_layout:
+                        total_monto = Cheque.select(fn.SUM(Cheque.monto)).where(Cheque.layout == old_layout).scalar() or 0
+                        old_layout.monto = total_monto
+                        old_layout.save()
+                    
+                    updated_count += 1
+                except Exception as e:
+                    self.logger.warning(f"Error removiendo cheque {cheque_id}: {e}")
+            
+            self.logger.info(f"Removidos {updated_count} cheques de sus layouts")
+            return updated_count > 0
+            
+        except Exception as e:
+            self.logger.error(f"Error removiendo cheques de layouts: {e}")
+            return False
+
+    def get_layout_by_id(self, layout_id: int) -> Optional[Any]:
+        """
+        Obtiene un layout por su ID
+        
+        Args:
+            layout_id: ID del layout a buscar
+            
+        Returns:
+            Objeto Layout si se encuentra, None en caso contrario
+        """
+        if not self.db_available:
+            self.logger.warning("Base de datos no disponible")
+            return None
+            
+        try:
+            layout = Layout.get_by_id(layout_id)
+            self.logger.info(f"Layout {layout_id} encontrado: {layout.nombre}")
+            return layout
+            
+        except Layout.DoesNotExist:
+            self.logger.warning(f"Layout con ID {layout_id} no encontrado")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error obteniendo layout {layout_id}: {e}")
+            return None

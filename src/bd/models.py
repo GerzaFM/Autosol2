@@ -40,6 +40,7 @@ class Cheque(Model):
     proveedor = CharField()  # Nombre del proveedor
     monto = DecimalField()
     banco = CharField()
+    layout = ForeignKeyField(Layout, backref='cheques', null=True, column_name='layout')  # Especificar nombre de columna
 
     class Meta:
         database = db
