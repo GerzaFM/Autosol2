@@ -25,8 +25,9 @@ class Proveedor(Model):
 
 class Layout(Model):
     id = IntegerField(primary_key=True)
-    nombre = CharField()
     fecha = DateField()
+    nombre = CharField()
+    monto = DecimalField()
 
     class Meta:
         database = db

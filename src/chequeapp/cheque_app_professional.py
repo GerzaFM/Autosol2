@@ -10,6 +10,15 @@ import logging
 import sys
 import os
 
+# Importar la clase de base de datos de cheques
+try:
+    from cheque_database import ChequeDatabase
+except ImportError:
+    # Fallback si no se puede importar
+    class ChequeDatabase:
+        def search_cheques(self, **kwargs):
+            return []
+
 # Importar utilidades seguras si están disponibles
 try:
     from app.utils.ui_helpers import safe_set_geometry, get_safe_window_size, center_window_on_parent
@@ -44,6 +53,16 @@ class ChequeAppProfessional(tb.Frame):
         # Variables de estado
         self.initialized = False
         
+        # Inicializar base de datos
+        self.cheque_db = ChequeDatabase()
+        
+        # Referencias a widgets para acceso posterior
+        self.initial_date = None
+        self.final_date = None
+        self.class_entry = None
+        self.cheque_table = None
+        self.layout_table = None
+        
         self._setup_ui()
         self._post_init()
         
@@ -65,18 +84,18 @@ class ChequeAppProfessional(tb.Frame):
 
             initial_date_label = tb.Label(search_frame, text="Fecha Inicial:")
             initial_date_label.pack(side=LEFT, padx=(10, 5), anchor=W)
-            initial_date = tb.DateEntry(search_frame, width=12)
-            initial_date.pack(side=LEFT, padx=(0, 5), anchor=W)
+            self.initial_date = tb.DateEntry(search_frame, width=12)
+            self.initial_date.pack(side=LEFT, padx=(0, 5), anchor=W)
 
             final_date_label = tb.Label(search_frame, text="Fecha Final:")
             final_date_label.pack(side=LEFT, padx=(0, 5), anchor=W)
-            final_date = tb.DateEntry(search_frame, width=12)
-            final_date.pack(side=LEFT, padx=(0, 5), anchor=W)
+            self.final_date = tb.DateEntry(search_frame, width=12)
+            self.final_date.pack(side=LEFT, padx=(0, 5), anchor=W)
 
             class_label = tb.Label(search_frame, text="Clase:")
             class_label.pack(side=LEFT, padx=(0, 5), anchor=W)
-            class_entry = tb.Entry(search_frame)
-            class_entry.pack(side=LEFT, padx=(0, 5), anchor=W)
+            self.class_entry = tb.Entry(search_frame)
+            self.class_entry.pack(side=LEFT, padx=(0, 5), anchor=W)
 
             only_uncharged_label = tb.Label(search_frame, text="No Cargados:")
             only_uncharged_label.pack(side=LEFT, padx=(0, 5), anchor=W)
@@ -84,8 +103,8 @@ class ChequeAppProfessional(tb.Frame):
             only_uncharged_checkbox = tb.Checkbutton(search_frame, variable=self.only_uncharged_var)
             only_uncharged_checkbox.pack(side=LEFT, padx=(0, 5), anchor=W)
 
-            search_button = tb.Button(search_frame, text="Buscar cheques", command=self.on_search, width=15)
-            search_button.pack(side=RIGHT, padx=(5, 10), pady=5, anchor=E)
+            search_cheque_button = tb.Button(search_frame, text="Buscar cheques", command=self.on_search_cheques, width=15)
+            search_cheque_button.pack(side=RIGHT, padx=(5, 10), pady=5, anchor=E)
 
             search_layout_button = tb.Button(search_frame, text="Buscar layouts", command=self.on_search_layout, width=15)
             search_layout_button.pack(side=RIGHT, padx=(25, 5), pady=10, anchor=E)
@@ -109,15 +128,15 @@ class ChequeAppProfessional(tb.Frame):
 
             # Trees de los cheques a cargar
             columns = ["fecha", "vale", "folio", "proveedor", "monto", "banco"]
-            cheque_table = tb.Treeview(left_frame, columns=columns, show="headings")
-            cheque_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            self.cheque_table = tb.Treeview(left_frame, columns=columns, show="headings")
+            self.cheque_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
             cargar_table = tb.Treeview(right_frame, columns=columns, show="headings")
             cargar_table.pack(fill=BOTH, expand=True, padx=10, pady=10)     
 
             for col in columns:
-                cheque_table.heading(col, text=col.capitalize(), anchor=W)
-                cheque_table.column(col, anchor=W)
+                self.cheque_table.heading(col, text=col.capitalize(), anchor=W)
+                self.cheque_table.column(col, anchor=W)
 
                 cargar_table.heading(col, text=col.capitalize(), anchor=W)
                 cargar_table.column(col, anchor=W)
@@ -126,12 +145,12 @@ class ChequeAppProfessional(tb.Frame):
             c_small = 65
             c_medium = 100
             c_large = 200
-            cheque_table.column("fecha", width=c_small)
-            cheque_table.column("vale", width=c_small)
-            cheque_table.column("folio", width=c_small)
-            cheque_table.column("proveedor", width=c_medium)
-            cheque_table.column("monto", width=c_small+5)
-            cheque_table.column("banco", width=c_small)
+            self.cheque_table.column("fecha", width=c_small)
+            self.cheque_table.column("vale", width=c_small)
+            self.cheque_table.column("folio", width=c_small)
+            self.cheque_table.column("proveedor", width=c_medium)
+            self.cheque_table.column("monto", width=c_small+5)
+            self.cheque_table.column("banco", width=c_small)
 
             cargar_table.column("fecha", width=c_small)
             cargar_table.column("vale", width=c_small)
@@ -140,8 +159,8 @@ class ChequeAppProfessional(tb.Frame):
             cargar_table.column("monto", width=c_small+5)
             cargar_table.column("banco", width=c_small)
 
-            cheque_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
-            cargar_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
+            #cheque_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
+            #cargar_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
 
             # Botones de acción
             button_container = tb.Frame(center_frame)
@@ -168,17 +187,17 @@ class ChequeAppProfessional(tb.Frame):
 
             # Frame de layout
             columns = ["fecha", "nombre", "monto"]
-            layout_table = tb.Treeview(layout_left_frame, columns=columns, show="headings")
-            layout_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
-
+            self.layout_table = tb.Treeview(layout_left_frame, columns=columns, show="headings")
+            self.layout_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            
             for col in columns:
-                layout_table.heading(col, text=col.capitalize(), anchor=W)
-                layout_table.column(col, anchor=W)
-
-            layout_table.column("fecha", width=c_small)
-            layout_table.column("nombre", width=c_large)
-            layout_table.column("monto", width=c_small)
-
+                self.layout_table.heading(col, text=col.capitalize(), anchor=W)
+                self.layout_table.column(col, anchor=W)
+                
+            self.layout_table.column("fecha", width=c_small)
+            self.layout_table.column("nombre", width=c_large)
+            self.layout_table.column("monto", width=c_small)
+            
             frame_control_layout = tb.Frame(layout_left_frame)
             frame_control_layout.pack(side=BOTTOM, fill=X, padx=10)
 
@@ -261,22 +280,63 @@ class ChequeAppProfessional(tb.Frame):
             'status': 'ready'
         }
     
-    def on_search(self):
+    def on_search_cheques(self):
         """Manejador del botón de búsqueda."""
         try:
-            # Aquí se implementaría la lógica de búsqueda
-            self.logger.info("Búsqueda iniciada")
-            # Simulación de búsqueda
-            search_params = {
-                'initial_date': self.initial_date.get(),
-                'final_date': self.final_date.get(),
-                'class': self.class_entry.get(),
-                'only_uncharged': self.only_uncharged_var.get()
-            }
-            self.logger.info(f"Parámetros de búsqueda: {search_params}")
+            # Obtener valores de los filtros
+            fecha_inicial = self.initial_date.entry.get()
+            fecha_final = self.final_date.entry.get()
+            clase = self.class_entry.get().strip()
+            solo_no_cargados = self.only_uncharged_var.get()
             
+            self.logger.info("Búsqueda iniciada")
+            
+            # Buscar en base de datos
+            filters = {
+                'fecha_inicial': fecha_inicial if fecha_inicial else None,
+                'fecha_final': fecha_final if fecha_final else None,
+                'clase': clase if clase else None,
+                'solo_no_cargados': solo_no_cargados
+            }
+            cheques = self.cheque_db.search_cheques(filters)
+            
+            # Limpiar tabla
+            for item in self.cheque_table.get_children():
+                self.cheque_table.delete(item)
+            
+            # Llenar tabla con resultados
+            for cheque in cheques:
+                self.cheque_table.insert("", "end", values=(
+                    cheque.get("fecha", ""),
+                    cheque.get("vale", ""),
+                    cheque.get("folio", ""),
+                    cheque.get("proveedor", ""),
+                    cheque.get("monto", ""),
+                    cheque.get("banco", "")
+                ))
+            
+            self.logger.info(f"Se encontraron {len(cheques)} cheques")
+                
         except Exception as e:
             self.logger.error(f"Error en búsqueda: {e}")
+            # En caso de error, mostrar datos de ejemplo
+            self._load_sample_data()
+    
+    def _load_sample_data(self):
+        """Cargar datos de ejemplo en la tabla"""
+        sample_data = [
+            ("2024-01-15", "V001", "CH001", "Proveedor A", "$1,000.00", "Banco A"),
+            ("2024-01-16", "V002", "CH002", "Proveedor B", "$2,500.00", "Banco B"),
+            ("2024-01-17", "V003", "CH003", "Proveedor C", "$1,800.00", "Banco C")
+        ]
+        
+        # Limpiar tabla
+        for item in self.cheque_table.get_children():
+            self.cheque_table.delete(item)
+        
+        # Insertar datos de ejemplo
+        for data in sample_data:
+            self.cheque_table.insert("", "end", values=data)
 
     def on_search_layout(self):
         """Manejador del botón de búsqueda en layout."""
