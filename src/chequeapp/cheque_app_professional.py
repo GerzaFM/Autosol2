@@ -282,6 +282,9 @@ class ChequeAppProfessional(tb.Frame):
             frame_control_layout = tb.Frame(layout_left_frame)
             frame_control_layout.pack(side=BOTTOM, fill=X, padx=10)
 
+            button_mostrar = tb.Button(frame_control_layout, text="Mostrar", command=self.on_mostrar, width=10)
+            button_mostrar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+
             button_generar = tb.Button(frame_control_layout, text="Generar", command=self.on_generar, width=10)
             button_generar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
@@ -291,26 +294,33 @@ class ChequeAppProfessional(tb.Frame):
             button_eliminar = tb.Button(frame_control_layout, text="Eliminar", command=self.on_eliminar, width=10)
             button_eliminar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
-            columns = ["id", "fecha", "vale", "folio", "proveedor", "Total"]
-            layout_facturas = tb.Treeview(layout_right_frame, columns=columns, show="headings")
-            layout_facturas.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            columns = ["alias", "nombre", "importe", "descripcion", "referencia"]
+            self.layout = tb.Treeview(layout_right_frame, columns=columns, show="headings")
+            self.layout.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
             for col in columns:
-                layout_facturas.heading(col, text=col.capitalize(), anchor=W)
-                layout_facturas.column(col, anchor=W)
+                self.layout.heading(col, text=col.capitalize(), anchor=W)
+                self.layout.column(col, anchor=W)
 
-            layout_facturas.column("id", width=c_smallest)
-            layout_facturas.column("fecha", width=c_small)
-            layout_facturas.column("vale", width=c_small)
-            layout_facturas.column("folio", width=c_small)
-            layout_facturas.column("Total", width=c_small)
+            self.layout.column("alias", width=c_small)
+            self.layout.column("nombre", width=c_medium)
+            self.layout.column("importe", width=c_small)
+            self.layout.column("descripcion", width=c_large)
+            self.layout.column("referencia", width=c_small)
 
-            button_desenlazar = tb.Button(layout_right_frame, text="Desenlazar", command=self.on_desenlazar, width=10)
-            button_desenlazar.pack(side=RIGHT, padx=(5, 10), pady=(0, 5))
+            button_copy_layout_names = [
+                ["Alias", self.copy_layout("alias")],
+                ["Importe", self.copy_layout("importe")],
+                ["Descripción", self.copy_layout("descripcion")],
+                ["Referencia", self.copy_layout("referencia")]
+            ]
 
-            # Frame inferior
-            footer_frame = tb.Frame(main_container)
-            footer_frame.pack(side=BOTTOM, fill=X)
+            for button_name, command in reversed(button_copy_layout_names):
+                button = tb.Button(layout_right_frame, text=button_name, command=command, width=11)
+                button.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+
+            label_copyclipboard = tb.Label(layout_right_frame, text="Copiar al portapapeles:", anchor=E)
+            label_copyclipboard.pack(side=RIGHT, padx=10, pady=(10, 0))
 
             self.logger.info("Interfaz de usuario configurada correctamente")
             
@@ -843,6 +853,44 @@ class ChequeAppProfessional(tb.Frame):
         except Exception as e:
             self.logger.error(f"Error al eliminar layouts: {e}")
             messagebox.showerror("Error", f"Error inesperado al eliminar layouts: {str(e)}")
+
+    def on_mostrar(self):
+        """Muestra el contenido de un layout específico."""
+        try:
+            selected_items = self.layout_table.selection()
+            if not selected_items:
+                messagebox.showwarning("Sin Selección", "Por favor, seleccione un layout para mostrar su contenido.")
+                return
+
+            # Obtener el primer item seleccionado
+            values = self.layout_table.item(selected_items[0], "values")
+            layout_id = int(values[0])  # ID del layout está en la primera columna
+
+            layout_content = self.cheque_db.show_layout_content(layout_id)
+            if not layout_content:
+                messagebox.showwarning("Sin Contenido", f"No se encontró contenido para el Layout {layout_id}")
+                return
+            
+            # Borramos el contenido en layout
+            self.layout.delete(*self.layout.get_children())
+
+            for codigo, importe, vale, folio, monto in layout_content:
+                self.logger.info(f"Contenido del Layout {layout_id}: Código={codigo}, Importe={importe}, Vale={vale}, Folio={folio}, Monto={monto}")
+                # Aquí se mostraría el contenido del layout en la interfaz
+                file = {
+                    'alias': codigo,
+                    'importe': importe,
+                    'descripcion': f"{vale} f-{folio} Aqui va la descripción",
+                    'referencia': vale[1:]
+                }
+                # Aquí se mostraría el contenido del layout en la interfaz
+                self.layout.insert("", "end", values=file)
+
+        except Exception as e:
+            self.logger.error(f"Error al mostrar contenido de layout {layout_id}: {e}")
+
+    def copy_layout(self, column):
+        pass
 
     def on_desenlazar(self):
         """Manejador del botón de desenlazar factura."""

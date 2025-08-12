@@ -116,8 +116,8 @@ class ChequeDatabase:
             Lista de diccionarios con datos de layouts
         """
         if not self.db_available:
-            return self._get_sample_layouts()
-        
+            return None
+
         try:
             # Construir consulta base
             query = Layout.select()
@@ -149,8 +149,39 @@ class ChequeDatabase:
             
         except Exception as e:
             self.logger.error(f"Error en búsqueda de layouts: {e}")
-            return self._get_sample_layouts()
-    
+            return None
+        
+    def show_layout_content(self, layout_id: int):
+        """ Muestra el contenido de un layout"""
+        if not self.db_available:
+            self.logger.warning("Base de datos no disponible para mostrar contenido de Layout")
+            return None
+
+        try:
+            layout = Layout.get(Layout.id == layout_id)
+            if layout:
+                self.logger.info(f"Contenido del Layout {layout_id}: {layout.nombre}")
+                # Obtener los cheques relacionados al layout
+                cheques = []
+                for cheque in layout.cheques:
+                    cheques.append({
+                        'id': cheque.id,
+                        'fecha': cheque.fecha.strftime('%Y-%m-%d') if cheque.fecha else '',
+                        'vale': cheque.vale or '',
+                        'folio': cheque.folio or '',
+                        'codigo': cheque.proveedor.codigo_quiter if cheque.proveedor else '',
+                        'proveedor': cheque.proveedor.nombre or '',
+                        'monto': float(cheque.monto) if cheque.monto else 0.00,
+                        'banco': cheque.banco or ''
+                    })
+                self.logger.info(f"Cheques en el Layout {layout_id}: {len(cheques)} encontrados")
+
+                return cheques
+
+        except Exception as e:
+            self.logger.error(f"Error mostrando contenido de layout {layout_id}: {e}")
+            return None
+
     def _parse_date(self, date_str: str) -> Optional[date]:
         """Convierte string de fecha a objeto date"""
         if not date_str:
