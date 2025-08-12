@@ -252,7 +252,7 @@ class ChequeAppProfessional(tb.Frame):
             button_quitar = tb.Button(button_container, text="Quitar", command=self.on_quitar, width=10)
             button_quitar.pack(side=TOP, pady=(5, 5))
 
-            button_layout = tb.Button(button_container, text="Layout", command=self.on_exportar, width=10)
+            button_layout = tb.Button(button_container, text="Layout", command=self.on_crear_layout, width=10)
             button_layout.pack(side=TOP, pady=(5, 5))
 
             # Frame layouts
@@ -285,8 +285,8 @@ class ChequeAppProfessional(tb.Frame):
             button_mostrar = tb.Button(frame_control_layout, text="Mostrar", command=self.on_mostrar, width=10)
             button_mostrar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
-            button_generar = tb.Button(frame_control_layout, text="Generar", command=self.on_generar, width=10)
-            button_generar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+            button_exportar = tb.Button(frame_control_layout, text="Exportar", command=self.on_generar, width=10)
+            button_exportar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
             button_modificar = tb.Button(frame_control_layout, text="Modificar", command=self.on_modificar, width=10)
             button_modificar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
@@ -522,6 +522,101 @@ class ChequeAppProfessional(tb.Frame):
 
         except Exception as e:
             self.logger.error(f"Error al quitar cheque: {e}")
+
+    def on_crear_layout(self):
+        """Manejador del botón de crear layout (sin exportar automáticamente)."""
+        try:
+            # Verificar que hay elementos en cargar_table
+            items_to_export = self.cargar_table.get_children()
+            if not items_to_export:
+                messagebox.showwarning("Crear Layout", "No hay cheques para crear layout en la tabla de cargados.")
+                return
+
+            # Pedir al usuario un nombre para el layout
+            layout_name = simpledialog.askstring(
+                "Nombre del Layout",
+                "Ingrese un nombre para el nuevo layout:",
+                initialvalue=f"Layout {date.today().strftime('%Y-%m-%d')}"
+            )
+            
+            if not layout_name or not layout_name.strip():
+                messagebox.showwarning("Crear Layout", "Debe proporcionar un nombre válido para el layout.")
+                return
+            
+            layout_name = layout_name.strip()
+            
+            # Obtener fecha de hoy en formato string
+            fecha_hoy = date.today().strftime('%Y-%m-%d')
+            
+            # Crear el nuevo layout en la base de datos
+            self.logger.info(f"Creando layout: {layout_name}")
+            layout_id = self.cheque_db.create_layout(
+                nombre=layout_name,
+                fecha=fecha_hoy,
+                monto=0.0
+            )
+            
+            if not layout_id:
+                messagebox.showerror("Error", "No se pudo crear el layout en la base de datos.")
+                return
+            
+            # Obtener los IDs de los cheques en cargar_table
+            cheque_ids = []
+            monto_total = 0.0
+            
+            for item in items_to_export:
+                values = self.cargar_table.item(item, "values")
+                # Suponiendo que el ID está en la primera columna (índice 0)
+                try:
+                    cheque_id = int(values[0])  # ID del cheque
+                    cheque_ids.append(cheque_id)
+                    
+                    # Sumar al monto total (monto está en índice 5)
+                    try:
+                        monto_str = str(values[5]).replace('$', '').replace(',', '')
+                        monto = float(monto_str)
+                        monto_total += monto
+                    except (ValueError, IndexError):
+                        self.logger.warning(f"No se pudo parsear el monto del cheque {cheque_id}")
+                        
+                except (ValueError, IndexError):
+                    self.logger.warning(f"No se pudo obtener el ID del cheque en item: {values}")
+                    continue
+            
+            if not cheque_ids:
+                messagebox.showerror("Error", "No se pudieron obtener los IDs de los cheques.")
+                return
+            
+            # Asignar los cheques al layout
+            self.logger.info(f"Asignando {len(cheque_ids)} cheques al layout {layout_id}")
+            success = self.cheque_db.assign_cheques_to_layout(layout_id, cheque_ids)
+            
+            if not success:
+                messagebox.showerror("Error", "No se pudieron asignar los cheques al layout.")
+                return
+            
+            # Borrar todos los items de cargar_table
+            for item in items_to_export:
+                self.cargar_table.delete(item)
+            
+            self.logger.info("Items eliminados de cargar_table")
+            
+            # Actualizar layout_table con los layouts de hoy
+            self._refresh_layout_table()
+            
+            # Mostrar mensaje de éxito (SIN generar Excel automáticamente)
+            messagebox.showinfo(
+                "Éxito", 
+                f"Layout '{layout_name}' creado exitosamente con {len(cheque_ids)} cheques.\n"
+                f"Monto total: ${monto_total:,.2f}\n\n"
+                f"Use el botón 'Exportar' para generar el archivo Excel."
+            )
+            
+            self.logger.info(f"Layout '{layout_name}' creado exitosamente con {len(cheque_ids)} cheques")
+
+        except Exception as e:
+            self.logger.error(f"Error al crear layout: {e}")
+            messagebox.showerror("Error", f"Error inesperado al crear layout: {str(e)}")
 
     def on_exportar(self):
         """Manejador del botón de exportar cheques."""
@@ -879,12 +974,16 @@ class ChequeAppProfessional(tb.Frame):
                 codigo = cheque.get('codigo', '')
                 nombre = cheque.get('proveedor', '')
                 importe = cheque.get('monto', 0)
-                conceptos = cheque.get('conceptos', '')
+                descripcion_conceptos = cheque.get('descripcion', '')  # Obtener las descripciones de los vales
                 vale = cheque.get('vale', '')
                 folio = cheque.get('folio', '')
                 
-                # Crear referencia: quitar primer carácter del vale si tiene más de 1
-                referencia = vale[1:] if len(vale) > 1 else vale
+                # Crear referencia: tomar solo el primer vale (antes del espacio) sin la "V"
+                if vale:
+                    primer_vale = vale.split()[0]  # Obtener solo el primer vale antes del espacio
+                    referencia = primer_vale[1:] if len(primer_vale) > 1 else primer_vale
+                else:
+                    referencia = ""
                 
                 # Asegurar que importe sea float
                 try:
@@ -892,17 +991,20 @@ class ChequeAppProfessional(tb.Frame):
                 except (ValueError, TypeError):
                     importe_float = 0.0
                 
-                # Crear descripción más informativa
-                descripcion = f"{vale} F-{folio} {conceptos}"
-                print("XXXXXXXXXXXXXXXXXXXXXXXXXX"+ conceptos)
+                # Crear descripción completa: vale + folio + conceptos de los vales
+                descripcion = f"{vale} "
+                if folio:
+                    descripcion += f"F-{folio} "
+                if descripcion_conceptos:  # Si hay descripciones de vales, agregarlas
+                    descripcion += f"{descripcion_conceptos}"
                 
                 # Insertar en el treeview con los valores correctos en el orden de las columnas
-                # Columnas: "Alias", "Importe", "Descripción", "Referencia"
+                # Columnas: "alias", "nombre", "importe", "descripcion", "referencia"
                 self.layout.insert("", "end", values=(
                     codigo,           # Alias
-                    nombre,           # Proveedor
+                    nombre,           # Nombre (Proveedor)
                     importe_float,    # Importe como float
-                    descripcion,      # Descripción  
+                    descripcion,      # Descripción completa con conceptos
                     referencia        # Referencia
                 ))
 

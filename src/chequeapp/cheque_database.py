@@ -164,12 +164,20 @@ class ChequeDatabase:
                 # Obtener los cheques relacionados al layout
                 cheques = []
                 for cheque in layout.cheques:
-                    conceptos = ""
+                    descripcion = ""
                     for factura in cheque.facturas:
-                        # Si la factura tiene un vale asociado y ese vale tiene descripción
-                        if hasattr(factura, "vale") and factura.vale and hasattr(factura.vale, "descripcion"):
-                            conceptos += f"{factura.vale.descripcion} "
-                    conceptos = conceptos.strip()
+                        # Si la factura tiene un vale asociado
+                        if hasattr(factura, "vale") and factura.vale:
+                            try:
+                                # Obtener el primer (y único) vale de la consulta
+                                vale_obj = factura.vale.first()
+                                
+                                if vale_obj and hasattr(vale_obj, "descripcion") and vale_obj.descripcion:
+                                    descripcion += f"{vale_obj.descripcion} "
+                            except Exception as e:
+                                self.logger.warning(f"Error al obtener vale de factura: {e}")
+                    
+                    descripcion = descripcion.strip()
 
                     cheques.append({
                         'id': cheque.id,
@@ -178,7 +186,7 @@ class ChequeDatabase:
                         'folio': cheque.folio or '',
                         'codigo': cheque.proveedor.codigo_quiter if cheque.proveedor else '',
                         'proveedor': cheque.proveedor.nombre or '',
-                        'descripcion': conceptos,
+                        'descripcion': descripcion,
                         'monto': float(cheque.monto) if cheque.monto else 0.00,
                         'banco': cheque.banco or ''
                     })
