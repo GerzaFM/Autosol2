@@ -21,7 +21,7 @@ class LayoutExporter:
         ws.title = "Resumen Layout"
 
         # Encabezados
-        ws.append(["codigo_quiter", "monto", "banco"])
+        ws.append(["Codigo", "Total", "Banco"])
 
         for cheque in cheques:
             facturas = list(cheque.facturas)

@@ -743,15 +743,106 @@ class ChequeAppProfessional(tb.Frame):
             self.logger.error(f"Error al modificar cheque: {e}")
 
     def on_eliminar(self):
-        """Manejador del botón de eliminar cheque."""
+        """Manejador del botón de eliminar layout - Elimina layouts seleccionados."""
         try:
-            # Aquí se implementaría la lógica para eliminar un cheque seleccionado
-            self.logger.info("Eliminar cheque (lógica no implementada)")
-            # Simulación de eliminar cheque
-            messagebox.showinfo("Eliminar Cheque", "Funcionalidad de eliminar cheque aún no implementada.")
-
+            # Verificar que hay layouts seleccionados en layout_table
+            selected_items = self.layout_table.selection()
+            if not selected_items:
+                messagebox.showwarning("Eliminar Layout", "Por favor, seleccione uno o más layouts para eliminar.")
+                return
+            
+            # Obtener información de los layouts seleccionados
+            layouts_to_delete = []
+            layout_names = []
+            
+            for selected_item in selected_items:
+                values = self.layout_table.item(selected_item, "values")
+                try:
+                    layout_id = int(values[0])  # ID en la primera columna
+                    layout_name = values[2]     # Nombre en la tercera columna
+                    layouts_to_delete.append(layout_id)
+                    layout_names.append(layout_name)
+                except (ValueError, IndexError):
+                    self.logger.warning(f"No se pudo obtener información del layout: {values}")
+                    continue
+            
+            if not layouts_to_delete:
+                messagebox.showerror("Error", "No se pudieron obtener los IDs de los layouts seleccionados.")
+                return
+            
+            # Crear mensaje de confirmación
+            if len(layouts_to_delete) == 1:
+                mensaje = f"¿Está seguro que desea eliminar el layout '{layout_names[0]}'?\n\n"
+                mensaje += "Esta acción:\n"
+                mensaje += "• Eliminará el layout de la base de datos\n"
+                mensaje += "• Desasociará todos los cheques de este layout\n"
+                mensaje += "• No se puede deshacer"
+            else:
+                mensaje = f"¿Está seguro que desea eliminar {len(layouts_to_delete)} layouts?\n\n"
+                mensaje += "Layouts a eliminar:\n"
+                for name in layout_names[:5]:  # Mostrar máximo 5 nombres
+                    mensaje += f"• {name}\n"
+                if len(layout_names) > 5:
+                    mensaje += f"• ... y {len(layout_names) - 5} más\n"
+                mensaje += "\nEsta acción:\n"
+                mensaje += "• Eliminará los layouts de la base de datos\n"
+                mensaje += "• Desasociará todos los cheques de estos layouts\n"
+                mensaje += "• No se puede deshacer"
+            
+            # Confirmar con el usuario
+            confirm = messagebox.askyesno(
+                "Confirmar Eliminación",
+                mensaje,
+                icon="warning"
+            )
+            
+            if not confirm:
+                self.logger.info("Eliminación de layouts cancelada por el usuario")
+                return
+            
+            # Proceder con la eliminación
+            deleted_count = 0
+            errors = []
+            
+            for layout_id, layout_name in zip(layouts_to_delete, layout_names):
+                self.logger.info(f"Eliminando layout: {layout_name} (ID: {layout_id})")
+                success = self.cheque_db.delete_layout(layout_id)
+                
+                if success:
+                    deleted_count += 1
+                else:
+                    errors.append(layout_name)
+            
+            # Refrescar la tabla de layouts
+            self._refresh_layout_table()
+            
+            # Mostrar resultado
+            if deleted_count == len(layouts_to_delete):
+                if deleted_count == 1:
+                    messagebox.showinfo(
+                        "Eliminación Exitosa",
+                        f"El layout '{layout_names[0]}' ha sido eliminado exitosamente."
+                    )
+                else:
+                    messagebox.showinfo(
+                        "Eliminación Exitosa",
+                        f"Se eliminaron {deleted_count} layouts exitosamente."
+                    )
+            elif deleted_count > 0:
+                mensaje_error = f"Se eliminaron {deleted_count} de {len(layouts_to_delete)} layouts.\n\n"
+                mensaje_error += "Layouts que no se pudieron eliminar:\n"
+                for error_name in errors:
+                    mensaje_error += f"• {error_name}\n"
+                messagebox.showwarning("Eliminación Parcial", mensaje_error)
+            else:
+                messagebox.showerror(
+                    "Error en Eliminación",
+                    "No se pudo eliminar ningún layout. Revise los logs para más detalles."
+                )
+                
         except Exception as e:
-            self.logger.error(f"Error al eliminar cheque: {e}")
+            self.logger.error(f"Error al eliminar layouts: {e}")
+            messagebox.showerror("Error", f"Error inesperado al eliminar layouts: {str(e)}")
 
     def on_desenlazar(self):
         """Manejador del botón de desenlazar factura."""

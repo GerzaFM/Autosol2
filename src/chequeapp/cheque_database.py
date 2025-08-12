@@ -326,3 +326,39 @@ class ChequeDatabase:
         except Exception as e:
             self.logger.error(f"Error obteniendo layout {layout_id}: {e}")
             return None
+
+    def delete_layout(self, layout_id: int) -> bool:
+        """
+        Elimina un layout y desasocia todos los cheques de ese layout
+        
+        Args:
+            layout_id: ID del layout a eliminar
+            
+        Returns:
+            True si se eliminó exitosamente, False en caso contrario
+        """
+        if not self.db_available:
+            self.logger.warning("Base de datos no disponible")
+            return False
+            
+        try:
+            # Primero verificar que el layout existe
+            layout = Layout.get_by_id(layout_id)
+            layout_nombre = layout.nombre
+            
+            # Desasociar todos los cheques de este layout
+            cheques_count = Cheque.update(layout=None).where(Cheque.layout == layout_id).execute()
+            self.logger.info(f"Desasociados {cheques_count} cheques del layout {layout_id}")
+            
+            # Eliminar el layout
+            layout.delete_instance()
+            
+            self.logger.info(f"Layout '{layout_nombre}' (ID: {layout_id}) eliminado exitosamente")
+            return True
+            
+        except Layout.DoesNotExist:
+            self.logger.warning(f"Layout con ID {layout_id} no encontrado")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error eliminando layout {layout_id}: {e}")
+            return False
