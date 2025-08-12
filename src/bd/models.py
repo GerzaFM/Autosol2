@@ -37,7 +37,7 @@ class Cheque(Model):
     fecha = DateField()
     vale = CharField()
     folio = CharField()
-    proveedor = CharField()  # Nombre del proveedor
+    proveedor = ForeignKeyField(Proveedor, backref='cheques', null=True, column_name='proveedor')  # Especificar nombre de columna
     monto = DecimalField()
     banco = CharField()
     layout = ForeignKeyField(Layout, backref='cheques', null=True, column_name='layout')  # Especificar nombre de columna

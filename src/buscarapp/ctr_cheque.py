@@ -839,8 +839,39 @@ class Cheque:
             
             # Obtener datos del formulario
             campo_cheque = self.form_info.get('cheque', '')
-            proveedor = self.form_info.get('Orden', '')
+            proveedor_nombre = self.form_info.get('Orden', '')
             total_factura = self.factura.get('total', 0)
+            
+            # Buscar el proveedor (NO crear si no existe)
+            proveedor_obj = None
+            if proveedor_nombre and Proveedor:
+                try:
+                    # Buscar proveedor existente por nombre
+                    proveedor_obj = Proveedor.get(Proveedor.nombre == proveedor_nombre)
+                    print(f"✅ Proveedor encontrado: {proveedor_obj.nombre} (ID: {proveedor_obj.id})")
+                except Proveedor.DoesNotExist:
+                    try:
+                        # Buscar por nombre_en_quiter
+                        proveedor_obj = Proveedor.get(Proveedor.nombre_en_quiter == proveedor_nombre)
+                        print(f"✅ Proveedor encontrado (nombre_en_quiter): {proveedor_obj.nombre} (ID: {proveedor_obj.id})")
+                    except Proveedor.DoesNotExist:
+                        # Si no se encuentra en ninguno de los dos campos, lanzar error
+                        error_msg = (f"❌ Error: Proveedor '{proveedor_nombre}' no encontrado en la base de datos.\n\n"
+                                   f"El proveedor debe estar registrado previamente en el sistema.\n"
+                                   f"Verifique el nombre del proveedor o regístrelo antes de crear el cheque.")
+                        print(f"❌ Proveedor no encontrado: {proveedor_nombre}")
+                        raise ValueError(error_msg)
+            elif not proveedor_nombre:
+                error_msg = ("❌ Error: No se especificó un proveedor para este cheque.\n\n"
+                           "Verifique que los datos del formulario estén completos.")
+                print("❌ Nombre de proveedor vacío")
+                raise ValueError(error_msg)
+            else:
+                error_msg = ("❌ Error: No se pudo acceder a la base de datos de proveedores.\n\n"
+                           "Contacte al administrador del sistema.")
+                print("❌ Modelo Proveedor no disponible")
+                raise ValueError(error_msg)
+            
             
             # Obtener folios de las facturas
             if self.factura.get('vales_consolidados'):
@@ -879,12 +910,12 @@ class Cheque:
                 fecha=date.today(),
                 vale=campo_cheque,
                 folio=folios_str,
-                proveedor=proveedor,
+                proveedor=proveedor_obj,  # Usar el objeto Proveedor en lugar de la cadena
                 monto=float(total_factura),  # Guardar como número, no como string formateado
                 banco=codigo_banco
             )
             
-            print(f"✅ Cheque guardado en BD: ID {cheque_bd.id}, Vale: {campo_cheque}, Proveedor: {proveedor}")
+            print(f"✅ Cheque guardado en BD: ID {cheque_bd.id}, Vale: {campo_cheque}, Proveedor: {proveedor_obj.nombre if proveedor_obj else 'Sin proveedor'}")
             
             # Si hay facturas, asociarlas al cheque
             self._asociar_facturas_a_cheque(cheque_bd)

@@ -864,19 +864,33 @@ class BuscarAppRefactored(ttk.Frame):
                     
                     if len(selected_items) == 1:
                         # Un solo elemento - usar la primera factura
-                        cheque = Cheque(selected_items[0], ruta_exportacion)
-                        
-                        # Generar el cheque
-                        if cheque.exportar():
-                            self.dialog_utils.show_info(
-                                "Cheque Generado", 
-                                f"El cheque ha sido generado exitosamente:\n{ruta_exportacion}"
-                            )
-                            self.logger.info(f"Cheque generado exitosamente: {ruta_exportacion}")
-                        else:
+                        try:
+                            cheque = Cheque(selected_items[0], ruta_exportacion)
+                            
+                            # Generar el cheque
+                            if cheque.exportar():
+                                self.dialog_utils.show_info(
+                                    "Cheque Generado", 
+                                    f"El cheque ha sido generado exitosamente:\n{ruta_exportacion}"
+                                )
+                                self.logger.info(f"Cheque generado exitosamente: {ruta_exportacion}")
+                            else:
+                                self.dialog_utils.show_error(
+                                    "Error", 
+                                    f"Error al generar el cheque en:\n{ruta_exportacion}"
+                                )
+                        except ValueError as ve:
+                            self.logger.error(f"Error de validación en cheque individual: {ve}")
                             self.dialog_utils.show_error(
-                                "Error", 
-                                f"Error al generar el cheque en:\n{ruta_exportacion}"
+                                "Error de Validación", 
+                                f"Error validando datos para el cheque:\n{str(ve)}"
+                            )
+                        except Exception as ie:
+                            self.logger.error(f"Error inesperado generando cheque individual: {ie}")
+                            self.dialog_utils.show_error(
+                                "Error Inesperado", 
+                                f"Error inesperado al generar el cheque:\n{str(ie)}\n\n"
+                                "Revise el log para más detalles."
                             )
                     else:
                         # Múltiples elementos - usar la funcionalidad de facturas múltiples

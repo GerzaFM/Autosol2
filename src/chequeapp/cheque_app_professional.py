@@ -302,7 +302,7 @@ class ChequeAppProfessional(tb.Frame):
                 self.layout.heading(col, text=col.capitalize(), anchor=W)
                 self.layout.column(col, anchor=W)
 
-            self.layout.column("alias", width=c_small)
+            self.layout.column("alias", width=c_small-20)
             self.layout.column("nombre", width=c_medium)
             self.layout.column("importe", width=c_small)
             self.layout.column("descripcion", width=c_large)
@@ -874,17 +874,37 @@ class ChequeAppProfessional(tb.Frame):
             # Borramos el contenido en layout
             self.layout.delete(*self.layout.get_children())
 
-            for codigo, importe, vale, folio, monto in layout_content:
-                self.logger.info(f"Contenido del Layout {layout_id}: Código={codigo}, Importe={importe}, Vale={vale}, Folio={folio}, Monto={monto}")
-                # Aquí se mostraría el contenido del layout en la interfaz
-                file = {
-                    'alias': codigo,
-                    'importe': importe,
-                    'descripcion': f"{vale} f-{folio} Aqui va la descripción",
-                    'referencia': vale[1:]
-                }
-                # Aquí se mostraría el contenido del layout en la interfaz
-                self.layout.insert("", "end", values=file)
+            for cheque in layout_content:
+                # Extraer datos del cheque correctamente (sin comas finales)
+                codigo = cheque.get('codigo', '')
+                nombre = cheque.get('proveedor', '')
+                importe = cheque.get('monto', 0)
+                conceptos = cheque.get('conceptos', '')
+                vale = cheque.get('vale', '')
+                folio = cheque.get('folio', '')
+                
+                # Crear referencia: quitar primer carácter del vale si tiene más de 1
+                referencia = vale[1:] if len(vale) > 1 else vale
+                
+                # Asegurar que importe sea float
+                try:
+                    importe_float = float(importe) if importe else 0.0
+                except (ValueError, TypeError):
+                    importe_float = 0.0
+                
+                # Crear descripción más informativa
+                descripcion = f"{vale} F-{folio} {conceptos}"
+                print("XXXXXXXXXXXXXXXXXXXXXXXXXX"+ conceptos)
+                
+                # Insertar en el treeview con los valores correctos en el orden de las columnas
+                # Columnas: "Alias", "Importe", "Descripción", "Referencia"
+                self.layout.insert("", "end", values=(
+                    codigo,           # Alias
+                    nombre,           # Proveedor
+                    importe_float,    # Importe como float
+                    descripcion,      # Descripción  
+                    referencia        # Referencia
+                ))
 
         except Exception as e:
             self.logger.error(f"Error al mostrar contenido de layout {layout_id}: {e}")

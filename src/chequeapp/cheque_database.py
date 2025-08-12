@@ -81,7 +81,7 @@ class ChequeDatabase:
             if filters.get('proveedor'):
                 proveedor = filters['proveedor'].strip()
                 if proveedor:
-                    query = query.where(Cheque.proveedor.contains(proveedor))
+                    query = query.where(Cheque.proveedor.nombre.contains(proveedor))
             
             # Ejecutar consulta y convertir a lista de diccionarios
             cheques = []
@@ -91,7 +91,7 @@ class ChequeDatabase:
                     'fecha': cheque.fecha.strftime('%Y-%m-%d') if cheque.fecha else '',
                     'vale': cheque.vale or '',
                     'folio': cheque.folio or '',
-                    'proveedor': cheque.proveedor or '',
+                    'proveedor': cheque.proveedor.nombre if cheque.proveedor else '',
                     'monto': str(cheque.monto) if cheque.monto else '0.00',
                     'banco': cheque.banco or '',
                     'layout': cheque.layout.id if cheque.layout else None,
@@ -164,6 +164,13 @@ class ChequeDatabase:
                 # Obtener los cheques relacionados al layout
                 cheques = []
                 for cheque in layout.cheques:
+                    conceptos = ""
+                    for factura in cheque.facturas:
+                        # Si la factura tiene un vale asociado y ese vale tiene descripción
+                        if hasattr(factura, "vale") and factura.vale and hasattr(factura.vale, "descripcion"):
+                            conceptos += f"{factura.vale.descripcion} "
+                    conceptos = conceptos.strip()
+
                     cheques.append({
                         'id': cheque.id,
                         'fecha': cheque.fecha.strftime('%Y-%m-%d') if cheque.fecha else '',
@@ -171,6 +178,7 @@ class ChequeDatabase:
                         'folio': cheque.folio or '',
                         'codigo': cheque.proveedor.codigo_quiter if cheque.proveedor else '',
                         'proveedor': cheque.proveedor.nombre or '',
+                        'descripcion': conceptos,
                         'monto': float(cheque.monto) if cheque.monto else 0.00,
                         'banco': cheque.banco or ''
                     })
@@ -393,3 +401,35 @@ class ChequeDatabase:
         except Exception as e:
             self.logger.error(f"Error eliminando layout {layout_id}: {e}")
             return False
+
+    def _get_sample_cheques(self) -> List[Dict[str, Any]]:
+        """
+        Retorna datos de ejemplo cuando la base de datos no está disponible
+        
+        Returns:
+            Lista de diccionarios con datos de ejemplo de cheques
+        """
+        return [
+            {
+                'id': 1,
+                'fecha': '2024-01-15',
+                'vale': 'V001',
+                'folio': 'F001',
+                'proveedor': 'Proveedor Ejemplo 1',
+                'monto': '1000.00',
+                'banco': 'Banco Ejemplo',
+                'layout': None,
+                'layout_nombre': None
+            },
+            {
+                'id': 2,
+                'fecha': '2024-01-16',
+                'vale': 'V002',
+                'folio': 'F002',
+                'proveedor': 'Proveedor Ejemplo 2',
+                'monto': '2000.00',
+                'banco': 'Banco Ejemplo 2',
+                'layout': None,
+                'layout_nombre': None
+            }
+        ]
