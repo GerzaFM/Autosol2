@@ -161,12 +161,12 @@ class ChequeAppProfessional(tb.Frame):
 
             initial_date_label = tb.Label(search_frame, text="Fecha Inicial:")
             initial_date_label.pack(side=LEFT, padx=(10, 5), anchor=W)
-            self.initial_date = tb.DateEntry(search_frame, width=12)
+            self.initial_date = tb.DateEntry(search_frame, width=12, dateformat='%d/%m/%Y')
             self.initial_date.pack(side=LEFT, padx=(0, 5), anchor=W)
 
             final_date_label = tb.Label(search_frame, text="Fecha Final:")
             final_date_label.pack(side=LEFT, padx=(0, 5), anchor=W)
-            self.final_date = tb.DateEntry(search_frame, width=12)
+            self.final_date = tb.DateEntry(search_frame, width=12, dateformat='%d/%m/%Y')
             self.final_date.pack(side=LEFT, padx=(0, 5), anchor=W)
 
             class_label = tb.Label(search_frame, text="Clase:")
@@ -193,23 +193,23 @@ class ChequeAppProfessional(tb.Frame):
             content_frame = tb.LabelFrame(main_container, text="Agregar cheques a layout")
             content_frame.pack(fill=BOTH, expand=True)
             
-            left_frame = tb.Frame(content_frame, padding=10)
+            left_frame = tb.Frame(content_frame, padding=5)  # Reducir de 10 a 5
             left_frame.pack(side=LEFT, fill=BOTH, expand=True)
 
-            center_frame = tb.Frame(content_frame, width=60, padding=10)
+            center_frame = tb.Frame(content_frame, width=120, padding=5)  # Reducir de 10 a 5
             center_frame.pack(side=LEFT, fill=Y, expand=False)
-            center_frame.pack_propagate(False) 
+            center_frame.pack_propagate(False)  # Mantener el ancho fijo 
 
-            right_frame = tb.Frame(content_frame, padding=10)
+            right_frame = tb.Frame(content_frame, padding=5)  # Reducir de 10 a 5
             right_frame.pack(side=LEFT, fill=BOTH, expand=True)
 
             # Trees de los cheques a cargar
             columns = ["id", "fecha", "vale", "folio", "proveedor", "monto", "banco"]
             self.cheque_table = tb.Treeview(left_frame, columns=columns, show="headings")
-            self.cheque_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            self.cheque_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
 
             self.cargar_table = tb.Treeview(right_frame, columns=columns, show="headings")
-            self.cargar_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            self.cargar_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
 
             for col in columns:
                 self.cheque_table.heading(col, text=col.capitalize(), anchor=W)
@@ -243,32 +243,34 @@ class ChequeAppProfessional(tb.Frame):
             #cargar_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
 
             # Botones de acción
-            button_container = tb.Frame(center_frame)
-            button_container.place(relx=0.5, rely=0.5, anchor=CENTER)
+            center_buttons_width = 10  # Reducir el width a un valor más razonable en caracteres
 
-            button_agregar = tb.Button(button_container, text="Agregar", command=self.on_agregar, width=10)
+            button_container = tb.Frame(center_frame)
+            button_container.place(relx=0.5, rely=0.5, anchor=CENTER)  # Centrar en el medio del frame
+
+            button_agregar = tb.Button(button_container, text="Agregar", command=self.on_agregar, width=center_buttons_width)
             button_agregar.pack(side=TOP, pady=(5, 5))
 
-            button_quitar = tb.Button(button_container, text="Quitar", command=self.on_quitar, width=10)
+            button_quitar = tb.Button(button_container, text="Quitar", command=self.on_quitar, width=center_buttons_width)
             button_quitar.pack(side=TOP, pady=(5, 5))
 
-            button_layout = tb.Button(button_container, text="Layout", command=self.on_crear_layout, width=10)
+            button_layout = tb.Button(button_container, text="Layout", command=self.on_crear_layout, width=center_buttons_width)
             button_layout.pack(side=TOP, pady=(5, 5))
 
             # Frame layouts
             layout_frame = tb.LabelFrame(main_container, text="Reimprimir layouts")
-            layout_frame.pack(side=TOP, fill=BOTH, expand=True, pady=10)
+            layout_frame.pack(side=TOP, fill=BOTH, expand=True, pady=5)  # Reducir de 10 a 5
 
             layout_left_frame = tb.Frame(layout_frame)
-            layout_left_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=10)
+            layout_left_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=5)  # Reducir de 10 a 5
 
             layout_right_frame = tb.Frame(layout_frame)
-            layout_right_frame.pack(side=RIGHT, fill=BOTH, expand=True, padx=10)
+            layout_right_frame.pack(side=RIGHT, fill=BOTH, expand=True, padx=5)  # Reducir de 10 a 5
 
             # Frame de layout
             columns = ["id", "fecha", "nombre", "monto"]
             self.layout_table = tb.Treeview(layout_left_frame, columns=columns, show="headings")
-            self.layout_table.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            self.layout_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
             
             for col in columns:
                 self.layout_table.heading(col, text=col.capitalize(), anchor=W)
@@ -276,11 +278,11 @@ class ChequeAppProfessional(tb.Frame):
 
             self.layout_table.column("id", width=c_smallest)
             self.layout_table.column("fecha", width=c_smallest)
-            self.layout_table.column("nombre", width=c_large)
+            self.layout_table.column("nombre", width=c_medium)
             self.layout_table.column("monto", width=c_small)
             
             frame_control_layout = tb.Frame(layout_left_frame)
-            frame_control_layout.pack(side=BOTTOM, fill=X, padx=10)
+            frame_control_layout.pack(side=BOTTOM, fill=X, padx=5)
 
             button_mostrar = tb.Button(frame_control_layout, text="Mostrar", command=self.on_mostrar, width=10)
             button_mostrar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
@@ -296,7 +298,7 @@ class ChequeAppProfessional(tb.Frame):
 
             columns = ["alias", "nombre", "importe", "descripcion", "referencia"]
             self.layout = tb.Treeview(layout_right_frame, columns=columns, show="headings")
-            self.layout.pack(fill=BOTH, expand=True, padx=10, pady=10)
+            self.layout.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
 
             for col in columns:
                 self.layout.heading(col, text=col.capitalize(), anchor=W)
@@ -309,10 +311,10 @@ class ChequeAppProfessional(tb.Frame):
             self.layout.column("referencia", width=c_small)
 
             button_copy_layout_names = [
-                ["Alias", self.copy_layout("alias")],
-                ["Importe", self.copy_layout("importe")],
-                ["Descripción", self.copy_layout("descripcion")],
-                ["Referencia", self.copy_layout("referencia")]
+                ["Alias", lambda: self.copy_layout("alias")],
+                ["Importe", lambda: self.copy_layout("importe")],
+                ["Descripción", lambda: self.copy_layout("descripcion")],
+                ["Referencia", lambda: self.copy_layout("referencia")]
             ]
 
             for button_name, command in reversed(button_copy_layout_names):
@@ -327,6 +329,31 @@ class ChequeAppProfessional(tb.Frame):
         except Exception as e:
             self.logger.error(f"Error configurando interfaz: {e}")
             self._create_error_content(str(e))
+    
+    def _format_date(self, date_str):
+        """Formatea una fecha de YYYY-MM-DD a DD/MM/YY"""
+        if not date_str:
+            return ""
+        
+        try:
+            from datetime import datetime
+            # Intentar parsear diferentes formatos
+            if len(date_str) == 10 and '-' in date_str:  # YYYY-MM-DD
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            elif len(date_str) == 8:  # YYYYMMDD
+                date_obj = datetime.strptime(date_str, '%Y%m%d')
+            elif '/' in date_str:  # Ya está en formato DD/MM/YYYY o similar
+                if len(date_str.split('/')[-1]) == 2:  # Ya es DD/MM/YY
+                    return date_str
+                else:  # DD/MM/YYYY
+                    date_obj = datetime.strptime(date_str, '%d/%m/%Y')
+            else:
+                return date_str  # Retornar sin cambios si no se reconoce
+            
+            # Formatear como DD/MM/YY
+            return date_obj.strftime('%d/%m/%y')
+        except Exception:
+            return date_str  # En caso de error, retornar la fecha original
     
     
     def _create_error_content(self, error_msg):
@@ -400,7 +427,7 @@ class ChequeAppProfessional(tb.Frame):
             for cheque in cheques:
                 self.cheque_table.insert("", "end", values=(
                     cheque.get("id", ""),
-                    cheque.get("fecha", ""),
+                    self._format_date(cheque.get("fecha", "")),
                     cheque.get("vale", ""),
                     cheque.get("folio", ""),
                     cheque.get("proveedor", ""),
@@ -444,7 +471,7 @@ class ChequeAppProfessional(tb.Frame):
             for layout in layouts:
                 self.layout_table.insert("", "end", values=(
                     layout.get("id", ""),
-                    layout.get("fecha", ""),
+                    self._format_date(layout.get("fecha", "")),
                     layout.get("nombre", ""),
                     f"${float(layout.get('monto', 0)):,.2f}"
                 ))
@@ -762,7 +789,7 @@ class ChequeAppProfessional(tb.Frame):
             for layout in layouts:
                 self.layout_table.insert("", "end", values=(
                     layout.get("id", ""),
-                    layout.get("fecha", ""),
+                    self._format_date(layout.get("fecha", "")),
                     layout.get("nombre", ""),
                     f"${float(layout.get('monto', 0)):,.2f}"
                 ))
@@ -971,7 +998,7 @@ class ChequeAppProfessional(tb.Frame):
 
             for cheque in layout_content:
                 # Extraer datos del cheque correctamente (sin comas finales)
-                codigo = cheque.get('codigo', '')
+                codigo = str(cheque.get('codigo', ''))  # Forzar como string para Excel
                 nombre = cheque.get('proveedor', '')
                 importe = cheque.get('monto', 0)
                 descripcion_conceptos = cheque.get('descripcion', '')  # Obtener las descripciones de los vales
@@ -1012,7 +1039,57 @@ class ChequeAppProfessional(tb.Frame):
             self.logger.error(f"Error al mostrar contenido de layout {layout_id}: {e}")
 
     def copy_layout(self, column):
-        pass
+        """Copia todas las filas de una columna específica al portapapeles."""
+        try:
+            # Mapear nombres de parámetros a índices de columnas
+            column_mapping = {
+                "alias": 0,      # Columna "alias" 
+                "nombre": 1,     # Columna "nombre"
+                "importe": 2,    # Columna "importe"
+                "descripcion": 3, # Columna "descripcion"
+                "referencia": 4  # Columna "referencia"
+            }
+            
+            # Verificar que la columna solicitada existe
+            if column not in column_mapping:
+                messagebox.showerror("Error", f"Columna '{column}' no válida. Columnas disponibles: {list(column_mapping.keys())}")
+                return
+            
+            # Obtener el índice de la columna
+            column_index = column_mapping[column]
+            
+            # Obtener todos los elementos de la tabla layout
+            items = self.layout.get_children()
+            
+            if not items:
+                messagebox.showwarning("Sin Datos", "No hay datos en la tabla de layout para copiar.")
+                return
+            
+            # Extraer valores de la columna especificada
+            column_values = []
+            for item in items:
+                values = self.layout.item(item, "values")
+                if len(values) > column_index:
+                    value = str(values[column_index])
+                    column_values.append(value)
+            
+            if not column_values:
+                messagebox.showwarning("Sin Datos", f"No se encontraron datos en la columna '{column}'.")
+                return
+            
+            # Unir todos los valores con saltos de línea
+            clipboard_text = "\n".join(column_values)
+            
+            # Copiar al portapapeles usando la ventana actual
+            self.master.clipboard_clear()
+            self.master.clipboard_append(clipboard_text)
+            self.master.update()  # Asegurar que se copie
+            
+            self.logger.info(f"Copiados {len(column_values)} valores de la columna '{column}' al portapapeles")
+            
+        except Exception as e:
+            self.logger.error(f"Error al copiar columna '{column}' al portapapeles: {e}")
+            messagebox.showerror("Error", f"Error al copiar al portapapeles: {str(e)}")
 
     def on_desenlazar(self):
         """Manejador del botón de desenlazar factura."""
