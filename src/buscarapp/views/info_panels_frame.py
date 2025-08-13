@@ -65,7 +65,7 @@ class InfoPanelsFrame:
             text="Código: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.proveedor_codigo_label.pack(fill="x", pady=2)
         
@@ -74,7 +74,7 @@ class InfoPanelsFrame:
             text="Nombre: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200,
+            wraplength=300,
             justify="left"
         )
         self.proveedor_nombre_label.pack(fill="x", pady=2)
@@ -84,7 +84,7 @@ class InfoPanelsFrame:
             text="RFC: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.proveedor_rfc_label.pack(fill="x", pady=2)
         
@@ -93,7 +93,7 @@ class InfoPanelsFrame:
             text="Email: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.proveedor_email_label.pack(fill="x", pady=2)
     
@@ -115,7 +115,7 @@ class InfoPanelsFrame:
             text="No Vale: -",
             font=("Segoe UI", 10, "bold"),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.vale_no_label.pack(fill="x", pady=2)
         
@@ -124,7 +124,7 @@ class InfoPanelsFrame:
             text="Tipo: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.vale_tipo_label.pack(fill="x", pady=2)
         
@@ -133,7 +133,7 @@ class InfoPanelsFrame:
             text="Total: -",
             font=("Segoe UI", 10, "bold"),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.vale_total_label.pack(fill="x", pady=2)
         
@@ -142,7 +142,7 @@ class InfoPanelsFrame:
             text="Proveedor: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.vale_proveedor_label.pack(fill="x", pady=2)
         
@@ -151,7 +151,7 @@ class InfoPanelsFrame:
             text="Fecha: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.vale_fecha_label.pack(fill="x", pady=2)
         
@@ -160,7 +160,7 @@ class InfoPanelsFrame:
             text="Referencia: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.vale_referencia_label.pack(fill="x", pady=2)
         
@@ -169,7 +169,7 @@ class InfoPanelsFrame:
             text="Departamento: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.vale_departamento_label.pack(fill="x", pady=2)
         
@@ -180,7 +180,7 @@ class InfoPanelsFrame:
             font=("Segoe UI", 10),
             anchor="nw",
             justify="left",
-            wraplength=200  # Ajustado para 1/3 del ancho disponible
+            wraplength=300  # Ajustado para mejor uso del ancho disponible
         )
         self.vale_descripcion_label.pack(fill="both", expand=True, pady=2)
     
@@ -202,7 +202,7 @@ class InfoPanelsFrame:
             text="Importe: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.orden_importe_label.pack(fill="x", pady=2)
         
@@ -211,7 +211,7 @@ class InfoPanelsFrame:
             text="IVA: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.orden_iva_label.pack(fill="x", pady=2)
         
@@ -220,7 +220,7 @@ class InfoPanelsFrame:
             text="Importe en Letras: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.orden_letras_label.pack(fill="x", pady=2)
         
@@ -229,7 +229,7 @@ class InfoPanelsFrame:
             text="Cuenta Mayor: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.orden_cuenta_label.pack(fill="x", pady=2)
         
@@ -238,7 +238,7 @@ class InfoPanelsFrame:
             text="Banco Código: -",
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=200
+            wraplength=300
         )
         self.orden_banco_label.pack(fill="x", pady=2)
     
