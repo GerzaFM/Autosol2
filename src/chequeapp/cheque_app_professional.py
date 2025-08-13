@@ -207,9 +207,15 @@ class ChequeAppProfessional(tb.Frame):
             columns = ["id", "fecha", "vale", "folio", "proveedor", "monto", "banco"]
             self.cheque_table = tb.Treeview(left_frame, columns=columns, show="headings")
             self.cheque_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
+            
+            # Agregar doble clic para mover cheque a tabla de cargados
+            self.cheque_table.bind("<Double-1>", self.on_cheque_double_click)
 
             self.cargar_table = tb.Treeview(right_frame, columns=columns, show="headings")
             self.cargar_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
+            
+            # Agregar doble clic para quitar cheque de tabla de cargados
+            self.cargar_table.bind("<Double-1>", self.on_cargar_double_click)
 
             for col in columns:
                 self.cheque_table.heading(col, text=col.capitalize(), anchor=W)
@@ -271,6 +277,9 @@ class ChequeAppProfessional(tb.Frame):
             columns = ["id", "fecha", "nombre", "monto"]
             self.layout_table = tb.Treeview(layout_left_frame, columns=columns, show="headings")
             self.layout_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
+            
+            # Agregar doble clic para mostrar contenido del layout
+            self.layout_table.bind("<Double-1>", self.on_layout_double_click)
             
             for col in columns:
                 self.layout_table.heading(col, text=col.capitalize(), anchor=W)
@@ -522,6 +531,40 @@ class ChequeAppProfessional(tb.Frame):
 
         except Exception as e:
             self.logger.error(f"Error al agregar cheque: {e}")
+
+    def on_cheque_double_click(self, event):
+        """Manejador del doble clic en cheque_table - agrega el cheque automáticamente."""
+        try:
+            # Obtener el item donde se hizo doble clic
+            item = self.cheque_table.identify_row(event.y)
+            if not item:
+                return
+            
+            # Seleccionar el item automáticamente
+            self.cheque_table.selection_set(item)
+            
+            # Llamar a la función del botón agregar
+            self.on_agregar()
+
+        except Exception as e:
+            self.logger.error(f"Error en doble clic de cheque: {e}")
+
+    def on_cargar_double_click(self, event):
+        """Manejador del doble clic en cargar_table - quita el cheque automáticamente."""
+        try:
+            # Obtener el item donde se hizo doble clic
+            item = self.cargar_table.identify_row(event.y)
+            if not item:
+                return
+            
+            # Seleccionar el item automáticamente
+            self.cargar_table.selection_set(item)
+            
+            # Llamar a la función del botón quitar
+            self.on_quitar()
+
+        except Exception as e:
+            self.logger.error(f"Error en doble clic de cargar: {e}")
 
     def on_quitar(self):
         """Manejador del botón de quitar cheque."""
@@ -975,6 +1018,23 @@ class ChequeAppProfessional(tb.Frame):
         except Exception as e:
             self.logger.error(f"Error al eliminar layouts: {e}")
             messagebox.showerror("Error", f"Error inesperado al eliminar layouts: {str(e)}")
+
+    def on_layout_double_click(self, event):
+        """Manejador del doble clic en layout_table - muestra el contenido del layout automáticamente."""
+        try:
+            # Obtener el item donde se hizo doble clic
+            item = self.layout_table.identify_row(event.y)
+            if not item:
+                return
+            
+            # Seleccionar el item automáticamente
+            self.layout_table.selection_set(item)
+            
+            # Llamar a la función del botón mostrar
+            self.on_mostrar()
+
+        except Exception as e:
+            self.logger.error(f"Error en doble clic de layout: {e}")
 
     def on_mostrar(self):
         """Muestra el contenido de un layout específico."""
