@@ -967,15 +967,74 @@ class ChequeAppProfessional(tb.Frame):
             messagebox.showerror("Error", f"Error inesperado al generar layout: {str(e)}")
 
     def on_modificar(self):
-        """Manejador del botón de modificar cheque."""
+        """Manejador del botón de modificar layout - Permite cambiar el nombre de un layout seleccionado."""
         try:
-            # Aquí se implementaría la lógica para modificar un cheque seleccionado
-            self.logger.info("Modificar cheque (lógica no implementada)")
-            # Simulación de modificar cheque
-            messagebox.showinfo("Modificar Cheque", "Funcionalidad de modificar cheque aún no implementada.")
+            # Verificar que hay un layout seleccionado en layout_table
+            selected_items = self.layout_table.selection()
+            if not selected_items:
+                messagebox.showwarning("Modificar Layout", "Por favor, seleccione un layout para modificar.")
+                return
+            
+            # Con selectmode="browse" solo puede haber un elemento seleccionado
+            selected_item = selected_items[0]
+            values = self.layout_table.item(selected_item, "values")
+            
+            try:
+                layout_id = int(values[0])  # ID en la primera columna
+                nombre_actual = values[2]   # Nombre en la tercera columna
+            except (ValueError, IndexError):
+                messagebox.showerror("Error", "No se pudo obtener la información del layout seleccionado.")
+                self.logger.error(f"Error obteniendo datos del layout: {values}")
+                return
+            
+            # Mostrar diálogo para solicitar el nuevo nombre
+            nuevo_nombre = simpledialog.askstring(
+                "Modificar Layout",
+                f"Ingrese el nuevo nombre para el layout:\n\nNombre actual: {nombre_actual}",
+                initialvalue=nombre_actual
+            )
+            
+            # Verificar que el usuario no canceló y que proporcionó un nombre válido
+            if nuevo_nombre is None:
+                self.logger.info("Modificación de layout cancelada por el usuario")
+                return
+            
+            nuevo_nombre = nuevo_nombre.strip()
+            if not nuevo_nombre:
+                messagebox.showwarning("Modificar Layout", "El nombre del layout no puede estar vacío.")
+                return
+            
+            # Verificar si el nombre cambió
+            if nuevo_nombre == nombre_actual:
+                messagebox.showinfo("Modificar Layout", "El nombre no ha cambiado.")
+                return
+            
+            # Actualizar el nombre en la base de datos
+            success = self.cheque_db.update_layout_name(layout_id, nuevo_nombre)
+            
+            if success:
+                # Actualizar la tabla de layouts para mostrar el cambio
+                self._refresh_layout_table()
+                
+                messagebox.showinfo(
+                    "Modificación Exitosa",
+                    f"El nombre del layout se ha actualizado exitosamente:\n\n"
+                    f"Nombre anterior: {nombre_actual}\n"
+                    f"Nombre nuevo: {nuevo_nombre}"
+                )
+                
+                self.logger.info(f"Layout ID {layout_id} modificado: '{nombre_actual}' → '{nuevo_nombre}'")
+            else:
+                messagebox.showerror(
+                    "Error",
+                    f"No se pudo actualizar el nombre del layout.\n\n"
+                    f"Verifique que el layout existe y que la base de datos esté disponible."
+                )
+                self.logger.error(f"Fallo al modificar layout ID {layout_id}")
 
         except Exception as e:
-            self.logger.error(f"Error al modificar cheque: {e}")
+            self.logger.error(f"Error al modificar layout: {e}")
+            messagebox.showerror("Error", f"Error inesperado al modificar el layout: {str(e)}")
 
     def on_eliminar(self):
         """Manejador del botón de eliminar layout - Elimina layouts seleccionados."""

@@ -410,6 +410,44 @@ class ChequeDatabase:
             self.logger.error(f"Error eliminando layout {layout_id}: {e}")
             return False
 
+    def update_layout_name(self, layout_id: int, nuevo_nombre: str) -> bool:
+        """
+        Actualiza el nombre de un layout
+        
+        Args:
+            layout_id: ID del layout a actualizar
+            nuevo_nombre: Nuevo nombre para el layout
+            
+        Returns:
+            True si se actualizó exitosamente, False en caso contrario
+        """
+        if not self.db_available:
+            self.logger.warning("Base de datos no disponible")
+            return False
+            
+        if not nuevo_nombre or not nuevo_nombre.strip():
+            self.logger.warning("El nuevo nombre no puede estar vacío")
+            return False
+            
+        try:
+            # Verificar que el layout existe
+            layout = Layout.get_by_id(layout_id)
+            nombre_anterior = layout.nombre
+            
+            # Actualizar el nombre
+            layout.nombre = nuevo_nombre.strip()
+            layout.save()
+            
+            self.logger.info(f"Layout ID {layout_id}: nombre actualizado de '{nombre_anterior}' a '{nuevo_nombre.strip()}'")
+            return True
+            
+        except Layout.DoesNotExist:
+            self.logger.warning(f"Layout con ID {layout_id} no encontrado")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error actualizando nombre del layout {layout_id}: {e}")
+            return False
+
     def _get_sample_cheques(self) -> List[Dict[str, Any]]:
         """
         Retorna datos de ejemplo cuando la base de datos no está disponible
