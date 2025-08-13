@@ -493,12 +493,17 @@ class ChequeAppProfessional(tb.Frame):
     def on_clean_filters(self):
         """Manejador del botón de limpiar filtros."""
         try:
-            # Limpiar campos de búsqueda
-            self.initial_date.set('')
-            self.final_date.set('')
+            # Limpiar campos de búsqueda DateEntry
+            self.initial_date.entry.delete(0, 'end')
+            self.final_date.entry.delete(0, 'end')
+            
+            # Limpiar campo de clase
             self.class_entry.delete(0, 'end')
+            
+            # Limpiar checkbox
             self.only_uncharged_var.set(False)
-            self.logger.info("Filtros limpiados")
+            
+            self.logger.info("Filtros limpiados - campos DateEntry vaciados")
             
         except Exception as e:
             self.logger.error(f"Error limpiando filtros: {e}")
