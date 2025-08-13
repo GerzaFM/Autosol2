@@ -78,7 +78,7 @@ class SearchFrame:
         ttk.Label(row1_frame, text="Fecha Inicial:", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
         self.fecha_inicial_entry = ttk.DateEntry(
             row1_frame,
-            dateformat='%Y-%m-%d',
+            dateformat='%d/%m/%y',
             width=12
         )
         self.fecha_inicial_entry.pack(side="left", padx=(0, 15))
@@ -142,7 +142,7 @@ class SearchFrame:
         ttk.Label(row2_frame, text="Fecha Final:  ", font=("Segoe UI", 10)).pack(side="left", padx=(0, 5))
         self.fecha_final_entry = ttk.DateEntry(
             row2_frame,
-            dateformat='%Y-%m-%d',
+            dateformat='%d/%m/%y',
             width=12
         )
         self.fecha_final_entry.pack(side="left", padx=(0, 15))

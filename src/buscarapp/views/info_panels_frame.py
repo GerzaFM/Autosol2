@@ -23,11 +23,17 @@ class InfoPanelsFrame:
     def _create_widgets(self):
         """Crea todos los widgets del frame de información"""
         
-        # Frame contenedor principal (sin notebook, solo los 3 paneles)
+        # Frame contenedor principal con grid para distribución proporcional
         main_info_frame = ttk.Frame(self.main_frame, padding=10)
-        main_info_frame.pack(fill="x")
+        main_info_frame.pack(fill="both", expand=True)
         
-        # Crear tres LabelFrames horizontales como en el original
+        # Configurar grid para 3 columnas con pesos iguales (1/3 cada una)
+        main_info_frame.columnconfigure(0, weight=1)  # Proveedor
+        main_info_frame.columnconfigure(1, weight=1)  # Vale
+        main_info_frame.columnconfigure(2, weight=1)  # Orden
+        main_info_frame.rowconfigure(0, weight=1)
+        
+        # Crear tres LabelFrames con grid layout
         
         # 1. Panel de Datos Proveedor
         self._create_proveedor_panel(main_info_frame)
@@ -45,7 +51,7 @@ class InfoPanelsFrame:
             text="Datos Proveedor",
             padding=10
         )
-        proveedor_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        proveedor_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
         # Campos del proveedor
         self.proveedor_codigo_label = ttk.Label(
@@ -87,7 +93,7 @@ class InfoPanelsFrame:
             text="Vale",
             padding=10
         )
-        vale_frame.pack(side="left", fill="both", expand=True, padx=5)
+        vale_frame.grid(row=0, column=1, sticky="nsew", padx=5)
         
         # Campos del vale - expandidos para mostrar más información
         self.vale_no_label = ttk.Label(
@@ -153,7 +159,7 @@ class InfoPanelsFrame:
             font=("Segoe UI", 10),
             anchor="nw",
             justify="left",
-            wraplength=250  # Ajustar según el ancho del panel
+            wraplength=200  # Ajustado para 1/3 del ancho disponible
         )
         self.vale_descripcion_label.pack(fill="both", expand=True, pady=2)
     
@@ -164,7 +170,7 @@ class InfoPanelsFrame:
             text="Orden de Compra",
             padding=10
         )
-        orden_frame.pack(side="left", fill="both", expand=True, padx=(5, 0))
+        orden_frame.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         
         # Campos de la orden
         self.orden_importe_label = ttk.Label(

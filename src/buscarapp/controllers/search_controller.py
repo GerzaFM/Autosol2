@@ -349,7 +349,9 @@ class SearchController:
             # Intentar parsear diferentes formatos de fecha
             formats_to_try = [
                 '%Y-%m-%d',    # 2024-07-24
+                '%d/%m/%y',    # 24/07/24 (formato de DateEntry)
                 '%d/%m/%Y',    # 24/07/2024
+                '%Y%m%d',      # 20240724
                 '%m/%d/%Y',    # 07/24/2024
                 '%d-%m-%Y',    # 24-07-2024
                 '%m-%d-%Y',    # 07-24-2024

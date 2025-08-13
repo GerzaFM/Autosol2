@@ -408,7 +408,7 @@ class BuscarAppRefactored(ttk.Frame):
             basic_info = [
                 ("Folio Interno:", factura_info.get('folio_interno', 'N/A')),
                 ("Tipo:", factura_info.get('tipo', 'N/A')),
-                ("Fecha:", factura_info.get('fecha', 'N/A')),
+                ("Fecha:", self._format_date(factura_info.get('fecha', 'N/A'))),
                 ("Emisor:", factura_info.get('nombre_emisor', 'N/A')),
                 ("RFC Emisor:", factura_info.get('rfc_emisor', 'N/A')),
                 ("Subtotal:", f"${factura_info.get('subtotal', 0):,.2f}"),
@@ -736,6 +736,31 @@ class BuscarAppRefactored(ttk.Frame):
             
         except Exception as e:
             self.logger.error(f"Error refrescando búsqueda: {e}")
+    
+    def _format_date(self, date_str):
+        """Formatea una fecha de YYYY-MM-DD a DD/MM/YY"""
+        if not date_str:
+            return ""
+        
+        try:
+            from datetime import datetime
+            # Intentar parsear diferentes formatos
+            if len(date_str) == 10 and '-' in date_str:  # YYYY-MM-DD
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            elif len(date_str) == 8:  # YYYYMMDD
+                date_obj = datetime.strptime(date_str, '%Y%m%d')
+            elif '/' in date_str:  # Ya está en formato DD/MM/YYYY o similar
+                if len(date_str.split('/')[-1]) == 2:  # Ya es DD/MM/YY
+                    return date_str
+                else:  # DD/MM/YYYY
+                    date_obj = datetime.strptime(date_str, '%d/%m/%Y')
+            else:
+                return date_str  # Retornar sin cambios si no se reconoce
+            
+            # Formatear como DD/MM/YY
+            return date_obj.strftime('%d/%m/%y')
+        except Exception:
+            return date_str  # En caso de error, retornar la fecha original
     
     def _on_cheque(self):
         """Maneja el evento del botón Cheque - Genera cheques individuales o múltiples consolidados"""

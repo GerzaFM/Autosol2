@@ -116,6 +116,31 @@ class TableFrame:
         self.tree.tag_configure("pagada", background="")
         self.tree.tag_configure("cargada_pagada", background="")
     
+    def _format_date(self, date_str):
+        """Formatea una fecha de YYYY-MM-DD a DD/MM/YY"""
+        if not date_str:
+            return ""
+        
+        try:
+            from datetime import datetime
+            # Intentar parsear diferentes formatos
+            if len(date_str) == 10 and '-' in date_str:  # YYYY-MM-DD
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            elif len(date_str) == 8:  # YYYYMMDD
+                date_obj = datetime.strptime(date_str, '%Y%m%d')
+            elif '/' in date_str:  # Ya está en formato DD/MM/YYYY o similar
+                if len(date_str.split('/')[-1]) == 2:  # Ya es DD/MM/YY
+                    return date_str
+                else:  # DD/MM/YYYY
+                    date_obj = datetime.strptime(date_str, '%d/%m/%Y')
+            else:
+                return date_str  # Retornar sin cambios si no se reconoce
+            
+            # Formatear como DD/MM/YY
+            return date_obj.strftime('%d/%m/%y')
+        except Exception:
+            return date_str  # En caso de error, retornar la fecha original
+
     def load_data(self, data: List[Dict[str, Any]]):
         """
         Carga datos en la tabla
@@ -140,7 +165,9 @@ class TableFrame:
                     value = row.get(col, "")
                     
                     # Formatear valores especiales
-                    if col == "total" and isinstance(value, (int, float)):
+                    if col == "fecha":
+                        value = self._format_date(str(value))
+                    elif col == "total" and isinstance(value, (int, float)):
                         value = f"${value:,.2f}"
                     elif col in ["cargada", "pagada"]:
                         value = "✓" if row.get(f"{col}_bool", False) else ""

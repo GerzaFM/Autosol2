@@ -186,7 +186,7 @@ class ChequeAppProfessional(tb.Frame):
                 width=15,
                 bootstyle="success"
             )
-            search_layout_button.pack(side=RIGHT, padx=(5, 5), pady=10, anchor=E)
+            search_layout_button.pack(side=RIGHT, padx=(5, 10), pady=10, anchor=E)
 
             search_cheque_button = tb.Button(
                 search_frame, text="Buscar cheques",
@@ -331,7 +331,7 @@ class ChequeAppProfessional(tb.Frame):
                 width=10,
                 bootstyle="success"
             )
-            button_mostrar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+            button_mostrar.pack(side=RIGHT, padx=(5, 0), pady=(0, 10))
 
             button_exportar = tb.Button(
                 frame_control_layout,
@@ -340,7 +340,7 @@ class ChequeAppProfessional(tb.Frame):
                 width=10,
                 bootstyle="info"
             )
-            button_exportar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+            button_exportar.pack(side=RIGHT, padx=(5, 0), pady=(0, 10))
 
             button_modificar = tb.Button(
                 frame_control_layout,
@@ -349,7 +349,7 @@ class ChequeAppProfessional(tb.Frame):
                 width=10,
                 bootstyle="warning"
             )
-            button_modificar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+            button_modificar.pack(side=RIGHT, padx=(5, 0), pady=(0, 10))
 
             button_eliminar = tb.Button(
                 frame_control_layout,
@@ -358,7 +358,7 @@ class ChequeAppProfessional(tb.Frame):
                 width=10,
                 bootstyle="danger"
             )
-            button_eliminar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+            button_eliminar.pack(side=RIGHT, padx=(5, 0), pady=(0, 10))
 
             columns = ["alias", "nombre", "importe", "descripcion", "referencia"]
             self.layout = tb.Treeview(layout_right_frame, columns=columns, show="headings")
@@ -383,10 +383,10 @@ class ChequeAppProfessional(tb.Frame):
 
             for button_name, command in reversed(button_copy_layout_names):
                 button = tb.Button(layout_right_frame, text=button_name, command=command, width=11, bootstyle="info")
-                button.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
+                button.pack(side=RIGHT, padx=(0, 5), pady=(0, 10))
 
             label_copyclipboard = tb.Label(layout_right_frame, text="Copiar al portapapeles:", anchor=E)
-            label_copyclipboard.pack(side=RIGHT, padx=10, pady=(10, 0))
+            label_copyclipboard.pack(side=RIGHT, padx=(0, 5), pady=(0, 0))
 
             self.logger.info("Interfaz de usuario configurada correctamente")
             
