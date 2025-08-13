@@ -814,13 +814,32 @@ class BuscarAppRefactored(ttk.Frame):
                 # Crear nombre con múltiples vales
                 numeros_vale = []
                 folios_factura = []
+                folios_ya_agregados = set()  # Para evitar duplicados de folios complementarios
                 
                 for item in selected_items:
                     no_vale = str(item.get('no_vale', 'SinVale'))
                     folio_factura = str(item.get('folio', 'SinFolio'))  # Solo folio, no serie_folio
+                    serie_factura = str(item.get('serie', ''))  # Obtener la serie
                     
+                    # Agregar el número de vale (siempre se agrega)
                     numeros_vale.append(self._limpiar_nombre_archivo(no_vale))
-                    folios_factura.append(self._limpiar_nombre_archivo(folio_factura))
+                    
+                    # Para folios: si la serie empieza con "div-", es una factura complementaria
+                    # Solo agregar el folio si no es complementaria O si el folio no ha sido agregado antes
+                    es_complementaria = serie_factura.lower().startswith('div-')
+                    
+                    if es_complementaria:
+                        # Es complementaria, verificar si el folio ya fue agregado
+                        if folio_factura not in folios_ya_agregados:
+                            folios_factura.append(self._limpiar_nombre_archivo(folio_factura))
+                            folios_ya_agregados.add(folio_factura)
+                            self.logger.info(f"Factura complementaria detectada (serie: {serie_factura}), folio {folio_factura} agregado por primera vez")
+                        else:
+                            self.logger.info(f"Factura complementaria detectada (serie: {serie_factura}), folio {folio_factura} omitido (ya agregado)")
+                    else:
+                        # No es complementaria, agregar normalmente
+                        folios_factura.append(self._limpiar_nombre_archivo(folio_factura))
+                        folios_ya_agregados.add(folio_factura)
                 
                 # Obtener datos del primer elemento para proveedor y clase
                 proveedor = self._limpiar_nombre_archivo(primer_proveedor)
@@ -898,8 +917,16 @@ class BuscarAppRefactored(ttk.Frame):
                         
                         # DEBUG: Mostrar datos de cada factura seleccionada
                         self.logger.info("DEBUG - Facturas seleccionadas:")
+                        facturas_complementarias_count = 0
                         for i, item in enumerate(selected_items, 1):
-                            self.logger.info(f"  {i}. Vale: {item.get('no_vale', 'N/A')}, Folio: {item.get('folio', 'N/A')}, Total: {item.get('total', 'N/A')}")
+                            serie = str(item.get('serie', ''))
+                            es_complementaria = serie.lower().startswith('div-')
+                            if es_complementaria:
+                                facturas_complementarias_count += 1
+                            self.logger.info(f"  {i}. Vale: {item.get('no_vale', 'N/A')}, Serie: {serie}, Folio: {item.get('folio', 'N/A')}, Total: {item.get('total', 'N/A')}, Complementaria: {es_complementaria}")
+                        
+                        self.logger.info(f"Total facturas complementarias detectadas: {facturas_complementarias_count}")
+                        self.logger.info(f"Folios únicos a incluir en nombre: {folios_factura}")
                         
                         try:
                             print(f"🔄 [DEBUG] Llamando crear_multiple con ruta: {ruta_exportacion}")
@@ -916,6 +943,11 @@ class BuscarAppRefactored(ttk.Frame):
                                 total_consolidado = sum(float(item.get('total', 0)) for item in selected_items)
                                 iva_consolidado = sum(float(item.get('iva_trasladado', 0)) for item in selected_items)
                                 
+                                # Contar facturas complementarias
+                                facturas_complementarias = [item for item in selected_items 
+                                                           if str(item.get('serie', '')).lower().startswith('div-')]
+                                tiene_complementarias = len(facturas_complementarias) > 0
+                                
                                 mensaje_detalle = (
                                     f"Cheque múltiple generado exitosamente:\n"
                                     f"Archivo: {ruta_exportacion}\n\n"
@@ -925,8 +957,11 @@ class BuscarAppRefactored(ttk.Frame):
                                     f"• Total consolidado: ${total_consolidado:,.2f}\n"
                                     f"• IVA consolidado: ${iva_consolidado:,.2f}\n"
                                     f"• Vales: {', '.join(numeros_vale)}\n"
-                                    f"• Folios: {', '.join(folios_factura)}"
+                                    f"• Folios únicos: {', '.join(folios_factura)}"
                                 )
+                                
+                                if tiene_complementarias:
+                                    mensaje_detalle += f"\n• Facturas complementarias: {len(facturas_complementarias)} (folios no duplicados)"
                                 
                                 self.dialog_utils.show_info("Cheque Múltiple Generado", mensaje_detalle)
                                 self.logger.info(f"Cheque múltiple generado exitosamente: {ruta_exportacion} - {len(selected_items)} facturas consolidadas - Total: ${total_consolidado:,.2f}")
