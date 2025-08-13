@@ -28,10 +28,13 @@ class InfoPanelsFrame:
         main_info_frame.pack(fill="both", expand=True)
         
         # Configurar grid para 3 columnas con pesos iguales (1/3 cada una)
-        main_info_frame.columnconfigure(0, weight=1)  # Proveedor
-        main_info_frame.columnconfigure(1, weight=1)  # Vale
-        main_info_frame.columnconfigure(2, weight=1)  # Orden
+        main_info_frame.columnconfigure(0, weight=1, minsize=250)  # Proveedor
+        main_info_frame.columnconfigure(1, weight=1, minsize=250)  # Vale
+        main_info_frame.columnconfigure(2, weight=1, minsize=250)  # Orden
         main_info_frame.rowconfigure(0, weight=1)
+        
+        # Evitar propagación del tamaño de los widgets hijos
+        main_info_frame.grid_propagate(False)
         
         # Crear tres LabelFrames con grid layout
         
@@ -53,12 +56,16 @@ class InfoPanelsFrame:
         )
         proveedor_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
+        # Evitar que el frame se redimensione según su contenido
+        proveedor_frame.pack_propagate(False)
+        
         # Campos del proveedor
         self.proveedor_codigo_label = ttk.Label(
             proveedor_frame,
             text="Código: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.proveedor_codigo_label.pack(fill="x", pady=2)
         
@@ -66,7 +73,9 @@ class InfoPanelsFrame:
             proveedor_frame,
             text="Nombre: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200,
+            justify="left"
         )
         self.proveedor_nombre_label.pack(fill="x", pady=2)
         
@@ -74,7 +83,8 @@ class InfoPanelsFrame:
             proveedor_frame,
             text="RFC: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.proveedor_rfc_label.pack(fill="x", pady=2)
         
@@ -82,7 +92,8 @@ class InfoPanelsFrame:
             proveedor_frame,
             text="Email: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.proveedor_email_label.pack(fill="x", pady=2)
     
@@ -95,12 +106,16 @@ class InfoPanelsFrame:
         )
         vale_frame.grid(row=0, column=1, sticky="nsew", padx=5)
         
+        # Evitar que el frame se redimensione según su contenido
+        vale_frame.pack_propagate(False)
+        
         # Campos del vale - expandidos para mostrar más información
         self.vale_no_label = ttk.Label(
             vale_frame,
             text="No Vale: -",
             font=("Segoe UI", 10, "bold"),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.vale_no_label.pack(fill="x", pady=2)
         
@@ -108,7 +123,8 @@ class InfoPanelsFrame:
             vale_frame,
             text="Tipo: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.vale_tipo_label.pack(fill="x", pady=2)
         
@@ -116,7 +132,8 @@ class InfoPanelsFrame:
             vale_frame,
             text="Total: -",
             font=("Segoe UI", 10, "bold"),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.vale_total_label.pack(fill="x", pady=2)
         
@@ -124,7 +141,8 @@ class InfoPanelsFrame:
             vale_frame,
             text="Proveedor: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.vale_proveedor_label.pack(fill="x", pady=2)
         
@@ -132,7 +150,8 @@ class InfoPanelsFrame:
             vale_frame,
             text="Fecha: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.vale_fecha_label.pack(fill="x", pady=2)
         
@@ -140,7 +159,8 @@ class InfoPanelsFrame:
             vale_frame,
             text="Referencia: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.vale_referencia_label.pack(fill="x", pady=2)
         
@@ -148,7 +168,8 @@ class InfoPanelsFrame:
             vale_frame,
             text="Departamento: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.vale_departamento_label.pack(fill="x", pady=2)
         
@@ -172,12 +193,16 @@ class InfoPanelsFrame:
         )
         orden_frame.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         
+        # Evitar que el frame se redimensione según su contenido
+        orden_frame.pack_propagate(False)
+        
         # Campos de la orden
         self.orden_importe_label = ttk.Label(
             orden_frame,
             text="Importe: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.orden_importe_label.pack(fill="x", pady=2)
         
@@ -185,7 +210,8 @@ class InfoPanelsFrame:
             orden_frame,
             text="IVA: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.orden_iva_label.pack(fill="x", pady=2)
         
@@ -193,7 +219,8 @@ class InfoPanelsFrame:
             orden_frame,
             text="Importe en Letras: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.orden_letras_label.pack(fill="x", pady=2)
         
@@ -201,7 +228,8 @@ class InfoPanelsFrame:
             orden_frame,
             text="Cuenta Mayor: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.orden_cuenta_label.pack(fill="x", pady=2)
         
@@ -209,7 +237,8 @@ class InfoPanelsFrame:
             orden_frame,
             text="Banco Código: -",
             font=("Segoe UI", 10),
-            anchor="w"
+            anchor="w",
+            wraplength=200
         )
         self.orden_banco_label.pack(fill="x", pady=2)
     
