@@ -180,13 +180,29 @@ class ChequeAppProfessional(tb.Frame):
             only_uncharged_checkbox = tb.Checkbutton(search_frame, variable=self.only_uncharged_var)
             only_uncharged_checkbox.pack(side=LEFT, padx=(0, 5), anchor=W)
 
-            search_cheque_button = tb.Button(search_frame, text="Buscar cheques", command=self.on_search_cheques, width=15)
-            search_cheque_button.pack(side=RIGHT, padx=(5, 10), pady=5, anchor=E)
+            search_layout_button = tb.Button(
+                search_frame, text="Buscar layouts", 
+                command=self.on_search_layout, 
+                width=15,
+                bootstyle="success"
+            )
+            search_layout_button.pack(side=RIGHT, padx=(5, 5), pady=10, anchor=E)
 
-            search_layout_button = tb.Button(search_frame, text="Buscar layouts", command=self.on_search_layout, width=15)
-            search_layout_button.pack(side=RIGHT, padx=(25, 5), pady=10, anchor=E)
+            search_cheque_button = tb.Button(
+                search_frame, text="Buscar cheques",
+                command=self.on_search_cheques, 
+                width=15,
+                bootstyle="success"
+            )
+            search_cheque_button.pack(side=RIGHT, padx=(5, 5), pady=5, anchor=E)
 
-            clean_button = tb.Button(search_frame, text="Limpiar filtros", command=self.on_clean_filters, width=15)
+            clean_button = tb.Button(
+                search_frame, 
+                text="Limpiar filtros", 
+                command=self.on_clean_filters, 
+                width=15,
+                bootstyle="danger"
+            )
             clean_button.pack(side=RIGHT, padx=(5, 5), pady=10, anchor=E)
 
             # Contenido principal
@@ -254,13 +270,28 @@ class ChequeAppProfessional(tb.Frame):
             button_container = tb.Frame(center_frame)
             button_container.place(relx=0.5, rely=0.5, anchor=CENTER)  # Centrar en el medio del frame
 
-            button_agregar = tb.Button(button_container, text="Agregar", command=self.on_agregar, width=center_buttons_width)
+            button_agregar = tb.Button(
+                button_container, text="Agregar", 
+                command=self.on_agregar, 
+                width=center_buttons_width,
+                bootstyle="success"
+            )
             button_agregar.pack(side=TOP, pady=(5, 5))
 
-            button_quitar = tb.Button(button_container, text="Quitar", command=self.on_quitar, width=center_buttons_width)
+            button_quitar = tb.Button(
+                button_container, text="Quitar", 
+                command=self.on_quitar, 
+                width=center_buttons_width,
+                bootstyle="danger"
+            )
             button_quitar.pack(side=TOP, pady=(5, 5))
 
-            button_layout = tb.Button(button_container, text="Layout", command=self.on_crear_layout, width=center_buttons_width)
+            button_layout = tb.Button(
+                button_container, text="Layout", 
+                command=self.on_crear_layout, 
+                width=center_buttons_width,
+                bootstyle="info"
+            )
             button_layout.pack(side=TOP, pady=(5, 5))
 
             # Frame layouts
@@ -275,7 +306,7 @@ class ChequeAppProfessional(tb.Frame):
 
             # Frame de layout
             columns = ["id", "fecha", "nombre", "monto"]
-            self.layout_table = tb.Treeview(layout_left_frame, columns=columns, show="headings")
+            self.layout_table = tb.Treeview(layout_left_frame, columns=columns, show="headings", selectmode="browse")
             self.layout_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
             
             # Agregar doble clic para mostrar contenido del layout
@@ -293,16 +324,40 @@ class ChequeAppProfessional(tb.Frame):
             frame_control_layout = tb.Frame(layout_left_frame)
             frame_control_layout.pack(side=BOTTOM, fill=X, padx=5)
 
-            button_mostrar = tb.Button(frame_control_layout, text="Mostrar", command=self.on_mostrar, width=10)
+            button_mostrar = tb.Button(
+                frame_control_layout,
+                text="Mostrar", 
+                command=self.on_mostrar, 
+                width=10,
+                bootstyle="success"
+            )
             button_mostrar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
-            button_exportar = tb.Button(frame_control_layout, text="Exportar", command=self.on_generar, width=10)
+            button_exportar = tb.Button(
+                frame_control_layout,
+                text="Exportar",
+                command=self.on_generar,
+                width=10,
+                bootstyle="info"
+            )
             button_exportar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
-            button_modificar = tb.Button(frame_control_layout, text="Modificar", command=self.on_modificar, width=10)
+            button_modificar = tb.Button(
+                frame_control_layout,
+                text="Modificar",
+                command=self.on_modificar,
+                width=10,
+                bootstyle="warning"
+            )
             button_modificar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
-            button_eliminar = tb.Button(frame_control_layout, text="Eliminar", command=self.on_eliminar, width=10)
+            button_eliminar = tb.Button(
+                frame_control_layout,
+                text="Eliminar",
+                command=self.on_eliminar,
+                width=10,
+                bootstyle="danger"
+            )
             button_eliminar.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
             columns = ["alias", "nombre", "importe", "descripcion", "referencia"]
@@ -327,7 +382,7 @@ class ChequeAppProfessional(tb.Frame):
             ]
 
             for button_name, command in reversed(button_copy_layout_names):
-                button = tb.Button(layout_right_frame, text=button_name, command=command, width=11)
+                button = tb.Button(layout_right_frame, text=button_name, command=command, width=11, bootstyle="info")
                 button.pack(side=RIGHT, padx=(5, 0), pady=(0, 5))
 
             label_copyclipboard = tb.Label(layout_right_frame, text="Copiar al portapapeles:", anchor=E)
