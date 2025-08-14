@@ -50,7 +50,7 @@ class ChequeDatabase:
             Lista de diccionarios con datos de cheques
         """
         if not self.db_available:
-            return self._get_sample_cheques()
+            return self._get_sample_cheques(filters)
         
         try:
             # Construir consulta base
@@ -68,14 +68,25 @@ class ChequeDatabase:
                 if fecha_final:
                     query = query.where(Cheque.fecha <= fecha_final)
             
-            # Aplicar filtro de clase (en el campo vale o folio)
+            # Aplicar filtro de clase (en las facturas relacionadas)
             if filters.get('clase'):
                 clase = filters['clase'].strip()
                 if clase:
-                    query = query.where(
-                        (Cheque.vale.contains(clase)) | 
-                        (Cheque.folio.contains(clase))
-                    )
+                    # Importar Factura para hacer el join
+                    try:
+                        from models import Factura
+                        # Filtrar cheques que tengan facturas con la clase especificada
+                        # Usar la relación inversa: cheques que tienen facturas con esa clase
+                        query = query.join(Factura, on=(Cheque.id == Factura.cheque)).where(
+                            Factura.clase.contains(clase)
+                        ).distinct()
+                    except Exception as e:
+                        self.logger.warning(f"Error al aplicar filtro de clase: {e}")
+                        # Fallback: buscar en vale o folio como antes
+                        query = query.where(
+                            (Cheque.vale.contains(clase)) | 
+                            (Cheque.folio.contains(clase))
+                        )
             
             # Aplicar filtro de proveedor
             if filters.get('proveedor'):
@@ -86,6 +97,16 @@ class ChequeDatabase:
             # Ejecutar consulta y convertir a lista de diccionarios
             cheques = []
             for cheque in query:
+                # Obtener la clase de la primera factura relacionada
+                clase_factura = ""
+                try:
+                    if hasattr(cheque, 'facturas') and cheque.facturas:
+                        primera_factura = cheque.facturas.first()
+                        if primera_factura and hasattr(primera_factura, 'clase'):
+                            clase_factura = primera_factura.clase or ""
+                except Exception as e:
+                    self.logger.warning(f"Error al obtener clase de factura para cheque {cheque.id}: {e}")
+                
                 cheques.append({
                     'id': cheque.id,
                     'fecha': cheque.fecha.strftime('%Y-%m-%d') if cheque.fecha else '',
@@ -93,7 +114,7 @@ class ChequeDatabase:
                     'folio': cheque.folio or '',
                     'proveedor': cheque.proveedor.nombre if cheque.proveedor else '',
                     'monto': str(cheque.monto) if cheque.monto else '0.00',
-                    'banco': cheque.banco or '',
+                    'clase': clase_factura,
                     'layout': cheque.layout.id if cheque.layout else None,
                     'layout_nombre': cheque.layout.nombre if cheque.layout else None
                 })
@@ -103,7 +124,7 @@ class ChequeDatabase:
             
         except Exception as e:
             self.logger.error(f"Error en búsqueda de cheques: {e}")
-            return self._get_sample_cheques()
+            return self._get_sample_cheques(filters)
     
     def search_layouts(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -455,7 +476,17 @@ class ChequeDatabase:
         Returns:
             Lista de diccionarios con datos de ejemplo de cheques
         """
-        return [
+    def _get_sample_cheques(self, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """
+        Retorna datos de ejemplo cuando la base de datos no está disponible
+        
+        Args:
+            filters: Filtros a aplicar a los datos de ejemplo
+            
+        Returns:
+            Lista de diccionarios con datos de ejemplo de cheques
+        """
+        sample_data = [
             {
                 'id': 1,
                 'fecha': '2024-01-15',
@@ -463,7 +494,7 @@ class ChequeDatabase:
                 'folio': 'F001',
                 'proveedor': 'Proveedor Ejemplo 1',
                 'monto': '1000.00',
-                'banco': 'Banco Ejemplo',
+                'clase': '33',
                 'layout': None,
                 'layout_nombre': None
             },
@@ -474,8 +505,52 @@ class ChequeDatabase:
                 'folio': 'F002',
                 'proveedor': 'Proveedor Ejemplo 2',
                 'monto': '2000.00',
-                'banco': 'Banco Ejemplo 2',
+                'clase': '35',
+                'layout': None,
+                'layout_nombre': None
+            },
+            {
+                'id': 3,
+                'fecha': '2024-01-17',
+                'vale': 'V003',
+                'folio': 'F003',
+                'proveedor': 'Proveedor Ejemplo 3',
+                'monto': '1500.00',
+                'clase': '33',
                 'layout': None,
                 'layout_nombre': None
             }
         ]
+        
+        # Aplicar filtros si están especificados
+        if filters:
+            filtered_data = []
+            
+            for cheque in sample_data:
+                # Filtro de fecha inicial
+                if filters.get('fecha_inicial'):
+                    if cheque['fecha'] < filters['fecha_inicial']:
+                        continue
+                
+                # Filtro de fecha final
+                if filters.get('fecha_final'):
+                    if cheque['fecha'] > filters['fecha_final']:
+                        continue
+                
+                # Filtro de clase
+                if filters.get('clase'):
+                    clase_filtro = filters['clase'].strip()
+                    if clase_filtro and clase_filtro not in cheque['clase']:
+                        continue
+                
+                # Filtro de proveedor
+                if filters.get('proveedor'):
+                    proveedor_filtro = filters['proveedor'].strip().lower()
+                    if proveedor_filtro and proveedor_filtro not in cheque['proveedor'].lower():
+                        continue
+                
+                filtered_data.append(cheque)
+            
+            return filtered_data
+        
+        return sample_data

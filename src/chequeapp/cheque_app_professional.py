@@ -220,7 +220,7 @@ class ChequeAppProfessional(tb.Frame):
             right_frame.pack(side=LEFT, fill=BOTH, expand=True)
 
             # Trees de los cheques a cargar
-            columns = ["id", "fecha", "vale", "folio", "proveedor", "monto", "banco"]
+            columns = ["id", "fecha", "vale", "folio", "proveedor", "monto", "clase"]
             self.cheque_table = tb.Treeview(left_frame, columns=columns, show="headings")
             self.cheque_table.pack(fill=BOTH, expand=True, padx=5, pady=5)  # Reducir de 10 a 5
             
@@ -251,7 +251,7 @@ class ChequeAppProfessional(tb.Frame):
             self.cheque_table.column("folio", width=c_small)
             self.cheque_table.column("proveedor", width=c_medium)
             self.cheque_table.column("monto", width=c_small+5)
-            self.cheque_table.column("banco", width=c_small)
+            self.cheque_table.column("clase", width=c_small)
 
             self.cargar_table.column("id", width=c_smallest)
             self.cargar_table.column("fecha", width=c_small)
@@ -259,10 +259,10 @@ class ChequeAppProfessional(tb.Frame):
             self.cargar_table.column("folio", width=c_small)
             self.cargar_table.column("proveedor", width=c_medium)
             self.cargar_table.column("monto", width=c_small+5)
-            self.cargar_table.column("banco", width=c_small)
+            self.cargar_table.column("clase", width=c_small)
 
-            #cheque_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
-            #cargar_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "BTC23"))
+            #cheque_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "33"))
+            #cargar_table.insert("", "end", values=("2024-08-10", "V156486", "12456", "Servicio Nava Medrano", "100000.00", "33"))
 
             # Botones de acción
             center_buttons_width = 10  # Reducir el width a un valor más razonable en caracteres
@@ -496,7 +496,7 @@ class ChequeAppProfessional(tb.Frame):
                     cheque.get("folio", ""),
                     cheque.get("proveedor", ""),
                     cheque.get("monto", ""),
-                    cheque.get("banco", "")
+                    cheque.get("clase", "")
                 ))
             
             self.logger.info(f"Se encontraron {len(cheques)} cheques")
