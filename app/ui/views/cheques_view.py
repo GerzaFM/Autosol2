@@ -24,20 +24,18 @@ class ChequesView(tb.Frame):
     Integra la aplicación profesional de cheques (frame vacío)
     """
     
-    def __init__(self, parent, db_manager=None):
+    def __init__(self, parent):
         """
         Inicializa la vista de cheques
         
         Args:
             parent: Widget padre
-            db_manager: Gestor de base de datos (opcional)
         """
         super().__init__(parent)
-        self.db_manager = db_manager
         self.logger = get_logger(__name__)
         
         # Aplicación de cheques integrada
-        self.cheque_app: Optional[ChequeAppProfessional] = None
+        self.cheque_app = None
         
         self._create_layout()
         self.logger.info("Vista de cheques inicializada (frame vacío)")

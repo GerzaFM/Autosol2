@@ -24,18 +24,16 @@ class ChequeView(tb.Frame):
     Encapsula ChequeApp y la integra en la nueva arquitectura.
     """
     
-    def __init__(self, parent, db_manager, **kwargs):
+    def __init__(self, parent, **kwargs):
         """
         Inicializa la vista de cheques.
         
         Args:
             parent: Widget padre
-            db_manager: Gestor de base de datos
         """
         super().__init__(parent, **kwargs)
         
         self.logger = get_logger(__name__)
-        self.db_manager = db_manager
         self.cheque_app = None
         
         self._create_cheque_component()

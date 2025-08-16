@@ -23,19 +23,17 @@ class SolicitudView(tb.Frame):
     Encapsula SolicitudApp y la integra en la nueva arquitectura.
     """
     
-    def __init__(self, parent, db_manager, **kwargs):
+    def __init__(self, parent, **kwargs):
         """
         Inicializa la vista de solicitud.
         
         Args:
             parent: Widget padre
-            db_manager: Gestor de base de datos
         """
         super().__init__(parent, **kwargs)
         
         self.logger = get_logger(__name__)
-        self.db_manager = db_manager
-        self.solicitud_app: Optional[SolicitudApp] = None
+        self.solicitud_app = None
         
         self._create_solicitud_component()
     
@@ -99,7 +97,7 @@ class SolicitudView(tb.Frame):
         # Intentar crear el componente nuevamente
         self._create_solicitud_component()
     
-    def get_solicitud_app(self) -> Optional[SolicitudApp]:
+    def get_solicitud_app(self):
         """
         Obtiene la instancia de SolicitudApp.
         

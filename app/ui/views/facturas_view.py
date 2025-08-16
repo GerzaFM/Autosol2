@@ -23,19 +23,17 @@ class FacturasView(tb.Frame):
     Encapsula BuscarAppRefactored y la integra en la nueva arquitectura.
     """
     
-    def __init__(self, parent, db_manager, **kwargs):
+    def __init__(self, parent, **kwargs):
         """
         Inicializa la vista de facturas.
         
         Args:
             parent: Widget padre
-            db_manager: Gestor de base de datos
         """
         super().__init__(parent, **kwargs)
         
         self.logger = get_logger(__name__)
-        self.db_manager = db_manager
-        self.buscar_app: Optional[Any] = None
+        self.buscar_app = None
         
         self._create_buscar_component()
     

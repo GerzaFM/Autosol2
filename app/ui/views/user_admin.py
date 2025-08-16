@@ -26,21 +26,19 @@ class AdministradorUsuarios(tb.Frame):
     Permite crear, editar, eliminar y gestionar usuarios.
     """
     
-    def __init__(self, parent, db_manager, **kwargs):
+    def __init__(self, parent, **kwargs):
         """
         Inicializa el administrador de usuarios.
         
         Args:
             parent: Widget padre
-            db_manager: Gestor de base de datos
         """
         super().__init__(parent, **kwargs)
         
         self.logger = get_logger(__name__)
-        self.db_manager = db_manager
         
         # Variables de estado
-        self.usuarios_data: List[Dict] = []
+        self.usuarios_data = []
         self.selected_user = None
         self.modo_edicion = False
         

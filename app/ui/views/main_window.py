@@ -19,7 +19,7 @@ class MainWindow(tb.Window):
     Ventana principal de la aplicación con arquitectura modular.
     """
     
-    def __init__(self, title: str, size: str, theme: str, db_manager):
+    def __init__(self, title: str, size: str, theme: str):
         """
         Inicializa la ventana principal.
         
@@ -27,12 +27,10 @@ class MainWindow(tb.Window):
             title: Título de la ventana
             size: Tamaño inicial (ej: "1200x900")
             theme: Tema de ttkbootstrap
-            db_manager: Gestor de base de datos
         """
         super().__init__(themename=theme)
         
         self.logger = get_logger(__name__)
-        self.db_manager = db_manager
         
         # Configurar ventana
         self.title(title)
@@ -237,7 +235,7 @@ class MainWindow(tb.Window):
             # Limpiar contenido anterior
             self._clear_content()
             
-            solicitud_view = SolicitudView(self.content_frame, self.db_manager)
+            solicitud_view = SolicitudView(self.content_frame)
             solicitud_view.pack(fill=BOTH, expand=True)
             self.current_view = solicitud_view
             
@@ -251,7 +249,7 @@ class MainWindow(tb.Window):
             # Limpiar contenido anterior
             self._clear_content()
             
-            facturas_view = FacturasView(self.content_frame, self.db_manager)
+            facturas_view = FacturasView(self.content_frame)
             facturas_view.pack(fill=BOTH, expand=True)
             self.current_view = facturas_view
             
@@ -267,7 +265,7 @@ class MainWindow(tb.Window):
             # Limpiar contenido anterior
             self._clear_content()
             
-            cheques_view = ChequesView(self.content_frame, self.db_manager)
+            cheques_view = ChequesView(self.content_frame)
             cheques_view.pack(fill=BOTH, expand=True)
             self.current_view = cheques_view
             
@@ -284,7 +282,7 @@ class MainWindow(tb.Window):
             self._clear_content()
             
             # Crear el administrador de usuarios
-            admin_usuarios = AdministradorUsuarios(self.content_frame, self.db_manager)
+            admin_usuarios = AdministradorUsuarios(self.content_frame)
             admin_usuarios.pack(fill=BOTH, expand=True)
             
             # Inicializar con datos

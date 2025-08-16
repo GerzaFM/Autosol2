@@ -7,7 +7,6 @@ from typing import Optional
 
 from config.settings import config
 from app.ui.views.main_window import MainWindow
-from app.core.database import DatabaseManager
 from app.utils.logger import get_logger
 
 class Application:
@@ -19,23 +18,17 @@ class Application:
         """Inicializa la aplicación."""
         self.logger = get_logger(__name__)
         self.window: Optional[MainWindow] = None
-        self.db_manager: Optional[DatabaseManager] = None
         
         self._initialize_components()
     
     def _initialize_components(self):
         """Inicializa los componentes principales de la aplicación."""
         try:
-            # Inicializar gestor de base de datos
-            self.db_manager = DatabaseManager()
-            self.logger.info("Gestor de base de datos inicializado")
-            
             # Inicializar ventana principal
             self.window = MainWindow(
                 title=config.app_name,
                 size=config.ui.window_size,
-                theme=config.ui.theme,
-                db_manager=self.db_manager
+                theme=config.ui.theme
             )
             self.logger.info("Ventana principal inicializada")
             
@@ -65,10 +58,6 @@ class Application:
         """Maneja el cierre de la aplicación."""
         try:
             self.logger.info("Cerrando aplicación")
-            
-            # Limpiar recursos si es necesario
-            if self.db_manager:
-                self.db_manager.close()
             
             # Cerrar ventana
             if self.window:
