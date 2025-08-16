@@ -1,5 +1,6 @@
 """
 Ventana principal de la aplicación refactorizada.
+MainApp - Aplicación independiente en src/
 """
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
@@ -9,13 +10,11 @@ import sys
 import os
 
 from config.settings import config
-from app.ui.components.sidebar import SidebarComponent
+from .sidebar import SidebarComponent
 
 from app.utils.logger import get_logger
 
-# Importar aplicaciones legacy directamente
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
-
+# Importar aplicaciones directamente (estamos en src/)
 try:
     from solicitudapp.solicitud_app_professional import SolicitudApp
 except ImportError:
@@ -170,18 +169,6 @@ class MainWindow(tb.Window):
             lambda: self._show_view("cheques"), 
             "top"
         )
-        """
-        self.sidebar.add_menu_item(
-            "Reportes", "📊", 
-            lambda: self._show_view("reportes"), 
-            "top"
-        )
-        self.sidebar.add_menu_item(
-            "Pagos", "💵", 
-            lambda: self._show_view("pagos"), 
-            "top"
-        )
-        """
         
         # Elementos de configuración (parte inferior)
         self.sidebar.add_menu_item(
@@ -335,16 +322,6 @@ class MainWindow(tb.Window):
         except Exception as e:
             self.logger.error(f"Error al crear aplicación de usuarios: {e}")
             self._show_error_view(f"Error al cargar aplicación de usuarios: {str(e)}")
-    
-    def _accion_personalizada(self, accion: str):
-        """
-        Método de ejemplo para manejar acciones de tu nueva vista.
-        
-        Args:
-            accion: Nombre de la acción ejecutada
-        """
-        self.logger.info(f"Acción ejecutada: {accion}")
-        # Aquí puedes agregar la lógica específica para cada acción
     
     def _show_placeholder_view(self, view_name: str):
         """

@@ -6,7 +6,7 @@ import ttkbootstrap as tb
 from typing import Optional
 
 from config.settings import config
-from app.ui.views.main_window import MainWindow
+from mainapp import MainApp
 from app.utils.logger import get_logger
 
 class Application:
@@ -17,15 +17,15 @@ class Application:
     def __init__(self):
         """Inicializa la aplicación."""
         self.logger = get_logger(__name__)
-        self.window: Optional[MainWindow] = None
+        self.app: Optional[MainApp] = None
         
         self._initialize_components()
     
     def _initialize_components(self):
         """Inicializa los componentes principales de la aplicación."""
         try:
-            # Inicializar ventana principal
-            self.window = MainWindow(
+            # Inicializar aplicación principal
+            self.app = MainApp(
                 title=config.app_name,
                 size=config.ui.window_size,
                 theme=config.ui.theme
@@ -41,14 +41,14 @@ class Application:
         try:
             self.logger.info("Iniciando aplicación")
             
-            if not self.window:
-                raise RuntimeError("La ventana principal no está inicializada")
+            if not self.app:
+                raise RuntimeError("La aplicación principal no está inicializada")
             
             # Configurar eventos de cierre
-            self.window.protocol("WM_DELETE_WINDOW", self._on_closing)
+            self.app.main_window.protocol("WM_DELETE_WINDOW", self._on_closing)
             
             # Iniciar el bucle principal
-            self.window.mainloop()
+            self.app.run()
             
         except Exception as e:
             self.logger.error(f"Error al ejecutar la aplicación: {e}")
@@ -59,10 +59,10 @@ class Application:
         try:
             self.logger.info("Cerrando aplicación")
             
-            # Cerrar ventana
-            if self.window:
-                self.window.quit()
-                self.window.destroy()
+            # Cerrar aplicación
+            if self.app and self.app.main_window:
+                self.app.main_window.quit()
+                self.app.main_window.destroy()
                 
         except Exception as e:
             self.logger.error(f"Error al cerrar la aplicación: {e}")

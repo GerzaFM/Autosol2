@@ -6,9 +6,10 @@ import os
 import logging
 from pathlib import Path
 
-# Agregar el directorio raíz al path
+# Agregar el directorio raíz y src al path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / 'src'))
 
 from config.settings import config, LOGS_DIR
 from app.core.application import Application

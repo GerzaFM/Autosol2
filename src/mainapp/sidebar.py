@@ -1,5 +1,6 @@
 """
 Componente de barra lateral (sidebar) reutilizable.
+MainApp - Sidebar independiente en src/mainapp/
 """
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
