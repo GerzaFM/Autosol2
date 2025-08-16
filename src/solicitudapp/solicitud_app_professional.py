@@ -23,7 +23,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
-from solicitudapp.models.solicitud import Solicitud, Proveedor, Concepto, Totales
+# from solicitudapp.models.solicitud import Solicitud, Proveedor, Concepto, Totales  # ELIMINADO: No se usa
 from solicitudapp.services.validation import ValidationService
 from solicitudapp.config.app_config import AppConfig
 from solicitudapp.views.components import ProveedorFrame, SolicitudFrame, ConceptoPopup, BaseFrame
@@ -65,7 +65,7 @@ class SolicitudApp(tb.Frame):
         
         # Estado de la aplicación
         self.solicitudes_restantes = 0
-        self.solicitud_actual: Optional[Solicitud] = None
+        self.solicitud_actual = None  # Eliminado type hint Optional[Solicitud]
         self.factura_duplicada = False  # Flag para indicar si la factura está duplicada
         self.folio_interno_manual = None  # Almacenar folio interno ingresado manualmente
         self.folio_segunda_factura = None  # Almacenar folio para la segunda factura en división
