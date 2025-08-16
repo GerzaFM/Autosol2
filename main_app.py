@@ -30,7 +30,7 @@ def main():
     """Función principal de la aplicación."""
     try:
         setup_environment()
-        
+         
         # Crear e iniciar la aplicación
         app = Application()
         app.run()

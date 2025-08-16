@@ -239,6 +239,10 @@ class ChequeAppProfessional(tb.Frame):
 
                 self.cargar_table.heading(col, text=col.capitalize(), anchor=W)
                 self.cargar_table.column(col, anchor=W)
+            
+            # Configurar ordenamiento para los TreeViews
+            self._setup_treeview_sorting(self.cheque_table, columns)
+            self._setup_treeview_sorting(self.cargar_table, columns)
 
             # Definir ancho de columnas (opcional)
             c_smallest = 30
@@ -315,6 +319,9 @@ class ChequeAppProfessional(tb.Frame):
             for col in columns:
                 self.layout_table.heading(col, text=col.capitalize(), anchor=W)
                 self.layout_table.column(col, anchor=W)
+            
+            # Configurar ordenamiento para layout_table
+            self._setup_treeview_sorting(self.layout_table, columns)
 
             self.layout_table.column("id", width=c_smallest)
             self.layout_table.column("fecha", width=c_smallest)
@@ -367,6 +374,9 @@ class ChequeAppProfessional(tb.Frame):
             for col in columns:
                 self.layout.heading(col, text=col.capitalize(), anchor=W)
                 self.layout.column(col, anchor=W)
+            
+            # Configurar ordenamiento para layout
+            self._setup_treeview_sorting(self.layout, columns)
 
             self.layout.column("alias", width=c_small-20)
             self.layout.column("nombre", width=c_medium)
@@ -446,6 +456,64 @@ class ChequeAppProfessional(tb.Frame):
         except Exception as e:
             self.logger.error(f"Error en post-inicialización: {e}")
     
+    def _setup_treeview_sorting(self, treeview, columns):
+        """Configura el ordenamiento para un TreeView específico."""
+        self.sort_columns = {}  # Diccionario para rastrear orden actual por columna
+        
+        for col in columns:
+            # Bind del evento de clic en el encabezado
+            treeview.heading(col, command=lambda c=col, tv=treeview: self._sort_treeview(tv, c))
+    
+    def _sort_treeview(self, treeview, col):
+        """Ordena el TreeView por la columna especificada."""
+        try:
+            # Obtener todos los elementos del TreeView
+            items = [(treeview.set(item, col), item) for item in treeview.get_children('')]
+            
+            # Determinar si es ordenamiento ascendente o descendente
+            treeview_id = str(id(treeview))
+            if treeview_id not in self.sort_columns:
+                self.sort_columns[treeview_id] = {}
+            
+            reverse = self.sort_columns[treeview_id].get(col, False)
+            
+            # Intentar ordenamiento numérico primero, luego alfabético
+            try:
+                # Para columnas numéricas (monto, id, etc.)
+                if col in ['monto', 'importe', 'id']:
+                    items.sort(key=lambda x: float(x[0]) if x[0] and str(x[0]).replace('.', '').replace(',', '').replace('-', '').isdigit() else 0, reverse=reverse)
+                else:
+                    # Para columnas de texto
+                    items.sort(key=lambda x: str(x[0]).lower() if x[0] else '', reverse=reverse)
+            except (ValueError, TypeError):
+                # Si falla el ordenamiento numérico, usar alfabético
+                items.sort(key=lambda x: str(x[0]).lower() if x[0] else '', reverse=reverse)
+            
+            # Reorganizar elementos en el TreeView
+            for index, (val, item) in enumerate(items):
+                treeview.move(item, '', index)
+            
+            # Actualizar el estado de ordenamiento
+            self.sort_columns[treeview_id][col] = not reverse
+            
+            # Actualizar el indicador visual en el encabezado
+            for column in treeview['columns']:
+                if column == col:
+                    # Agregar indicador de dirección
+                    direction = " ↓" if reverse else " ↑"
+                    current_text = treeview.heading(column)['text']
+                    # Remover indicadores anteriores
+                    clean_text = current_text.replace(" ↑", "").replace(" ↓", "")
+                    treeview.heading(column, text=clean_text + direction)
+                else:
+                    # Limpiar indicadores de otras columnas
+                    current_text = treeview.heading(column)['text']
+                    clean_text = current_text.replace(" ↑", "").replace(" ↓", "")
+                    treeview.heading(column, text=clean_text)
+                    
+        except Exception as e:
+            self.logger.error(f"Error al ordenar TreeView por columna {col}: {e}")
+
     def refresh(self):
         """Refresca la aplicación (método requerido por la nueva arquitectura)."""
         try:

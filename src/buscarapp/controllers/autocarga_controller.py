@@ -17,10 +17,12 @@ try:
     from ..utils.dialog_utils import DialogUtils
     from ..autocarga.autocarga import AutoCarga
     from ..autocarga.provider_matcher import ProviderMatcher
+    from ..views.dialogo_asociacion_manual import mostrar_dialogo_asociacion_manual
 except ImportError:
     from utils.dialog_utils import DialogUtils
     from autocarga.autocarga import AutoCarga
     from autocarga.provider_matcher import ProviderMatcher
+    from views.dialogo_asociacion_manual import mostrar_dialogo_asociacion_manual
 
 
 class AutocargaController:
@@ -462,10 +464,22 @@ class AutocargaController:
                 ruta_carpeta=config['ruta_carpeta'],
                 dias_atras=config['dias_atras']
             )
+            
+            # DIAGNÓSTICO: Verificar que el parámetro se pasó correctamente
+            self.logger.info(f"🔍 DIAGNÓSTICO - Días configurados en AutoCarga: {autocarga.dias_atras}")
 
             # Buscar archivos para saber el total
             lista_vales, lista_ordenes = autocarga.buscar_archivos()
             total_archivos = len(lista_vales) + len(lista_ordenes)
+            
+            # DIAGNÓSTICO: Mostrar qué archivos se encontraron
+            self.logger.info(f"📁 DIAGNÓSTICO - Archivos encontrados con {config['dias_atras']} días:")
+            self.logger.info(f"   📄 Vales: {len(lista_vales)}")
+            self.logger.info(f"   📋 Órdenes: {len(lista_ordenes)}")
+            if lista_vales:
+                self.logger.info(f"   📝 Primer vale: {os.path.basename(lista_vales[0])}")
+            if lista_ordenes:
+                self.logger.info(f"   📝 Primera orden: {os.path.basename(lista_ordenes[0])}")
 
             import threading
             progreso_window, barra = (None, None)
@@ -588,11 +602,22 @@ class AutocargaController:
         periodo_frame = ttk.LabelFrame(main_frame, text="📅 Período de Búsqueda", padding=10)
         periodo_frame.pack(fill="x", pady=(0, 15))
         
-        ttk.Label(periodo_frame, text="Buscar archivos modificados en los últimos:").pack(anchor="w")
+        ttk.Label(
+            periodo_frame, 
+            text="Buscar archivos modificados en los últimos:",
+            font=("Segoe UI", 9, "bold")
+        ).pack(anchor="w")
         
-        dias_var = ttk.IntVar(value=1)
+        dias_var = ttk.IntVar(value=2)  # Cambiado a 2 días por defecto
         dias_frame = ttk.Frame(periodo_frame)
-        dias_frame.pack(fill="x", pady=(5, 0))
+        dias_frame.pack(fill="x", pady=(10, 0))
+        
+        # Añadir etiqueta con instrucciones
+        ttk.Label(
+            dias_frame,
+            text="Días:",
+            font=("Segoe UI", 9)
+        ).pack(side="left", padx=(0, 10))
         
         ttk.Scale(
             dias_frame,
@@ -602,7 +627,12 @@ class AutocargaController:
             orient="horizontal"
         ).pack(side="left", fill="x", expand=True, padx=(0, 10))
         
-        dias_label = ttk.Label(dias_frame, text="1 día")
+        dias_label = ttk.Label(
+            dias_frame, 
+            text="2 días",
+            font=("Segoe UI", 10, "bold"),
+            bootstyle="primary"
+        )
         dias_label.pack(side="right")
         
         def actualizar_dias_label(event=None):
@@ -704,17 +734,25 @@ class AutocargaController:
             for vale_id, vale_data in vales.items():
                 try:
                     self._procesar_vale_individual(vale_data, contadores, facturas_seleccionadas)
+                    
+                    # Verificar si el usuario canceló el proceso
+                    if contadores.get('cancelado_por_usuario', False):
+                        self.logger.info("🚫 Proceso de autocarga cancelado por el usuario")
+                        break
+                        
                 except Exception as e:
                     self.logger.error(f"Error procesando vale {vale_id}: {e}")
                     contadores['errores'] += 1
             
-            # Procesar órdenes
-            for orden_id, orden_data in ordenes.items():
-                try:
-                    self._procesar_orden_individual(orden_data, contadores)
-                except Exception as e:
-                    self.logger.error(f"Error procesando orden {orden_id}: {e}")
-                    contadores['errores'] += 1
+            # Solo procesar órdenes si no fue cancelado
+            if not contadores.get('cancelado_por_usuario', False):
+                # Procesar órdenes
+                for orden_id, orden_data in ordenes.items():
+                    try:
+                        self._procesar_orden_individual(orden_data, contadores)
+                    except Exception as e:
+                        self.logger.error(f"Error procesando orden {orden_id}: {e}")
+                        contadores['errores'] += 1
             
             # Mostrar reporte final
             self._mostrar_reporte_procesamiento(stats, contadores, facturas_seleccionadas)
@@ -828,36 +866,122 @@ class AutocargaController:
                     return partes[0].strip(), partes[1].strip()
                 return None, None
 
+            def normalizar_folio_para_comparacion(folio_str):
+                """
+                Normaliza un folio para comparación flexible.
+                Extrae la parte principal del folio ignorando prefijos/sufijos.
+                
+                Ejemplos:
+                - 'B1-405721387T1' -> '405721387'
+                - 'TP-B1-405721387T1' -> '405721387' 
+                - '123456' -> '123456'
+                - 'A-123-B' -> '123'
+                """
+                if not folio_str:
+                    return ''
+                
+                # Remover espacios y convertir a string
+                folio_clean = str(folio_str).strip()
+                
+                # Si es solo dígitos, retornar tal como está
+                if folio_clean.isdigit():
+                    return folio_clean
+                
+                # Buscar la secuencia de dígitos más larga
+                import re
+                numeros = re.findall(r'\d+', folio_clean)
+                if numeros:
+                    # Retornar el número más largo encontrado
+                    return max(numeros, key=len)
+                
+                # Si no hay números, retornar el folio normalizado sin guiones
+                return folio_clean.replace('-', '').replace(' ', '')
+
+            def folios_son_equivalentes(folio1, folio2):
+                """
+                Compara dos folios usando normalización flexible.
+                
+                Args:
+                    folio1, folio2: Los folios a comparar
+                    
+                Returns:
+                    bool: True si son equivalentes
+                """
+                if not folio1 or not folio2:
+                    return False
+                
+                # Normalizar ambos folios
+                norm1 = normalizar_folio_para_comparacion(folio1)
+                norm2 = normalizar_folio_para_comparacion(folio2)
+                
+                # Comparar normalizados
+                return norm1 == norm2 and len(norm1) > 0
+
             def buscar_factura_asociada(no_documento, facturas_seleccionadas, nombre_vale=""):
+                """
+                Busca facturas que coincidan con el número de documento del vale.
+                LÓGICA SIMPLIFICADA: Intenta diferentes estrategias de matching
+                """
                 if not no_documento or not facturas_seleccionadas:
                     return None, None
                 
-                # Analizar el tipo de No Documento: ¿es "SERIE-FOLIO" o solo "FOLIO"?
-                doc_serie, doc_folio = extraer_serie_folio(no_documento)
-                doc_norm = normalizar_documento(no_documento)
-                
-                if doc_serie and doc_folio:
-                    self.logger.debug(f"🔍 No Documento '{no_documento}' parece ser SERIE-FOLIO: serie='{doc_serie}', folio='{doc_folio}'")
-                    es_serie_folio = True
-                else:
-                    self.logger.debug(f"🔍 No Documento '{no_documento}' parece ser solo FOLIO o formato desconocido")
-                    es_serie_folio = False
-                
-                self.logger.debug(f"🔍 Buscando asociación para vale {nombre_vale}: No Documento '{no_documento}' (normalizado: '{doc_norm}')")
+                self.logger.debug(f"🔍 Buscando asociación para vale {nombre_vale}: No Documento '{no_documento}'")
                 self.logger.info(f"📊 DEBUGGING - Total facturas seleccionadas: {len(facturas_seleccionadas)}")
                 
                 for i, factura_data in enumerate(facturas_seleccionadas):
                     try:
-                        # DEBUG: Mostrar datos completos de la factura
-                        self.logger.debug(f"   🔍 FACTURA {i+1}: {factura_data}")
-                        
-                        # Obtener datos directamente del diccionario de factura
+                        # Obtener datos de la factura
                         serie_folio = factura_data.get('serie_folio', '')
-                        serie_original = factura_data.get('serie', '')
-                        folio_original = factura_data.get('folio', '')
+                        serie = factura_data.get('serie', '').strip()
+                        folio = str(factura_data.get('folio', '')).strip()
+                        folio_interno = factura_data.get('folio_interno', '')
                         
-                        # DEBUG: Mostrar valores RAW antes de procesamiento
-                        self.logger.debug(f"   📋 Valores RAW: serie_folio='{serie_folio}', serie='{serie_original}', folio='{folio_original}'")
+                        self.logger.debug(f"   🔍 FACTURA {i+1}: serie='{serie}', folio='{folio}', serie_folio='{serie_folio}'")
+                        
+                        # ESTRATEGIA 1: Coincidencia exacta completa
+                        # Comparar no_documento con serie_folio completo
+                        if serie_folio and no_documento in serie_folio:
+                            self.logger.info(f"   ✅ Coincidencia EXACTA en serie_folio: '{no_documento}' está en '{serie_folio}'")
+                            try:
+                                if serie:
+                                    factura_encontrada = Factura.get((Factura.serie == serie) & (Factura.folio == folio))
+                                else:
+                                    factura_encontrada = Factura.get(Factura.folio == folio)
+                                return factura_encontrada, "serie_folio_exacto"
+                            except Exception as e:
+                                self.logger.warning(f"   ❌ Error buscando factura: {e}")
+                                continue
+                        
+                        # ESTRATEGIA 2: Coincidencia por folio solamente
+                        # Comparar no_documento con folio de la factura
+                        if folio and folios_son_equivalentes(no_documento, folio):
+                            self.logger.info(f"   ✅ Coincidencia por FOLIO: '{no_documento}' ≈ '{folio}'")
+                            try:
+                                if serie:
+                                    factura_encontrada = Factura.get((Factura.serie == serie) & (Factura.folio == folio))
+                                else:
+                                    factura_encontrada = Factura.get(Factura.folio == folio)
+                                return factura_encontrada, "folio_equivalente"
+                            except Exception as e:
+                                self.logger.warning(f"   ❌ Error buscando factura: {e}")
+                                continue
+                        
+                        # ESTRATEGIA 3: Buscar por núcleo numérico
+                        # Extraer números y comparar
+                        no_doc_numerico = normalizar_folio_para_comparacion(no_documento)
+                        folio_numerico = normalizar_folio_para_comparacion(folio)
+                        
+                        if no_doc_numerico and folio_numerico and no_doc_numerico == folio_numerico:
+                            self.logger.info(f"   ✅ Coincidencia NUMÉRICA: '{no_doc_numerico}' (de '{no_documento}') = '{folio_numerico}' (de '{folio}')")
+                            try:
+                                if serie:
+                                    factura_encontrada = Factura.get((Factura.serie == serie) & (Factura.folio == folio))
+                                else:
+                                    factura_encontrada = Factura.get(Factura.folio == folio)
+                                return factura_encontrada, "numerico_equivalente"
+                            except Exception as e:
+                                self.logger.warning(f"   ❌ Error buscando factura: {e}")
+                                continue
                         
                         # Si no tenemos serie y folio directamente, extraerlos del folio_xml
                         if not serie_original or not folio_original:
@@ -872,164 +996,13 @@ class AutocargaController:
                                     except ValueError:
                                         folio_original = partes[1].strip()
                                     self.logger.debug(f"   ✅ Extraído: serie='{serie_original}', folio='{folio_original}'")
-                        
-                        # Convertir a strings para evitar errores de tipo
-                        serie_folio = str(serie_folio).strip() if serie_folio else ''
-                        serie = str(serie_original).strip() if serie_original else ''
-                        folio_str = str(folio_original).strip() if folio_original not in [None, ''] else ''
-                        
-                        # DEBUG: Mostrar valores procesados
-                        self.logger.debug(f"   🎯 Valores PROCESADOS: serie_folio='{serie_folio}', serie='{serie}', folio_str='{folio_str}'")
-                        
-                        if not serie_folio:
-                            self.logger.debug(f"   ⚠️ Saltando factura sin serie_folio")
-                            continue
-                        
-                        self.logger.debug(f"   📋 Verificando factura: '{serie_folio}' - Serie: '{serie}', Folio: '{folio_str}'")
-                        
-                        # ===== CASO 1: No Documento es SERIE-FOLIO (ej: "A-123", "CFDI 456") =====
-                        if es_serie_folio and doc_serie and doc_folio:
-                            self.logger.debug(f"   🔍 CASO 1 - SERIE-FOLIO: Comparando doc_serie='{doc_serie}' con serie='{serie}' y doc_folio='{doc_folio}' con folio_str='{folio_str}'")
-                            
-                            # 1.1. Coincidencia exacta: serie y folio coinciden
-                            if serie == doc_serie and folio_str == doc_folio:
-                                self.logger.info(f"   ✅ Coincidencia exacta SERIE-FOLIO para vale {nombre_vale}: {doc_serie}-{doc_folio} = {serie}-{folio_str}")
-                                try:
-                                    if folio_str.isdigit():
-                                        factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                        return factura_asociada, "serie_folio_exacto"
-                                except Exception as e:
-                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                    continue
-                            else:
-                                self.logger.debug(f"   ❌ NO coincide exacto: serie '{serie}' != '{doc_serie}' O folio '{folio_str}' != '{doc_folio}'")
-                            
-                            # 1.2. Coincidencia normalizada: comparar serie_folio completo normalizado
-                            serie_folio_norm = normalizar_documento(serie_folio)
-                            self.logger.debug(f"   🔍 Comparando normalizado: '{serie_folio_norm}' vs '{doc_norm}'")
-                            if serie_folio_norm == doc_norm:
-                                self.logger.info(f"   ✅ Coincidencia normalizada SERIE-FOLIO para vale {nombre_vale}: '{serie_folio}' ~ '{no_documento}'")
-                                try:
-                                    if serie and folio_str and folio_str.isdigit():
-                                        factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                        return factura_asociada, "serie_folio_normalizado"
-                                except Exception as e:
-                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                    continue
-                            else:
-                                self.logger.debug(f"   ❌ NO coincide normalizado: '{serie_folio_norm}' != '{doc_norm}'")
-                        
-                        # ===== CASO 2: No Documento es solo FOLIO (ej: "123", "456") =====
-                        else:
-                            self.logger.debug(f"   🔍 CASO 2 - SOLO FOLIO: Comparando no_documento='{no_documento}' con folio_str='{folio_str}'")
-                            
-                            # 2.1. Coincidencia directa con folio
-                            if folio_str and folio_str == no_documento:
-                                self.logger.info(f"   ✅ Coincidencia exacta FOLIO para vale {nombre_vale}: folio '{folio_str}' = '{no_documento}'")
-                                try:
-                                    if folio_str.isdigit():
-                                        # Buscar factura por folio (con o sin serie)
-                                        if serie and serie.strip():
-                                            # Caso: Factura con serie
-                                            self.logger.debug(f"   🔍 Buscando en BD: serie='{serie}' AND folio={int(folio_str)}")
-                                            factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                        else:
-                                            # Caso: Factura sin serie (solo folio)
-                                            self.logger.debug(f"   🔍 Buscando en BD: folio={int(folio_str)} (sin serie)")
-                                            factura_asociada = Factura.get(Factura.folio == int(folio_str))
-                                        
-                                        self.logger.info(f"   🎯 FACTURA ENCONTRADA EN BD: {factura_asociada.serie}-{factura_asociada.folio}")
-                                        return factura_asociada, "folio_exacto"
-                                    else:
-                                        self.logger.warning(f"   ❌ folio_str no es dígito: '{folio_str}'")
-                                except Exception as e:
-                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                    self.logger.debug(f"   📍 Intentaba buscar: folio={int(folio_str) if folio_str.isdigit() else 'NO_DIGIT'}, serie='{serie}'")
-                                    continue
-                            else:
-                                self.logger.debug(f"   ❌ NO coincide folio exacto: '{folio_str}' != '{no_documento}'")
-                            
-                            # 2.2. Coincidencia con serie_folio normalizado (por si el folio está dentro)
-                            serie_folio_norm = normalizar_documento(serie_folio)
-                            self.logger.debug(f"   🔍 Verificando si '{no_documento}' está en '{serie_folio_norm}' o termina con él")
-                            if no_documento in serie_folio_norm or serie_folio_norm.endswith(no_documento):
-                                self.logger.info(f"   ✅ Coincidencia FOLIO en serie_folio para vale {nombre_vale}: '{no_documento}' está en '{serie_folio}'")
-                                try:
-                                    if folio_str and folio_str.isdigit():
-                                        # Buscar factura por folio (con o sin serie)
-                                        if serie and serie.strip():
-                                            # Caso: Factura con serie
-                                            self.logger.debug(f"   🔍 Buscando en BD: serie='{serie}' AND folio={int(folio_str)}")
-                                            factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                        else:
-                                            # Caso: Factura sin serie (solo folio)
-                                            self.logger.debug(f"   🔍 Buscando en BD: folio={int(folio_str)} (sin serie)")
-                                            factura_asociada = Factura.get(Factura.folio == int(folio_str))
-                                        
-                                        self.logger.info(f"   🎯 FACTURA ENCONTRADA EN BD: {factura_asociada.serie}-{factura_asociada.folio}")
-                                        return factura_asociada, "folio_en_serie_folio"
-                                    else:
-                                        self.logger.warning(f"   ❌ folio_str no es dígito: '{folio_str}'")
-                                except Exception as e:
-                                    self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                    self.logger.debug(f"   📍 Intentaba buscar: folio={int(folio_str) if folio_str.isdigit() else 'NO_DIGIT'}, serie='{serie}'")
-                                    continue
-                            else:
-                                self.logger.debug(f"   ❌ NO está contenido: '{no_documento}' no está en '{serie_folio_norm}'")
-                        
-                        # ===== CASO 3: Coincidencias adicionales y fallback =====
-                        
-                        # 3.1. Coincidencia con serie (menos común, pero posible)
-                        if serie and serie == no_documento:
-                            self.logger.info(f"   ✅ Coincidencia por SERIE para vale {nombre_vale}: serie '{serie}' = '{no_documento}'")
-                            try:
-                                if folio_str and folio_str.isdigit():
-                                    factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                    return factura_asociada, "serie_exacto"
-                            except Exception as e:
-                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                continue
-                        
-                        # 3.2. Coincidencia parcial general (último recurso)
-                        serie_folio_norm = normalizar_documento(serie_folio)
-                        if doc_norm and len(doc_norm) >= 3 and (doc_norm in serie_folio_norm or serie_folio_norm in doc_norm):
-                            self.logger.info(f"   ✅ Coincidencia PARCIAL para vale {nombre_vale}: '{doc_norm}' <-> '{serie_folio_norm}'")
-                            try:
-                                if folio_str and folio_str.isdigit():
-                                    # Buscar factura por folio (con o sin serie)
-                                    if serie and serie.strip():
-                                        # Caso: Factura con serie
-                                        self.logger.debug(f"   🔍 Buscando en BD: serie='{serie}' AND folio={int(folio_str)}")
-                                        factura_asociada = Factura.get((Factura.serie == serie) & (Factura.folio == int(folio_str)))
-                                    else:
-                                        # Caso: Factura sin serie (solo folio)
-                                        self.logger.debug(f"   🔍 Buscando en BD: folio={int(folio_str)} (sin serie)")
-                                        factura_asociada = Factura.get(Factura.folio == int(folio_str))
-                                    
-                                    self.logger.info(f"   🎯 FACTURA ENCONTrada EN BD: {factura_asociada.serie}-{factura_asociada.folio}")
-                                    return factura_asociada, "parcial"
-                                else:
-                                    self.logger.warning(f"   ❌ folio_str no es dígito: '{folio_str}'")
-                            except Exception as e:
-                                self.logger.warning(f"   ❌ Error buscando factura en BD: {e}")
-                                continue
-                        
-                        self.logger.debug(f"   ❌ Sin coincidencia: '{no_documento}' vs '{serie_folio}' (Serie: '{serie}', Folio: '{folio_str}')")
+                        self.logger.debug(f"   ❌ Sin coincidencia: '{no_documento}' vs '{serie_folio}' (Serie: '{serie}', Folio: '{folio}')")
                     
                     except Exception as e:
                         self.logger.warning(f"   ❌ Error procesando factura {i}: {e}")
                         continue
                 
                 self.logger.info(f"   ⚠️ No se encontró coincidencia para No Documento '{no_documento}' entre {len(facturas_seleccionadas)} facturas")
-                
-                # DEBUG FINAL: Mostrar resumen de todas las facturas que se intentaron comparar
-                self.logger.debug("📋 RESUMEN DE FACTURAS NO COINCIDENTES:")
-                for i, factura_data in enumerate(facturas_seleccionadas):
-                    serie_folio = str(factura_data.get('serie_folio', '')).strip()
-                    serie = str(factura_data.get('serie', '')).strip()
-                    folio = str(factura_data.get('folio', '')).strip()
-                    self.logger.debug(f"   {i+1}. serie_folio='{serie_folio}', serie='{serie}', folio='{folio}'")
-                
                 return None, None
 
             datos_procesados = procesar_datos_vale(vale_data)
@@ -1068,6 +1041,66 @@ class AutocargaController:
                             self.logger.error(f"      ❌ Error asociando vale existente: {e}")
                     else:
                         self.logger.info(f"      ⚠️ Vale existente {datos_procesados['noVale']} - No se encontró coincidencia con facturas seleccionadas")
+                        
+                        # **NUEVA FUNCIONALIDAD: Diálogo de asociación manual para vales existentes**
+                        nombre_proveedor = datos_procesados.get('proveedor', '').strip()
+                        if nombre_proveedor and hasattr(self, 'parent_widget') and self.parent_widget:
+                            # Buscar facturas del mismo proveedor sin asociar
+                            facturas_proveedor = self._buscar_facturas_sin_asociar_por_proveedor(nombre_proveedor, facturas_seleccionadas)
+                            
+                            if facturas_proveedor:
+                                self.logger.info(f"🔍 Encontradas {len(facturas_proveedor)} facturas del proveedor '{nombre_proveedor}' sin asociar - mostrando diálogo")
+                                
+                                # Preparar datos del vale para el diálogo
+                                vale_data_dialogo = {
+                                    'folio_vale': datos_procesados['noVale'],
+                                    'no_documento': datos_procesados.get('noDocumento', ''),
+                                    'total': datos_procesados.get('total', 0),
+                                    'fecha': datos_procesados.get('fechaVale', ''),
+                                    'proveedor': nombre_proveedor
+                                }
+                                
+                                try:
+                                    # Mostrar diálogo de asociación manual
+                                    factura_seleccionada, resultado = mostrar_dialogo_asociacion_manual(
+                                        self.parent_widget, 
+                                        vale_data_dialogo, 
+                                        facturas_proveedor
+                                    )
+                                    
+                                    if resultado == 'asociar' and factura_seleccionada:
+                                        # Usuario seleccionó una factura para asociar
+                                        try:
+                                            from bd.models import Factura
+                                            serie = factura_seleccionada.get('serie', '')
+                                            folio = factura_seleccionada.get('folio', 0)
+                                            
+                                            factura_bd = Factura.get((Factura.serie == serie) & (Factura.folio == folio))
+                                            
+                                            # Asociar el vale existente con la factura seleccionada
+                                            vale_existente.factura = factura_bd
+                                            vale_existente.save()
+                                            contadores['vales_asociados'] += 1
+                                            
+                                            self.logger.info(f"✅ ASOCIACIÓN MANUAL: Vale existente {datos_procesados['noVale']} asociado con factura {serie}-{folio}")
+                                            
+                                        except Exception as e:
+                                            self.logger.error(f"❌ Error en asociación manual: {e}")
+                                            
+                                    elif resultado == 'omitir':
+                                        # Usuario eligió omitir esta asociación
+                                        self.logger.info(f"⏭️ OMITIR: Vale existente {datos_procesados['noVale']} permanecerá sin asociar por decisión del usuario")
+                                        
+                                    elif resultado == 'cancelar':
+                                        # Usuario canceló el proceso completo
+                                        self.logger.info(f"🚫 CANCELAR: Proceso de autocarga cancelado por el usuario")
+                                        contadores['cancelado_por_usuario'] = True
+                                        return  # Salir del procesamiento de este vale
+                                        
+                                except Exception as e:
+                                    self.logger.error(f"❌ Error mostrando diálogo de asociación manual: {e}")
+                            else:
+                                self.logger.info(f"ℹ️ No hay facturas del proveedor '{nombre_proveedor}' disponibles para asociación manual")
                 elif facturas_seleccionadas and tiene_factura and factura_valida:
                     self.logger.info(f"✅ Vale {datos_procesados['noVale']} ya existe y YA ESTÁ ASOCIADO con {vale_existente.factura.serie}-{vale_existente.factura.folio}")
                 self._actualizar_codigo_proveedor(datos_procesados)
@@ -1077,10 +1110,71 @@ class AutocargaController:
             no_documento = datos_procesados.get('noDocumento', '').strip()
             self.logger.debug(f"🔄 Procesando vale: {datos_procesados.get('noVale', 'SIN_NUMERO')}, No Documento: '{no_documento}'")
             factura_asociada, tipo_coincidencia = buscar_factura_asociada(no_documento, facturas_seleccionadas, datos_procesados['noVale'])
+            
             if factura_asociada:
                 self.logger.info(f"✅ Vale {datos_procesados['noVale']} será asociado con factura {factura_asociada.serie}-{factura_asociada.folio} (tipo: {tipo_coincidencia})")
             elif facturas_seleccionadas:
                 self.logger.info(f"⚠️ Vale {datos_procesados['noVale']} - No Documento '{no_documento}' no coincide con ninguna factura seleccionada")
+                
+                # **NUEVA FUNCIONALIDAD: Diálogo de asociación manual**
+                # Buscar si hay facturas del mismo proveedor disponibles para asociación manual
+                nombre_proveedor = datos_procesados.get('proveedor', '').strip()
+                if nombre_proveedor and hasattr(self, 'parent_widget') and self.parent_widget:
+                    # Buscar facturas del mismo proveedor sin asociar
+                    facturas_proveedor = self._buscar_facturas_sin_asociar_por_proveedor(nombre_proveedor, facturas_seleccionadas)
+                    
+                    if facturas_proveedor:
+                        self.logger.info(f"🔍 Encontradas {len(facturas_proveedor)} facturas del proveedor '{nombre_proveedor}' sin asociar")
+                        
+                        # Preparar datos del vale para el diálogo
+                        vale_data_dialogo = {
+                            'folio_vale': datos_procesados['noVale'],
+                            'no_documento': no_documento,
+                            'total': datos_procesados.get('total', 0),
+                            'fecha': datos_procesados.get('fechaVale', ''),
+                            'proveedor': nombre_proveedor
+                        }
+                        
+                        try:
+                            # Mostrar diálogo de asociación manual
+                            factura_seleccionada, resultado = mostrar_dialogo_asociacion_manual(
+                                self.parent_widget, 
+                                vale_data_dialogo, 
+                                facturas_proveedor
+                            )
+                            
+                            if resultado == 'asociar' and factura_seleccionada:
+                                # Usuario seleccionó una factura para asociar
+                                try:
+                                    from bd.models import Factura
+                                    serie = factura_seleccionada.get('serie', '')
+                                    folio = factura_seleccionada.get('folio', 0)
+                                    
+                                    factura_bd = Factura.get((Factura.serie == serie) & (Factura.folio == folio))
+                                    factura_asociada = factura_bd
+                                    tipo_coincidencia = "asociacion_manual"
+                                    
+                                    self.logger.info(f"✅ ASOCIACIÓN MANUAL: Vale {datos_procesados['noVale']} será asociado con factura {serie}-{folio}")
+                                    
+                                except Exception as e:
+                                    self.logger.error(f"❌ Error en asociación manual: {e}")
+                                    factura_asociada = None
+                                    
+                            elif resultado == 'omitir':
+                                # Usuario eligió omitir esta asociación
+                                self.logger.info(f"⏭️ OMITIR: Vale {datos_procesados['noVale']} se creará sin asociar por decisión del usuario")
+                                
+                            elif resultado == 'cancelar':
+                                # Usuario canceló el proceso completo
+                                self.logger.info(f"🚫 CANCELAR: Proceso de autocarga cancelado por el usuario")
+                                contadores['cancelado_por_usuario'] = True
+                                return  # Salir del procesamiento de este vale
+                                
+                        except Exception as e:
+                            self.logger.error(f"❌ Error mostrando diálogo de asociación manual: {e}")
+                    else:
+                        self.logger.info(f"ℹ️ No hay facturas del proveedor '{nombre_proveedor}' disponibles para asociación manual")
+                        
             else:
                 self.logger.warning("No hay facturas seleccionadas para asociar vales")
             
@@ -1179,6 +1273,120 @@ class AutocargaController:
             self.logger.error(f"Error en asociación inteligente: {e}")
             
         return None
+
+    def _obtener_vales_disponibles_por_proveedor(self, nombre_proveedor: str, vales_procesados: Dict) -> List[Dict]:
+        """
+        Obtiene vales disponibles del mismo proveedor que no han sido asociados
+        
+        Args:
+            nombre_proveedor: Nombre del proveedor a buscar
+            vales_procesados: Diccionario de vales procesados en esta sesión
+            
+        Returns:
+            List[Dict]: Lista de vales disponibles del proveedor
+        """
+        try:
+            from bd.models import Vale, Proveedor
+            from ..autocarga.provider_matcher import ProviderMatcher
+            
+            vales_disponibles = []
+            matcher = ProviderMatcher()
+            
+            # Buscar en vales procesados en esta sesión
+            for vale_id, vale_data in vales_procesados.items():
+                vale_nombre = vale_data.get('Nombre', '').strip()
+                
+                # Comparar nombres normalizados
+                if matcher.normalize_name(vale_nombre) == matcher.normalize_name(nombre_proveedor):
+                    # Verificar si este vale ya tiene una factura asociada en la BD
+                    folio_vale = vale_data.get('Folio', '')
+                    if folio_vale:
+                        try:
+                            vale_bd = Vale.get_or_none(Vale.folio == folio_vale)
+                            if not vale_bd or not vale_bd.factura:
+                                # Vale no asociado, agregarlo a la lista
+                                vale_info = {
+                                    'folio_vale': folio_vale,
+                                    'no_documento': vale_data.get('No_Documento', ''),
+                                    'total': vale_data.get('Total', 0),
+                                    'fecha': vale_data.get('Fecha', ''),
+                                    'nombre': vale_nombre,
+                                    'datos_completos': vale_data
+                                }
+                                vales_disponibles.append(vale_info)
+                        except Exception as e:
+                            self.logger.warning(f"Error verificando vale {folio_vale}: {e}")
+            
+            self.logger.info(f"Encontrados {len(vales_disponibles)} vales disponibles para proveedor '{nombre_proveedor}'")
+            return vales_disponibles
+            
+        except Exception as e:
+            self.logger.error(f"Error obteniendo vales disponibles: {e}")
+            return []
+
+    def _buscar_facturas_sin_asociar_por_proveedor(self, nombre_proveedor: str, facturas_seleccionadas: List[Dict]) -> List[Dict]:
+        """
+        Busca facturas del mismo proveedor en las facturas seleccionadas que no están asociadas con vales
+        
+        Args:
+            nombre_proveedor: Nombre del proveedor a buscar
+            facturas_seleccionadas: Lista de facturas seleccionadas en esta sesión
+            
+        Returns:
+            List[Dict]: Lista de facturas del proveedor sin asociar
+        """
+        try:
+            from bd.models import Vale, Factura
+            from ..autocarga.provider_matcher import ProviderMatcher
+            
+            facturas_disponibles = []
+            matcher = ProviderMatcher()
+            nombre_normalizado = matcher.normalize_name(nombre_proveedor)
+            
+            for factura_data in facturas_seleccionadas:
+                # Obtener nombre del emisor de la factura
+                nombre_emisor = factura_data.get('nombre_emisor', '').strip()
+                if not nombre_emisor:
+                    continue
+                    
+                # Comparar nombres normalizados
+                if matcher.normalize_name(nombre_emisor) == nombre_normalizado:
+                    # Es del mismo proveedor, verificar si ya tiene vale asociado
+                    serie = factura_data.get('serie', '')
+                    folio = factura_data.get('folio', 0)
+                    
+                    if serie and folio:
+                        try:
+                            # Buscar la factura en la BD y verificar si tiene vales asociados
+                            factura_bd = Factura.get_or_none((Factura.serie == serie) & (Factura.folio == folio))
+                            
+                            if factura_bd:
+                                # Verificar si esta factura ya tiene un vale asociado
+                                vales_asociados = Vale.select().where(Vale.factura == factura_bd).count()
+                                
+                                if vales_asociados == 0:
+                                    # Factura sin vale asociado, agregarla a la lista
+                                    factura_info = {
+                                        'serie': serie,
+                                        'folio': folio,
+                                        'total': factura_data.get('total', 0),
+                                        'fecha': factura_data.get('fecha', ''),
+                                        'nombre_emisor': nombre_emisor,
+                                        'datos_completos': factura_data
+                                    }
+                                    facturas_disponibles.append(factura_info)
+                            else:
+                                self.logger.warning(f"Factura {serie}-{folio} no encontrada en BD")
+                                
+                        except Exception as e:
+                            self.logger.warning(f"Error verificando factura {serie}-{folio}: {e}")
+            
+            self.logger.info(f"Encontradas {len(facturas_disponibles)} facturas sin asociar para proveedor '{nombre_proveedor}'")
+            return facturas_disponibles
+            
+        except Exception as e:
+            self.logger.error(f"Error buscando facturas sin asociar: {e}")
+            return []
 
     def _actualizar_cuenta_mayor_proveedor(self, proveedor, cuenta_mayor, orden_id):
         """

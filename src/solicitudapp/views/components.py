@@ -400,8 +400,20 @@ class ConceptoPopup:
         self.popup.grab_set()
         self.popup.resizable(False, False)
         
-        # Centrar el popup
+        # Centrar la ventana en la pantalla
         self.popup.transient(self.parent)
+        
+        # Calcular posición para centrar
+        self.popup.update_idletasks()  # Asegurar que las dimensiones estén actualizadas
+        window_width = 720
+        window_height = 120
+        screen_width = self.popup.winfo_screenwidth()
+        screen_height = self.popup.winfo_screenheight()
+        
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.popup.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
         labels = ["Cantidad", "Descripción", "Precio", "Total"]
         
@@ -427,8 +439,8 @@ class ConceptoPopup:
             command=self._on_ok
         ).grid(row=2, column=0, columnspan=len(labels), pady=12)
         
-        # Focus en el primer campo
-        self.entries["Cantidad"].focus()
+        # Focus en el campo Descripción
+        self.entries["Descripción"].focus()
         
         # Bind Enter key
         self.popup.bind('<Return>', lambda e: self._on_ok())

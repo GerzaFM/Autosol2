@@ -91,6 +91,51 @@ class ProviderMatcher:
         
         return normalized
     
+    def remove_legal_suffixes(self, name: str) -> str:
+        """
+        Remueve sufijos legales comunes de nombres de empresas para comparación.
+        
+        Args:
+            name (str): Nombre normalizado
+            
+        Returns:
+            str: Nombre sin sufijos legales
+        """
+        if not name:
+            return ""
+        
+        # Lista de sufijos legales comunes (ya normalizados)
+        legal_suffixes = [
+            'SA',           # S.A.
+            'SADECV',       # S.A. DE C.V.
+            'SADERL',       # S.A. DE R.L.
+            'SDERL',        # S. DE R.L.
+            'SCDERL',       # S.C. DE R.L.
+            'SRL',          # S.R.L.
+            'SRCV',         # S.R. DE C.V.
+            'SC',           # S.C.
+            'SOCIEDAD',     # SOCIEDAD
+            'CIA',          # COMPAÑIA / CIA
+            'COMPANIA',     # COMPAÑIA
+            'CORP',         # CORPORACION
+            'CORPORACION',  # CORPORACION
+            'LTDA',         # LIMITADA
+            'LIMITED',      # LIMITED
+            'LTD',          # LTD
+            'INC',          # INCORPORATED
+            'INCORPORATED', # INCORPORATED
+            'LLC',          # LLC
+        ]
+        
+        # Remover sufijos del final
+        name_cleaned = name
+        for suffix in legal_suffixes:
+            if name_cleaned.endswith(suffix):
+                name_cleaned = name_cleaned[:-len(suffix)]
+                break  # Solo remover un sufijo
+        
+        return name_cleaned
+    
     def find_provider_by_code(self, codigo_quiter: str) -> Optional[object]:
         """
         Busca un proveedor por su código QuiteR.
@@ -134,24 +179,31 @@ class ProviderMatcher:
             for proveedor in proveedores:
                 normalized_db = self.normalize_name(proveedor.nombre)
                 
-                # Comparación exacta
+                # 1. Comparación exacta
                 if normalized_db == normalized_target:
                     return proveedor
                 
-                # Comparación parcial - el nombre del PDF puede incluir "SADECV" extra
+                # 2. Comparación sin sufijos legales
+                target_sin_sufijos = self.remove_legal_suffixes(normalized_target)
+                db_sin_sufijos = self.remove_legal_suffixes(normalized_db)
+                
+                if target_sin_sufijos and db_sin_sufijos and target_sin_sufijos == db_sin_sufijos:
+                    return proveedor
+                
+                # 3. Comparación parcial - el nombre del PDF puede incluir "SADECV" extra
                 if normalized_target.endswith('SADECV'):
                     # Quitar "SADECV" del final y comparar
                     target_sin_sadecv = normalized_target[:-6]  # Quitar "SADECV"
                     if normalized_db == target_sin_sadecv:
                         return proveedor
                 
-                # Comparación inversa - el nombre de BD puede ser más completo
+                # 4. Comparación inversa - el nombre de BD puede ser más completo
                 if normalized_db.endswith('SADECV'):
                     db_sin_sadecv = normalized_db[:-6]
                     if db_sin_sadecv == normalized_target:
                         return proveedor
                 
-                # Comparación por contención - uno contiene al otro
+                # 5. Comparación por contención - uno contiene al otro
                 if len(normalized_target) > 10 and len(normalized_db) > 10:
                     if normalized_target in normalized_db or normalized_db in normalized_target:
                         # Verificar que la coincidencia sea significativa (>80% del nombre más corto)

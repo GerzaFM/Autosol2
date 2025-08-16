@@ -294,7 +294,15 @@ class Cheque:
         if self.factura.get('concepto_consolidado'):
             concepto = self.factura.get('concepto_consolidado')
         else:
-            concepto = f"FACTURA {folio_factura}" if folio_factura else "FACTURA"
+            # Obtener clase para incluir en el concepto
+            clase_factura = self.factura.get('clase', '')
+            if folio_factura:
+                if clase_factura and clase_factura.lower() != 'vacio':
+                    concepto = f"FACTURA {folio_factura} {clase_factura}"
+                else:
+                    concepto = f"FACTURA {folio_factura}"
+            else:
+                concepto = "FACTURA"
         
         # Crear campo Costos: debe mostrar el TIPO de vale, no el número
         campo_costos = ""
@@ -762,9 +770,10 @@ class Cheque:
         # Sumar totales e IVAs de todas las facturas
         total_consolidado = 0
         iva_consolidado = 0
-        folios_facturas = []
+        folios_facturas = set()  # Usar set para evitar duplicados
         vales_consolidados = []
-        
+        primera_clase_valida = ""  # Para almacenar la primera clase válida encontrada
+
         for factura in facturas:
             # Sumar total
             total_factura = factura.get('total', 0)
@@ -776,12 +785,16 @@ class Cheque:
             if iva_factura:
                 iva_consolidado += float(iva_factura)
             
-            # Recopilar folios para el concepto
+            # Recopilar folios para el concepto (evitar duplicados)
             folio = factura.get('folio', '')
             if folio:
-                folios_facturas.append(str(folio))
+                folios_facturas.add(str(folio))  # add() para set en lugar de append()
             
-            # Recopilar números de vale para el campo Costos
+            # Recopilar la primera clase válida (no vacía)
+            if not primera_clase_valida:
+                clase_factura = factura.get('clase', '')
+                if clase_factura and clase_factura.lower() != 'vacio':
+                    primera_clase_valida = clase_factura            # Recopilar números de vale para el campo Costos
             no_vale = factura.get('no_vale', '')
             if no_vale:
                 vales_consolidados.append(str(no_vale))
@@ -790,14 +803,24 @@ class Cheque:
         factura_base['total'] = total_consolidado
         factura_base['iva_trasladado'] = iva_consolidado if iva_consolidado > 0 else 0
         
-        # Crear concepto con múltiples folios
-        if folios_facturas:
-            if len(folios_facturas) == 1:
-                concepto_folios = f"FACTURA {folios_facturas[0]} "
+        # Crear concepto con múltiples folios (convertir set a lista ordenada)
+        folios_lista = sorted(list(folios_facturas))  # Convertir set a lista ordenada
+        if folios_lista:
+            if len(folios_lista) == 1:
+                concepto_folios = f"FACTURA {folios_lista[0]}"
+                # Agregar clase si existe
+                if primera_clase_valida:
+                    concepto_folios += f" {primera_clase_valida}"
             else:
-                concepto_folios = f"FACTURAS {' '.join(folios_facturas)}"
+                concepto_folios = f"FACTURAS {' '.join(folios_lista)}"
+                # Agregar clase si existe
+                if primera_clase_valida:
+                    concepto_folios += f" {primera_clase_valida}"
         else:
             concepto_folios = f"FACTURAS ({len(facturas)} facturas)"
+            # Agregar clase si existe
+            if primera_clase_valida:
+                concepto_folios += f" {primera_clase_valida}"
 
         # Actualizar concepto en la factura base
         factura_base['concepto_consolidado'] = concepto_folios
@@ -875,14 +898,14 @@ class Cheque:
             
             # Obtener folios de las facturas
             if self.factura.get('vales_consolidados'):
-                # Cheque múltiple: obtener folios de todas las facturas
-                folios_facturas = []
+                # Cheque múltiple: obtener folios de todas las facturas (sin duplicados)
+                folios_facturas = set()  # Usar set para evitar duplicados
                 if hasattr(self, '_facturas_originales'):
                     for factura in self._facturas_originales:
                         folio = factura.get('folio', '')
                         if folio:
-                            folios_facturas.append(str(folio))
-                    folios_str = ' '.join(folios_facturas) if folios_facturas else 'MULTIPLE'
+                            folios_facturas.add(str(folio))  # add() para set
+                    folios_str = ' '.join(sorted(list(folios_facturas))) if folios_facturas else 'MULTIPLE'
                 else:
                     folios_str = 'MULTIPLE'
             else:

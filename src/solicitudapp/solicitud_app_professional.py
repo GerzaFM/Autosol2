@@ -1041,8 +1041,8 @@ class SolicitudApp(tb.Frame):
             valores_iniciales = [
                 "1",
                 "",
-                getattr(datos, "total", ""),
-                getattr(datos, "total", "")
+                getattr(datos, "subtotal", ""),
+                getattr(datos, "subtotal", "")
             ]
             
             def insertar_concepto(values):
@@ -1332,6 +1332,112 @@ class SolicitudApp(tb.Frame):
             logger.error(f"Error al cargar favorito: {e}")
             messagebox.showerror("Error", f"Error al cargar favorito: {str(e)}")
     
+    def _formatear_numero(self, valor):
+        """
+        Formatea un número para mostrar:
+        - Sin decimales si es entero (1.00 -> 1)
+        - Máximo 2 decimales si tiene decimales (2.5839572 -> 2.58)
+        """
+        try:
+            # Convertir a float
+            numero = float(valor)
+            
+            # Si es un número entero, mostrar sin decimales
+            if numero == int(numero):
+                return str(int(numero))
+            else:
+                # Si tiene decimales, redondear a 2 decimales
+                return f"{numero:.2f}"
+                
+        except (ValueError, TypeError):
+            # Si no se puede convertir, devolver el valor original
+            return str(valor)
+    
+    def _formatear_porcentaje(self, valor):
+        """
+        Formatea un valor de porcentaje:
+        - Si es 0 o vacío, devuelve cadena vacía
+        - Si es diferente de 0, agrega el símbolo %
+        """
+        try:
+            # Si está vacío o es None, devolver vacío
+            if not valor or str(valor).strip() == "":
+                return ""
+            
+            # Convertir a float para validar
+            numero = float(valor)
+            
+            # Si es 0, devolver vacío
+            if numero == 0:
+                return ""
+            else:
+                # Si es diferente de 0, formatear y agregar %
+                if numero == int(numero):
+                    return f"{int(numero)}%"
+                else:
+                    return f"{numero:.2f}%"
+                    
+        except (ValueError, TypeError):
+            # Si no se puede convertir pero no está vacío, devolver con %
+            valor_str = str(valor).strip()
+            if valor_str and valor_str != "0":
+                return f"{valor_str}%"
+            else:
+                return ""
+    
+    def _formatear_moneda(self, valor):
+        """
+        Formatea un valor monetario con formato $x,xxx.xx
+        - Agrega símbolo de peso $
+        - Usa comas para separar miles
+        - Siempre muestra 2 decimales
+        """
+        try:
+            # Si está vacío o es None, devolver vacío
+            if not valor or str(valor).strip() == "":
+                return ""
+            
+            # Convertir a float
+            numero = float(valor)
+            
+            # Si es 0, devolver $0.00
+            if numero == 0:
+                return "$0.00"
+            
+            # Formatear con comas y 2 decimales
+            return f"${numero:,.2f}"
+                
+        except (ValueError, TypeError):
+            # Si no se puede convertir, devolver el valor original
+            return str(valor)
+    
+    def _obtener_nombre_para_archivo(self, proveedor_data):
+        """Obtiene el nombre del proveedor para el archivo, priorizando nombre_contacto"""
+        if not proveedor_data:
+            return "PROVEEDOR_DESCONOCIDO"
+        
+        rfc = proveedor_data.get("RFC", "").strip()
+        
+        if rfc:
+            try:
+                # Buscar el proveedor por RFC en la base de datos
+                from models.solicitud import Proveedor
+                proveedor = Proveedor.get(Proveedor.rfc == rfc)
+                
+                # Priorizar nombre_contacto si existe y no está vacío
+                if hasattr(proveedor, 'nombre_contacto') and proveedor.nombre_contacto and proveedor.nombre_contacto.strip():
+                    return proveedor.nombre_contacto.strip()
+                # Si no hay nombre_contacto, usar nombre_emisor
+                elif hasattr(proveedor, 'nombre_emisor') and proveedor.nombre_emisor and proveedor.nombre_emisor.strip():
+                    return proveedor.nombre_emisor.strip()
+            except:
+                # Si no se encuentra en la base de datos o hay error, usar el nombre del formulario
+                pass
+        
+        # Fallback al nombre del formulario
+        nombre_formulario = proveedor_data.get("Nombre", "").strip()
+        return nombre_formulario if nombre_formulario else "PROVEEDOR_DESCONOCIDO"
+    
     def generar(self):
         """Genera el documento final."""
         try:
@@ -1413,32 +1519,32 @@ class SolicitudApp(tb.Frame):
 
             data = {
                 "TIPO DE VALE": solicitud_data.get("Tipo", ""),
-                "C A N T I D A D": "\n".join([c[0] for c in conceptos]),
+                "C A N T I D A D": "\n".join([self._formatear_numero(c[0]) for c in conceptos]),
                 "C O M E N T A R I O S": comentarios,
                 "Nombre de Empresa": proveedor_data.get("Nombre", ""), 
                 "RFC": proveedor_data.get("RFC", ""), 
                 "Teléfono": proveedor_data.get("Teléfono", ""), 
                 "Correo": proveedor_data.get("Correo", ""), 
                 "Nombre Contacto": proveedor_data.get("Contacto", ""),
-                "Menudeo": categorias.get("Comer", ""), 
-                "Seminuevos": categorias.get("Semis", ""), 
-                "Flotas": categorias.get("Fleet", ""),
-                "Administración": categorias.get("Admin", ""),
-                "Refacciones": categorias.get("Refa", ""),
-                "Servicio": categorias.get("Serv", ""),
-                "HYP": categorias.get("HyP", ""),
+                "Menudeo": self._formatear_porcentaje(categorias.get("Comer", "")), 
+                "Seminuevos": self._formatear_porcentaje(categorias.get("Semis", "")), 
+                "Flotas": self._formatear_porcentaje(categorias.get("Fleet", "")),
+                "Administración": self._formatear_porcentaje(categorias.get("Admin", "")),
+                "Refacciones": self._formatear_porcentaje(categorias.get("Refa", "")),
+                "Servicio": self._formatear_porcentaje(categorias.get("Serv", "")),
+                "HYP": self._formatear_porcentaje(categorias.get("HyP", "")),
                 "DESCRIPCIÓN": "\n".join([c[1] for c in conceptos]),
-                "PRECIO UNITARIO": "\n".join([c[2] for c in conceptos]),
-                "TOTAL": "\n".join([c[3] for c in conceptos]),
+                "PRECIO UNITARIO": "\n".join([self._formatear_moneda(c[2]) for c in conceptos]),
+                "TOTAL": "\n".join([self._formatear_moneda(c[3]) for c in conceptos]),
                 "FECHA GERENTE DE ÁREA": "", 
                 "FECHA GERENTE ADMINISTRATIVO": "", 
                 "FECHA DE AUTORIZACIÓN GG O DIRECTOR DE MARCA": "", 
-                "SUBTOTAL": totales.get("Subtotal", ""), 
-                "IVA": totales.get("IVA", ""), 
-                "TOTAL, SUMATORIA": totales.get("TOTAL", ""), 
+                "SUBTOTAL": self._formatear_moneda(totales.get("Subtotal", "")), 
+                "IVA": self._formatear_moneda(totales.get("IVA", "")), 
+                "TOTAL, SUMATORIA": self._formatear_moneda(totales.get("TOTAL", "")), 
                 "FECHA CREACIÓN SOLICITUD": solicitud_data.get("Fecha", ""), 
                 "FOLIO": "",
-                "RETENCIÓN": totales.get("Ret", ""), 
+                "RETENCIÓN": self._formatear_moneda(totales.get("Ret", "")), 
                 "Departamento": solicitud_data.get("Depa", "")
             }
             logger.info("Datos preparados para generación de documento")
@@ -1471,7 +1577,7 @@ class SolicitudApp(tb.Frame):
                     # No se guardará en BD: usar folio manual si existe
                     folio_interno = self.folio_interno_manual
                 
-                proveedor = proveedor_data.get("Nombre", "")
+                proveedor = self._obtener_nombre_para_archivo(proveedor_data)
                 folio_factura = solicitud_data.get("Folio", "")
                 clase = solicitud_data.get("Clase", "")  # Campo específico del formulario
                 

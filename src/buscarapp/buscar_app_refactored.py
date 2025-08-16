@@ -778,7 +778,7 @@ class BuscarAppRefactored(ttk.Frame):
                 # Un solo elemento seleccionado
                 item = selected_items[0]
                 no_vale = str(item.get('no_vale', 'SinVale'))
-                proveedor = str(item.get('nombre_emisor', 'SinProveedor'))
+                proveedor = self._obtener_nombre_para_archivo(item)  # Usar función que considera nombre_contacto
                 folio_factura = str(item.get('folio', 'SinFolio'))  # Solo folio, no serie_folio
                 clase = str(item.get('clase', 'SinClase'))
                 
@@ -867,14 +867,15 @@ class BuscarAppRefactored(ttk.Frame):
                         folios_ya_agregados.add(folio_factura)
                 
                 # Obtener datos del primer elemento para proveedor y clase
-                proveedor = self._limpiar_nombre_archivo(primer_proveedor)
-                clase = self._limpiar_nombre_archivo(str(selected_items[0].get('clase', 'SinClase')))
+                proveedor = self._limpiar_nombre_archivo(self._obtener_nombre_para_archivo(selected_items[0]))
+                clase = self._limpiar_clase(str(selected_items[0].get('clase', 'SinClase')))
                 
-                # Crear nombre del archivo - solo incluir clase si no está vacía
+                # Crear nombre del archivo
                 vales_str = " ".join(numeros_vale)  # Unir múltiples vales con guión bajo
                 folios_str = " ".join(folios_factura)  # Unir múltiples folios con guión bajo
                 
-                if clase and clase not in ['Vacio', 'SinClase', 'Item']:
+                # Solo incluir clase si NO es "Vacio"
+                if clase and clase.lower() != 'vacio':
                     nombre_archivo = f"{vales_str} {proveedor} {folios_str} {clase}.pdf"
                 else:
                     nombre_archivo = f"{vales_str} {proveedor} {folios_str}.pdf"
@@ -1024,6 +1025,61 @@ class BuscarAppRefactored(ttk.Frame):
             self.logger.error(f"Error en función de cheque: {e}")
             self.dialog_utils.show_error("Error", f"Error procesando cheque: {str(e)}")
     
+    def _limpiar_clase(self, clase) -> str:
+        """
+        Limpia una clase para nombre de archivo preservando formato letra-número
+        
+        Args:
+            clase: String de la clase
+            
+        Returns:
+            String limpio para usar como clase en nombre de archivo
+        """
+        if clase is None:
+            return 'Vacio'
+        
+        clase_str = str(clase)
+        
+        if not clase_str or clase_str.strip() == '':
+            return 'Vacio'
+        
+        # Para clases, solo remover caracteres problemáticos pero mantener guiones
+        caracteres_invalidos = '<>:"/\\|?*'  # Sin incluir - para preservar Q-15
+        clase_limpia = clase_str
+        
+        for char in caracteres_invalidos:
+            clase_limpia = clase_limpia.replace(char, '')
+        
+        # Limitar longitud
+        if len(clase_limpia) > 20:
+            clase_limpia = clase_limpia[:20]
+        
+        # Si queda vacío después de limpiar, usar valor por defecto
+        if not clase_limpia:
+            return 'Vacio'
+        
+        return clase_limpia
+
+    def _obtener_nombre_para_archivo(self, item) -> str:
+        """
+        Obtiene el nombre a usar en el archivo: nombre_contacto si existe, sino nombre_emisor
+        
+        Args:
+            item: Diccionario con los datos del item
+            
+        Returns:
+            String con el nombre a usar (contacto o emisor)
+        """
+        nombre_contacto = item.get('nombre_contacto', '')
+        nombre_emisor = item.get('nombre_emisor', '')
+        
+        # Si hay nombre_contacto y no está vacío, usarlo
+        if nombre_contacto and str(nombre_contacto).strip():
+            return str(nombre_contacto).strip()
+        else:
+            # Si no hay nombre_contacto, usar nombre_emisor
+            return str(nombre_emisor).strip()
+
     def _limpiar_nombre_archivo(self, nombre) -> str:
         """
         Limpia un string para que pueda ser usado como nombre de archivo
