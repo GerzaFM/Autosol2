@@ -10,7 +10,7 @@ import os
 
 from config.settings import config
 from app.ui.components.sidebar import SidebarComponent
-from app.ui.views.user_admin import AdministradorUsuarios
+
 from app.utils.logger import get_logger
 
 # Importar aplicaciones legacy directamente
@@ -30,6 +30,11 @@ try:
     from chequeapp.cheque_app_professional import ChequeAppProfessional
 except ImportError:
     ChequeAppProfessional = None
+
+try:
+    from useradminapp import UserAdminApp
+except ImportError:
+    UserAdminApp = None
 
 class MainWindow(tb.Window):
     """
@@ -165,6 +170,7 @@ class MainWindow(tb.Window):
             lambda: self._show_view("cheques"), 
             "top"
         )
+        """
         self.sidebar.add_menu_item(
             "Reportes", "📊", 
             lambda: self._show_view("reportes"), 
@@ -175,11 +181,7 @@ class MainWindow(tb.Window):
             lambda: self._show_view("pagos"), 
             "top"
         )
-        self.sidebar.add_menu_item(
-            "Usuarios", "👥", 
-            lambda: self._show_view("nueva_vista"), 
-            "top"
-        )
+        """
         
         # Elementos de configuración (parte inferior)
         self.sidebar.add_menu_item(
@@ -195,6 +197,11 @@ class MainWindow(tb.Window):
         self.sidebar.add_menu_item(
             "Cuenta", "👤", 
             lambda: self._show_view("cuenta"), 
+            "bottom"
+        )
+        self.sidebar.add_menu_item(
+            "Usuarios", "👥", 
+            lambda: self._show_view("nueva_vista"), 
             "bottom"
         )
     
@@ -307,24 +314,27 @@ class MainWindow(tb.Window):
             self._show_error_view(f"Error al cargar cheques: {str(e)}")
     
     def _administrador_usuarios(self):
-        """Muestra el administrador de usuarios."""
+        """Muestra la aplicación de administración de usuarios (MVC)."""
         try:
             # Limpiar contenido anterior
             self._clear_content()
             
-            # Crear el administrador de usuarios
-            admin_usuarios = AdministradorUsuarios(self.content_frame)
-            admin_usuarios.pack(fill=BOTH, expand=True)
+            if UserAdminApp is None:
+                self._show_error_view("UserAdminApp no está disponible")
+                return
+            
+            # Instanciar directamente la aplicación MVC
+            self.current_view = UserAdminApp(self.content_frame)
+            self.current_view.pack(fill=BOTH, expand=True)
             
             # Inicializar con datos
-            admin_usuarios.inicializar()
+            self.current_view.inicializar()
             
-            self.current_view = admin_usuarios
-            self.logger.info("Administrador de usuarios mostrado exitosamente")
+            self.logger.info("Aplicación de usuarios (MVC) cargada directamente")
             
         except Exception as e:
-            self.logger.error(f"Error al crear administrador de usuarios: {e}")
-            self._show_error_view(f"Error al cargar administrador de usuarios: {str(e)}")
+            self.logger.error(f"Error al crear aplicación de usuarios: {e}")
+            self._show_error_view(f"Error al cargar aplicación de usuarios: {str(e)}")
     
     def _accion_personalizada(self, accion: str):
         """
