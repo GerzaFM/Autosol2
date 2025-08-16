@@ -1421,7 +1421,7 @@ class SolicitudApp(tb.Frame):
         if rfc:
             try:
                 # Buscar el proveedor por RFC en la base de datos
-                from models.solicitud import Proveedor
+                from bd.models import Proveedor
                 proveedor = Proveedor.get(Proveedor.rfc == rfc)
                 
                 # Priorizar nombre_contacto si existe y no está vacío
