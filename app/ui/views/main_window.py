@@ -5,14 +5,31 @@ import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 from typing import Optional
 import logging
+import sys
+import os
 
 from config.settings import config
 from app.ui.components.sidebar import SidebarComponent
-from app.ui.views.solicitud_view import SolicitudView
 from app.ui.views.user_admin import AdministradorUsuarios
-from app.ui.views.facturas_view import FacturasView
-from app.ui.views.cheques_view import ChequesView
 from app.utils.logger import get_logger
+
+# Importar aplicaciones legacy directamente
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
+
+try:
+    from solicitudapp.solicitud_app_professional import SolicitudApp
+except ImportError:
+    SolicitudApp = None
+
+try:
+    from buscarapp.buscar_app_refactored import BuscarAppRefactored
+except ImportError:
+    BuscarAppRefactored = None
+
+try:
+    from chequeapp.cheque_app_professional import ChequeAppProfessional
+except ImportError:
+    ChequeAppProfessional = None
 
 class MainWindow(tb.Window):
     """
@@ -230,46 +247,60 @@ class MainWindow(tb.Window):
             self._show_error_view(str(e))
     
     def _show_solicitud_view(self):
-        """Muestra la vista de nueva solicitud."""
+        """Muestra la aplicación de nueva solicitud directamente."""
         try:
             # Limpiar contenido anterior
             self._clear_content()
             
-            solicitud_view = SolicitudView(self.content_frame)
-            solicitud_view.pack(fill=BOTH, expand=True)
-            self.current_view = solicitud_view
+            if SolicitudApp is None:
+                self._show_error_view("SolicitudApp no está disponible")
+                return
+            
+            # Instanciar directamente la aplicación legacy
+            self.current_view = SolicitudApp(master=self.content_frame)
+            self.current_view.pack(fill=BOTH, expand=True)
+            
+            self.logger.info("Aplicación de solicitud cargada directamente")
             
         except Exception as e:
-            self.logger.error(f"Error al crear vista de solicitud: {e}")
+            self.logger.error(f"Error al crear aplicación de solicitud: {e}")
             self._show_error_view(f"Error al cargar solicitud: {str(e)}")
     
     def _show_facturas_view(self):
-        """Muestra la vista de facturas guardadas."""
+        """Muestra la aplicación de facturas directamente."""
         try:
             # Limpiar contenido anterior
             self._clear_content()
             
-            facturas_view = FacturasView(self.content_frame)
-            facturas_view.pack(fill=BOTH, expand=True)
-            self.current_view = facturas_view
+            if BuscarAppRefactored is None:
+                self._show_error_view("BuscarAppRefactored no está disponible")
+                return
             
-            self.logger.info("Vista de facturas mostrada exitosamente")
+            # Instanciar directamente la aplicación legacy
+            self.current_view = BuscarAppRefactored(master=self.content_frame)
+            self.current_view.pack(fill=BOTH, expand=True)
+            
+            self.logger.info("Aplicación de facturas cargada directamente")
             
         except Exception as e:
-            self.logger.error(f"Error al crear vista de facturas: {e}")
+            self.logger.error(f"Error al crear aplicación de facturas: {e}")
             self._show_error_view(f"Error al cargar facturas: {str(e)}")
     
     def _show_cheques_view(self):
-        """Muestra la vista de gestión de cheques."""
+        """Muestra la aplicación de cheques directamente."""
         try:
             # Limpiar contenido anterior
             self._clear_content()
             
-            cheques_view = ChequesView(self.content_frame)
-            cheques_view.pack(fill=BOTH, expand=True)
-            self.current_view = cheques_view
+            if ChequeAppProfessional is None:
+                self._show_error_view("ChequeAppProfessional no está disponible")
+                return
             
-            self.logger.info("Vista de cheques mostrada exitosamente")
+            # Instanciar directamente la aplicación legacy
+            self.current_view = ChequeAppProfessional(self.content_frame)
+            # Nota: ChequeAppProfessional maneja su propio pack() internamente
+            
+            self.logger.info("Aplicación de cheques cargada directamente")
             
         except Exception as e:
             self.logger.error(f"Error al crear vista de cheques: {e}")
