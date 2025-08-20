@@ -80,17 +80,16 @@ class SidebarComponent(tb.Frame):
         
         btn = tb.Button(
             parent_frame,
-            text=f"{icon}   {text}",
+            text=f"{icon}   {text}",  # Sin formato de relleno
             bootstyle="dark",
-            width=20,
             command=callback
         )
         
         if position == "top":
-            btn.pack(side=TOP, fill="x", pady=2)
+            btn.pack(side=TOP, pady=2, anchor='w')  # Sin fill="x"
         else:
-            btn.pack(side=BOTTOM, fill="x", pady=2)
-        
+            btn.pack(side=BOTTOM, pady=2, anchor='w')
+
         # Agregar efectos hover
         self._bind_hover_effects(btn)
         
@@ -140,12 +139,12 @@ class SidebarComponent(tb.Frame):
                 self.config(width=self.width_expanded)
                 # Mostrar texto completo en botones
                 for btn, icon, text, _ in self.menu_buttons:
-                    btn.config(text=f"{icon}   {text:<21}", width=20)
+                    btn.config(text=f"{icon}   {text}")
             else:
                 self.config(width=self.width_collapsed)
                 # Mostrar solo iconos
                 for btn, icon, text, _ in self.menu_buttons:
-                    btn.config(text=icon, width=4)
+                    btn.config(text=icon)
             
             # Forzar actualización
             self.update_idletasks()

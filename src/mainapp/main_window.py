@@ -35,6 +35,12 @@ try:
 except ImportError:
     UserAdminApp = None
 
+try:
+    from proveedoresapp.__init__ import ProveedoresApp
+except ImportError:
+    ProveedoresApp = None
+
+
 class MainWindow(tb.Window):
     """
     Ventana principal de la aplicación con arquitectura modular.
@@ -62,6 +68,9 @@ class MainWindow(tb.Window):
         min_width, min_height = config.ui.min_window_size
         self.minsize(min_width, min_height)
         
+        # Centrar la ventana
+        self._center_window()
+        
         # Referencias a componentes
         self.sidebar: Optional[SidebarComponent] = None
         self.content_frame: Optional[tb.Frame] = None
@@ -71,6 +80,43 @@ class MainWindow(tb.Window):
         self._setup_menu_items()
         
         self.logger.info("Ventana principal inicializada")
+    
+    def _center_window(self):
+        """Centra la ventana en la pantalla."""
+        try:
+            # Actualizar la ventana para obtener las dimensiones correctas
+            self.update_idletasks()
+            
+            # Obtener dimensiones de la ventana
+            window_width = self.winfo_width()
+            window_height = self.winfo_height()
+            
+            # Si las dimensiones son muy pequeñas, usar las del geometry()
+            if window_width < 100 or window_height < 100:
+                geometry = self.geometry()
+                if 'x' in geometry:
+                    size_part = geometry.split('+')[0]  # Obtener solo "1200x900"
+                    window_width, window_height = map(int, size_part.split('x'))
+            
+            # Obtener dimensiones de la pantalla
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+            
+            # Calcular posición para centrar
+            x = (screen_width - window_width) // 2
+            y = (screen_height - window_height) // 2
+            
+            # Asegurar que la ventana no se salga de la pantalla
+            x = max(0, x)
+            y = max(0, y)
+            
+            # Aplicar la nueva geometría
+            self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+            
+            self.logger.info(f"Ventana centrada en posición {x}, {y}")
+            
+        except Exception as e:
+            self.logger.error(f"Error al centrar ventana: {e}")
     
     def _create_layout(self):
         """Crea el layout principal de la ventana."""
@@ -169,7 +215,12 @@ class MainWindow(tb.Window):
             lambda: self._show_view("cheques"), 
             "top"
         )
-        
+        self.sidebar.add_menu_item(
+            "Proveedores", "🏢",
+            lambda: self._show_view("proveedores"),
+            "top"
+        )
+
         # Elementos de configuración (parte inferior)
         self.sidebar.add_menu_item(
             "Configuración", "⚙️", 
@@ -211,8 +262,7 @@ class MainWindow(tb.Window):
                 "nueva": "Nueva Solicitud",
                 "buscar": "Buscar",
                 "cheques": "Cheques",
-                "reportes": "Reportes",
-                "pagos": "Pagos",
+                "proveedores": "Proveedores",
                 "nueva_vista": "Usuarios",
                 "config": "Configuración",
                 "database": "Base de Datos",
@@ -231,6 +281,8 @@ class MainWindow(tb.Window):
                 self._show_cheques_view()
             elif view_name == "nueva_vista":
                 self._administrador_usuarios()
+            elif view_name == "proveedores":
+                self._show_proveedores_view()
             else:
                 self._show_placeholder_view(view_name)
             
@@ -323,6 +375,29 @@ class MainWindow(tb.Window):
             self.logger.error(f"Error al crear aplicación de usuarios: {e}")
             self._show_error_view(f"Error al cargar aplicación de usuarios: {str(e)}")
     
+    def _show_proveedores_view(self):
+        """Muestra la aplicación de proveedores directamente."""
+        try:
+            # Limpiar contenido anterior
+            self._clear_content()
+
+            if ProveedoresApp is None:
+                self._show_error_view("ProveedoresApp no está disponible")
+                return
+
+            # Instanciar directamente la aplicación de proveedores
+            self.current_view = ProveedoresApp(self.content_frame)
+            
+            # Asegurar que se empaquete correctamente
+            if hasattr(self.current_view, 'pack'):
+                self.current_view.pack(fill=BOTH, expand=True)
+            
+            self.logger.info("Aplicación de proveedores cargada directamente")
+
+        except Exception as e:
+            self.logger.error(f"Error al crear aplicación de proveedores: {e}")
+            self._show_error_view(f"Error al cargar proveedores: {str(e)}")
+
     def _show_placeholder_view(self, view_name: str):
         """
         Muestra una vista placeholder para funcionalidades no implementadas.
@@ -399,5 +474,27 @@ class MainWindow(tb.Window):
     def _clear_content(self):
         """Limpia el contenido actual del área principal."""
         if self.current_view:
-            self.current_view.destroy()
-            self.current_view = None
+            try:
+                # Forzar la limpieza de todos los widgets hijos primero
+                for child in self.content_frame.winfo_children():
+                    child.destroy()
+                
+                # Luego destruir la vista actual
+                if hasattr(self.current_view, 'destroy'):
+                    self.current_view.destroy()
+                
+                self.current_view = None
+                
+                # Forzar actualización del contenedor
+                self.content_frame.update_idletasks()
+                
+            except Exception as e:
+                self.logger.error(f"Error limpiando contenido: {e}")
+                # En caso de error, intenta limpiar manualmente
+                try:
+                    for child in self.content_frame.winfo_children():
+                        child.destroy()
+                    self.current_view = None
+                except Exception as e2:
+                    self.logger.error(f"Error en limpieza de emergencia: {e2}")
+                    self.current_view = None
