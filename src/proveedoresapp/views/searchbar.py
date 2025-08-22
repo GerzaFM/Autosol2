@@ -2,18 +2,13 @@ import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 
 class SearchBar:
-    def __init__(self, master, placeholder="Ingrese un texto:"):
-        #self.master = master
-        #self.frame = tb.Frame(master)
-        #self.frame.pack(side=TOP, fill=X, anchor=N, pady=(30, 10))
-
+    def __init__(self, master, placeholder="Ingrese un texto:", width=10):
         self.inner_frame = tb.Frame(master)
-        #self.inner_frame.pack()
         
         self.entry_search = None
-        #self.button_search = None
         self.placeholder_text = placeholder
         self.placeholder_active = True
+        self.width = width
 
         self.create_widgets()
 
@@ -23,7 +18,7 @@ class SearchBar:
             self.inner_frame, 
             font=("Segoe UI", 10),
             foreground="gray",
-            width=50
+            width=self.width
         )
         self.entry_search.pack(side=LEFT, padx=10)
         
@@ -33,9 +28,6 @@ class SearchBar:
         # Eventos para manejar el placeholder
         self.entry_search.bind('<FocusIn>', self._on_entry_click)
         self.entry_search.bind('<FocusOut>', self._on_focus_out)
-
-        #self.button_search = tb.Button(self.inner_frame, text="🔍")
-        #self.button_search.pack(side=LEFT)
     
     def _on_entry_click(self, event):
         """Elimina el placeholder cuando el usuario hace clic en el entry."""
@@ -56,6 +48,13 @@ class SearchBar:
         if self.placeholder_active:
             return ""
         return self.entry_search.get()
+    
+    def clear_search(self):
+        """Limpia el texto de búsqueda y restaura el placeholder."""
+        self.entry_search.delete(0, "end")
+        self.entry_search.insert(0, self.placeholder_text)
+        self.entry_search.config(foreground="gray")
+        self.placeholder_active = True
 
     def set_placeholder_text(self, text):
         """Establece el texto del placeholder."""
@@ -63,3 +62,7 @@ class SearchBar:
         if self.placeholder_active:
             self.entry_search.delete(0, "end")
             self.entry_search.insert(0, self.placeholder_text)
+
+    def pack(self, **kwargs):
+        """Empaqueta el marco interno en el contenedor padre."""
+        self.inner_frame.pack(**kwargs)
