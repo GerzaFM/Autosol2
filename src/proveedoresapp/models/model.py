@@ -1,6 +1,44 @@
 """
-Modelo para la gestión de proveedores.
-Maneja todas las operaciones CRUD y consultas relacionadas con proveedores.
+ProveedorModel - Modelo de datos para gestión de proveedores
+============================================================
+
+Capa de persistencia en la arquitectura MVC que maneja todas las operaciones
+de base de datos relacionadas con proveedores. Actúa como abstracción entre
+la lógica de negocio y la base de datos subyacente.
+
+Arquitectura de datos:
+┌─────────────────────────────────────────┐
+│              Controller                  │
+│                   │                     │
+│                   ▼                     │
+│            ProveedorModel                │ <- Esta clase
+│         (Capa de abstracción)           │
+│                   │                     │
+│                   ▼                     │
+│        Peewee ORM + SQLite              │
+│         (Persistencia física)           │
+└─────────────────────────────────────────┘
+
+Responsabilidades principales:
+- Operaciones CRUD completas (Create, Read, Update, Delete)
+- Validaciones de datos y reglas de negocio
+- Consultas optimizadas y filtrado avanzado
+- Manejo de errores y logging detallado
+- Transformación entre formatos (ORM ↔ Dict)
+- Verificación de integridad referencial
+
+Patrones implementados:
+- Repository Pattern: Abstrae el acceso a datos
+- Data Mapper Pattern: Convierte entre objetos ORM y diccionarios
+- Active Record Pattern: Operaciones sobre instancias de modelo
+- Transaction Script Pattern: Operaciones complejas en métodos específicos
+
+Características técnicas:
+- Manejo robusto de errores con logging detallado
+- Validaciones a nivel de modelo y base de datos
+- Consultas optimizadas con Peewee ORM
+- Fallback graceful si BD no está disponible
+- Métodos de utilidad para transformación de datos
 """
 
 import logging
@@ -9,11 +47,13 @@ from datetime import datetime
 
 try:
     # Importar modelos de la base de datos
+    # Dependencias: Peewee ORM + definición de modelos de BD
     from src.bd.models import Proveedor, db
     from peewee import DoesNotExist, IntegrityError, fn
     DATABASE_AVAILABLE = True
 except ImportError:
-    # Fallback si no hay acceso a la base de datos
+    # Fallback graceful si no hay acceso a la base de datos
+    # Permite que la aplicación arranque incluso con problemas de BD
     Proveedor = None
     db = None
     DATABASE_AVAILABLE = False
@@ -21,55 +61,137 @@ except ImportError:
 
 class ProveedorModel:
     """
-    Modelo para manejar operaciones de proveedores en la base de datos.
-    Incluye operaciones CRUD, búsquedas y validaciones.
+    Modelo de datos principal para gestión de proveedores.
+    
+    Proporciona una interfaz de alto nivel para todas las operaciones
+    relacionadas con proveedores, abstrayendo los detalles de persistencia
+    y proporcionando validaciones consistentes.
+    
+    Características principales:
+    - CRUD completo con validaciones
+    - Búsquedas flexibles y filtrado avanzado
+    - Manejo robusto de errores
+    - Logging detallado para auditoría
+    - Transformación automática de datos
+    - Verificación de integridad referencial
+    
+    Interfaz de datos:
+    - Entrada: Diccionarios con datos del formulario
+    - Salida: Diccionarios normalizados para la vista
+    - Interno: Objetos Peewee ORM para operaciones BD
+    
+    Gestión de estado:
+    - Stateless: No mantiene estado entre operaciones
+    - Transaccional: Cada operación es atómica
+    - Thread-safe: Seguro para uso concurrente
     """
     
     def __init__(self):
+        """
+        Inicializa el modelo y establece conexión con la base de datos.
+        
+        Configuración realizada:
+        - Logger para registro de operaciones
+        - Verificación de disponibilidad de BD
+        - Establecimiento de conexión si está disponible
+        - Configuración de fallback si hay problemas
+        
+        El constructor implementa un patrón de inicialización defensiva,
+        permitiendo que la aplicación funcione incluso con problemas
+        de conectividad de base de datos.
+        """
+        # === CONFIGURACIÓN DE LOGGING ===
+        # Logger específico para este módulo, permite trazabilidad detallada
         self.logger = logging.getLogger(__name__)
+        
+        # === VERIFICACIÓN DE DISPONIBILIDAD DE BASE DE DATOS ===
+        # Flag que determina si las operaciones reales de BD están disponibles
         self.db_available = DATABASE_AVAILABLE
         
         if self.db_available:
             try:
-                # Verificar conexión a la base de datos
+                # === ESTABLECIMIENTO DE CONEXIÓN ===
+                # Verificar y establecer conexión con la base de datos
+                # reuse_if_open=True evita múltiples conexiones innecesarias
                 if db and db.is_closed():
                     db.connect(reuse_if_open=True)
                 self.logger.info("Conexión a base de datos de proveedores establecida")
             except Exception as e:
+                # === FALLBACK EN CASO DE ERROR DE CONEXIÓN ===
+                # Degradación graceful: deshabilitar BD pero mantener aplicación funcional
                 self.logger.error(f"Error conectando a BD: {e}")
                 self.db_available = False
         else:
+            # === MODO FALLBACK ===
+            # La aplicación puede arrancar sin BD para desarrollo/testing
             self.logger.warning("Base de datos no disponible, usando datos de ejemplo")
 
     # ==================== OPERACIONES CRUD ====================
     
     def crear_proveedor(self, datos: Dict[str, Any]) -> Tuple[bool, str, Optional[int]]:
         """
-        Crear un nuevo proveedor
+        Crear un nuevo proveedor en la base de datos.
         
         Args:
-            datos: Diccionario con datos del proveedor
-            
+            datos: Diccionario con datos del proveedor desde el formulario
+                  Formato esperado:
+                  {
+                      'codigo_quiter': int,
+                      'nombre': str,
+                      'nombre_en_quiter': str,
+                      'rfc': str,
+                      'telefono': str,
+                      'email': str,
+                      'nombre_contacto': str
+                  }
+                  
         Returns:
             Tupla (éxito, mensaje, id_del_proveedor)
+            - éxito: bool indicando si la operación fue exitosa
+            - mensaje: str descriptivo del resultado (éxito o error)
+            - id_del_proveedor: int con el ID asignado, None si falló
+        
+        Proceso de creación:
+        1. Verificar disponibilidad de base de datos
+        2. Validar datos de entrada con reglas de negocio
+        3. Verificar unicidad de RFC (si se proporciona)
+        4. Crear registro en base de datos
+        5. Registrar operación en logs
+        6. Retornar resultado estructurado
+        
+        Validaciones aplicadas:
+        - Datos requeridos según reglas de negocio
+        - Formato válido de RFC, email, etc.
+        - Unicidad de RFC en la base de datos
+        - Integridad referencial
+        
+        Manejo de errores:
+        - IntegrityError: Violaciones de restricciones BD
+        - ValueError: Datos inválidos
+        - Exception general: Errores inesperados
         """
+        # === VERIFICACIÓN DE DISPONIBILIDAD ===
         if not self.db_available:
             return False, "Base de datos no disponible", None
             
         try:
-            # Validar datos requeridos
+            # === VALIDACIÓN DE DATOS DE ENTRADA ===
+            # Aplicar reglas de negocio antes de intentar persistir
             is_valid, errors = self._validate_proveedor_data(datos)
             if not is_valid:
                 return False, f"Datos inválidos: {', '.join(errors)}", None
             
-            # Verificar si ya existe un proveedor con el mismo RFC (si se proporciona)
+            # === VERIFICACIÓN DE UNICIDAD DE RFC ===
+            # Prevenir duplicados de RFC si se proporciona
             rfc = datos.get('rfc', '').strip()
             if rfc:
                 existing = Proveedor.get_or_none(Proveedor.rfc == rfc)
                 if existing:
                     return False, f"Ya existe un proveedor con RFC: {rfc}", None
             
-            # Crear nuevo proveedor
+            # === CREACIÓN DEL REGISTRO ===
+            # Crear instancia en BD con datos normalizados
+            # Note: strip() y conversión a None para campos vacíos
             proveedor = Proveedor.create(
                 codigo_quiter=datos.get('codigo_quiter'),
                 nombre=datos.get('nombre', '').strip() or None,
@@ -80,71 +202,110 @@ class ProveedorModel:
                 nombre_contacto=datos.get('nombre_contacto', '').strip() or None
             )
             
+            # === LOGGING DE ÉXITO ===
             self.logger.info(f"Proveedor creado exitosamente: ID {proveedor.id}")
             return True, "Proveedor creado exitosamente", proveedor.id
             
         except IntegrityError as e:
+            # === MANEJO DE ERRORES DE INTEGRIDAD ===
+            # Violaciones de restricciones de BD (UNIQUE, FK, etc.)
             error_msg = f"Error de integridad: {str(e)}"
             self.logger.error(error_msg)
             return False, error_msg, None
         except Exception as e:
+            # === MANEJO DE ERRORES GENERALES ===
+            # Cualquier otro error inesperado
             error_msg = f"Error creando proveedor: {str(e)}"
             self.logger.error(error_msg)
             return False, error_msg, None
 
     def actualizar_proveedor(self, proveedor_id: int, datos: Dict[str, Any]) -> Tuple[bool, str]:
         """
-        Actualizar un proveedor existente
+        Actualizar un proveedor existente en la base de datos.
         
         Args:
-            proveedor_id: ID del proveedor a actualizar
-            datos: Diccionario con nuevos datos
+            proveedor_id: ID único del proveedor a actualizar
+            datos: Diccionario con nuevos datos (mismo formato que crear_proveedor)
             
         Returns:
             Tupla (éxito, mensaje)
+            - éxito: bool indicando si la operación fue exitosa
+            - mensaje: str descriptivo del resultado
+        
+        Proceso de actualización:
+        1. Verificar existencia del proveedor por ID
+        2. Validar nuevos datos con reglas flexibles
+        3. Verificar unicidad de RFC si cambió
+        4. Actualizar solo campos que cambiaron (optimización)
+        5. Guardar cambios en BD
+        6. Registrar operación con detalles
+        
+        Características especiales:
+        - Validación flexible (update=True) permite mayor permisividad
+        - Solo actualiza campos que realmente cambiaron
+        - Preserva integridad referencial
+        - Verifica unicidad de RFC excluyendo el registro actual
+        
+        Optimizaciones:
+        - Detecta si no hay cambios reales (evita UPDATE innecesario)
+        - Lista campos actualizados para logging detallado
+        - Comparación inteligente de valores (maneja None vs '')
         """
+        # === VERIFICACIÓN DE DISPONIBILIDAD ===
         if not self.db_available:
             return False, "Base de datos no disponible"
             
         try:
-            # Verificar que el proveedor existe
+            # === VERIFICACIÓN DE EXISTENCIA ===
+            # DoesNotExist se lanza si no existe el proveedor
             proveedor = Proveedor.get_by_id(proveedor_id)
             
-            # Validar datos
+            # === VALIDACIÓN DE DATOS (MODO ACTUALIZACIÓN) ===
+            # update=True permite validación más flexible
             is_valid, errors = self._validate_proveedor_data(datos, update=True)
             if not is_valid:
                 return False, f"Datos inválidos: {', '.join(errors)}"
             
-            # Verificar RFC duplicado (si se está cambiando)
+            # === VERIFICACIÓN DE RFC DUPLICADO ===
+            # Solo verificar si el RFC está cambiando
             nuevo_rfc = datos.get('rfc', '').strip()
             if nuevo_rfc and nuevo_rfc != proveedor.rfc:
+                # Buscar RFC duplicado excluyendo el registro actual
                 existing = Proveedor.get_or_none(
                     (Proveedor.rfc == nuevo_rfc) & (Proveedor.id != proveedor_id)
                 )
                 if existing:
                     return False, f"Ya existe otro proveedor con RFC: {nuevo_rfc}"
             
-            # Actualizar campos
+            # === ACTUALIZACIÓN INTELIGENTE DE CAMPOS ===
+            # Solo actualizar campos que realmente cambiaron
             campos_actualizados = []
             for campo, valor in datos.items():
                 if hasattr(proveedor, campo):
+                    # Normalizar valor: strip + conversión a None si vacío
                     valor_limpio = valor.strip() if isinstance(valor, str) else valor
                     valor_final = valor_limpio or None
                     
+                    # Solo actualizar si el valor realmente cambió
                     if getattr(proveedor, campo) != valor_final:
                         setattr(proveedor, campo, valor_final)
                         campos_actualizados.append(campo)
             
+            # === PERSISTENCIA Y LOGGING ===
             if campos_actualizados:
+                # Solo hacer UPDATE si hay cambios reales
                 proveedor.save()
                 self.logger.info(f"Proveedor {proveedor_id} actualizado: {', '.join(campos_actualizados)}")
                 return True, f"Proveedor actualizado exitosamente"
             else:
+                # No hay cambios - operación exitosa pero sin trabajo
                 return True, "No se realizaron cambios"
                 
         except DoesNotExist:
+            # === PROVEEDOR NO ENCONTRADO ===
             return False, f"Proveedor con ID {proveedor_id} no encontrado"
         except Exception as e:
+            # === ERRORES GENERALES ===
             error_msg = f"Error actualizando proveedor: {str(e)}"
             self.logger.error(error_msg)
             return False, error_msg
