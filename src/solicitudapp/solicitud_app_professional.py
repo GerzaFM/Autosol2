@@ -1458,14 +1458,17 @@ class SolicitudApp(tb.Frame):
             comentarios = self.comentarios.get("1.0", "end").strip()
             logger.info("Datos del formulario recopilados correctamente (conceptos se recopilarán después de división)")
 
-            # Detectar si es la segunda factura (VC) después de dividir
+            # Detectar si es la segunda factura después de dividir
             dividir_marcado = self.dividir_var.get()
             dividir_habilitado = str(self.chb_dividir.cget('state')) == "normal"
-            es_segunda_factura = (dividir_marcado and not dividir_habilitado and 
-                                solicitud_data.get("Tipo", "").startswith("VC"))
+            
+            # LÓGICA CORREGIDA: Detectar segunda factura basándose en:
+            # 1. Checkbox dividir deshabilitado (ya se generó primera factura)
+            # No importa el tipo específico, ya que puede ser VC u otro tipo
+            es_segunda_factura = not dividir_habilitado
             
             if es_segunda_factura:
-                logger.info("Detectada segunda factura (VC) después de dividir")
+                logger.info("Detectada segunda factura después de dividir")
                 
                 # Si la factura original estaba duplicada (XML ya existía), 
                 # usar el folio que ya se pidió al inicio
@@ -1559,10 +1562,20 @@ class SolicitudApp(tb.Frame):
                 logger.debug(f"DEBUG - dividir_marcado: {dividir_marcado}")
                 logger.debug(f"DEBUG - dividir_habilitado: {dividir_habilitado}")
                 
-                # Verificar si la factura está duplicada O si estamos en contexto de división con duplicado
+                # Verificar si la factura NO debe guardarse en base de datos
+                # Casos donde NO se guarda:
+                # 1. Factura duplicada sin división (primera factura normal duplicada)
+                # 2. Primera factura de división con duplicado (la SC ya existe en BD)
+                # 
+                # Casos donde SÍ se guarda:
+                # 1. Primera factura de división normal (SC nueva)
+                # 2. Segunda factura de división (VC siempre es nueva, incluso con duplicado)
+                # 3. Factura normal sin división
                 es_contexto_no_guardar = (
-                    self.factura_duplicada or 
-                    (self.division_con_duplicado and es_segunda_factura)
+                    # Factura duplicada sin división
+                    (self.factura_duplicada and not (dividir_marcado or es_segunda_factura)) or
+                    # Primera factura de división con duplicado (SC ya existe)
+                    (self.division_con_duplicado and not es_segunda_factura)
                 )
                 
                 logger.debug(f"DEBUG - es_contexto_no_guardar: {es_contexto_no_guardar}")
@@ -1604,10 +1617,10 @@ class SolicitudApp(tb.Frame):
                 logger.info(f"Ruta de guardado seleccionada: {ruta}")
                 
                 if es_contexto_no_guardar:
-                    if self.factura_duplicada and not es_segunda_factura:
-                        logger.info("Factura duplicada detectada, omitiendo guardado en base de datos")
-                    elif self.division_con_duplicado and es_segunda_factura:
-                        logger.info("Segunda factura en división con duplicado, omitiendo guardado en base de datos")
+                    if self.factura_duplicada and not (dividir_marcado or es_segunda_factura):
+                        logger.info("Factura duplicada sin división detectada, omitiendo guardado en base de datos")
+                    elif self.division_con_duplicado and not es_segunda_factura:
+                        logger.info("Primera factura en división con duplicado (SC ya existe), omitiendo guardado en base de datos")
                     
                     # Usar el folio interno manual proporcionado por el usuario
                     folio_a_usar = self.folio_interno_manual or "DUPLICADO"
@@ -1694,15 +1707,32 @@ class SolicitudApp(tb.Frame):
             logger.info("Formulario rellenado con datos de la factura")
 
             # Mensaje de éxito personalizado según si se guardó en BD o no
-            if self.factura_duplicada:
-                mensaje_exito = (
-                    f"Solicitud generada correctamente en:\n{ruta}\n\n"
-                    f"NOTA: La factura ya existía en la base de datos, "
-                    f"por lo que no se guardó nuevamente.\n"
-                    f"Folio interno asignado: {self.folio_interno_manual}"
-                )
+            if es_contexto_no_guardar:
+                if self.factura_duplicada and not (dividir_marcado or es_segunda_factura):
+                    mensaje_exito = (
+                        f"Solicitud generada correctamente en:\n{ruta}\n\n"
+                        f"NOTA: La factura ya existía en la base de datos, "
+                        f"por lo que no se guardó nuevamente.\n"
+                        f"Folio interno asignado: {self.folio_interno_manual}"
+                    )
+                elif self.division_con_duplicado and not es_segunda_factura:
+                    mensaje_exito = (
+                        f"Primera factura (SC) generada correctamente en:\n{ruta}\n\n"
+                        f"NOTA: Esta factura ya existía en la base de datos, "
+                        f"por lo que no se guardó nuevamente.\n"
+                        f"Folio interno asignado: {self.folio_interno_manual}"
+                    )
+                else:
+                    mensaje_exito = (
+                        f"Solicitud generada correctamente en:\n{ruta}\n\n"
+                        f"NOTA: No se guardó en la base de datos.\n"
+                        f"Folio interno asignado: {self.folio_interno_manual}"
+                    )
             else:
-                mensaje_exito = f"Solicitud generada y guardada correctamente en:\n{ruta}"
+                if es_segunda_factura:
+                    mensaje_exito = f"Segunda factura (VC) generada y guardada correctamente en:\n{ruta}"
+                else:
+                    mensaje_exito = f"Solicitud generada y guardada correctamente en:\n{ruta}"
             
             messagebox.showinfo("Éxito", mensaje_exito)
             logger.info(f"Solicitud generada y guardada en: {ruta}")
@@ -1711,15 +1741,15 @@ class SolicitudApp(tb.Frame):
             if dividir_habilitado and dividir_marcado:
                 self.chb_dividir.config(state="disabled")
                 
-                # Configurar el tipo de vale a VC (usando la misma lógica que el resto del código)
+                # Configurar el tipo de vale a VC por defecto (el usuario puede cambiarlo si necesita)
                 if hasattr(self.solicitud_frame, 'tipo_search') and self.solicitud_frame.tipo_search:
                     # Es SearchEntry, buscar específicamente el item con clave 'VC'
-                    logger.info("Buscando item VC en SearchEntry")
+                    logger.info("Estableciendo VC como tipo por defecto para segunda factura")
                     vc_encontrado = False
                     for item in self.solicitud_frame.tipo_search.items:
                         if item.get('clave') == 'VC':
                             self.solicitud_frame.tipo_search.set_selection(item)
-                            logger.info(f"Tipo VC seleccionado exitosamente: {item}")
+                            logger.info(f"Tipo VC seleccionado por defecto: {item}")
                             vc_encontrado = True
                             break
                     
@@ -1733,15 +1763,15 @@ class SolicitudApp(tb.Frame):
                                 break
                 else:
                     # Es Combobox tradicional (caso poco probable según la verificación)
-                    logger.info("Usando Combobox tradicional para Tipo")
+                    logger.info("Usando Combobox tradicional para establecer VC por defecto")
                     tipo_widget = self.solicitud_frame.entries["Tipo"]
                     if hasattr(tipo_widget, 'set'):
                         tipo_widget.set("VC - VALE DE CONTROL")
-                        logger.info("Tipo VC establecido en Combobox")
+                        logger.info("Tipo VC establecido por defecto en Combobox")
                     else:
                         logger.warning("Widget Tipo no soporta método set()")
                         
-                logger.info("Checkbox dividir deshabilitado y tipo de vale cambiado a VC")
+                logger.info("Checkbox dividir deshabilitado y tipo de vale establecido a VC por defecto")
                 
                 # CALCULAR VALORES COMPLEMENTARIOS INMEDIATAMENTE
                 logger.info("Calculando valores complementarios para la segunda factura")
@@ -1751,8 +1781,9 @@ class SolicitudApp(tb.Frame):
                 messagebox.showinfo(
                     "Segunda Factura Lista", 
                     f"Primera factura (SC) guardada correctamente.\n\n"
-                    f"El tipo se ha cambiado a 'VC - VALE DE CONTROL'.\n"
-                    f"Los valores complementarios han sido calculados automáticamente.\n\n"
+                    f"El tipo se ha establecido a 'VC - VALE DE CONTROL' por defecto.\n"
+                    f"NOTA: Puede cambiar el tipo si la segunda factura no es VC.\n\n"
+                    f"Los valores complementarios han sido calculados automáticamente.\n"
                     f"Haga clic en 'Generar' nuevamente para guardar la segunda factura."
                 )
                 
