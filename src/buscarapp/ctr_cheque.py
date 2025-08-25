@@ -438,12 +438,32 @@ class Cheque:
         # Construir string de cuentas mayores con todas las cuentas necesarias
         cuentas_lista = []
         
-        # SIEMPRE incluir cuenta del proveedor si existe, aunque sea vacía o por defecto
-        if proveedor_cuenta_mayor:
-            cuentas_lista.append(str(proveedor_cuenta_mayor))
-        elif nombre_proveedor:  # Si tenemos proveedor pero no cuenta_mayor, usar cuenta por defecto
-            # Podríamos usar una cuenta por defecto o dejar vacío, por ahora usar "1200" como cuenta de proveedores
-            cuentas_lista.append("1200")  # Cuenta por defecto para proveedores
+        # MODIFICADO: Usar cuenta_mayor de OrdenCompra en lugar del proveedor
+        orden_cuenta_mayor = None
+        
+        # Buscar la OrdenCompra asociada a la factura
+        if folio_interno and OrdenCompra:
+            try:
+                orden_compra = OrdenCompra.select().where(
+                    OrdenCompra.factura == folio_interno
+                ).first()
+                
+                if orden_compra and orden_compra.cuenta_mayor:
+                    orden_cuenta_mayor = orden_compra.cuenta_mayor
+                    print(f"🏦 DEBUG: Usando cuenta mayor de OrdenCompra: {orden_cuenta_mayor}")
+                else:
+                    print(f"🔍 DEBUG: No se encontró OrdenCompra o sin cuenta mayor para factura {folio_interno}")
+            except Exception as e:
+                print(f"Error obteniendo cuenta mayor de OrdenCompra: {e}")
+        
+        # SIEMPRE incluir cuenta de la orden o cuenta por defecto
+        if orden_cuenta_mayor:
+            cuentas_lista.append(str(orden_cuenta_mayor))
+            print(f"✅ DEBUG: Agregada cuenta mayor de orden: {orden_cuenta_mayor}")
+        else:
+            # Si no hay cuenta_mayor en OrdenCompra, usar "23020000" en lugar de "1200"
+            cuentas_lista.append("23020000")  # Cuenta por defecto modificada
+            print(f"⚠️ DEBUG: Usando cuenta por defecto: xxxx0000")
         
         # Agregar cuenta de banco si existe
         if banco_cuenta_mayor:

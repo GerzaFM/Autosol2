@@ -28,7 +28,8 @@ class FormPDF:
         :param ruta_salida: Ruta donde se guardará el PDF generado.
         """
         try:
-            self.pdf.fill(datos)
+            # Usar simple_mode=False para mantener el formulario editable
+            self.pdf.fill(datos, simple_mode=False)
             with open(ruta_salida, "wb") as output:
                 output.write(self.pdf.read())
             print(f"PDF generado correctamente en: {ruta_salida}")
