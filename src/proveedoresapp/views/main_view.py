@@ -54,11 +54,11 @@ class ProveedoreView(tb.Frame):
         return self.search_frame.incomplete_var.get()
     
     # Metodos para rellenar la lista
-    def clear(self):
+    def clear_list(self):
         self.tree_frame.treeview.delete(*self.tree_frame.treeview.get_children())
 
     def fill_list(self, data):
-        self.clear()
+        self.clear_list()
         for item in data:
             self.tree_frame.treeview.insert("", "end", values=item)
 
@@ -90,14 +90,19 @@ class ProveedoreView(tb.Frame):
 
     # Métodos para obtener datos del formulario
     def get_form_data(self):
-        return {key: entry.get() for key, entry in self.entries.items()}
+        return {key: entry.get_search_text() if hasattr(entry, 'get_search_text') else entry.get() 
+                for key, entry in self.entries.items()}
     
     def fill_form(self, data):
         for key, value in data.items():
             if key in self.entries:
-                self.entries[key].entry.delete(0, 'end')
-                self.entries[key].entry.insert(0, value)
+                # Usar el método set_text del SearchBar para manejar correctamente placeholder vs datos reales
+                self.entries[key].set_text(value)
 
-    def clean_form(self):
+    def clear_form(self):
         for entry in self.entries.values():
-            entry.entry.delete(0, 'end')
+            entry.clear_search()
+
+    def set_editable(self, editable):
+        for entry in self.entries.values():
+            entry.set_editable(editable) 

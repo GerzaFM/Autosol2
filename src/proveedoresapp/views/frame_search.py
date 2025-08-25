@@ -16,8 +16,8 @@ class SearchFrame:
         self.search_bar = SearchBar(self.inner_frame, "Buscar proveedor...", width=50)
         self.search_bar.inner_frame.pack(side=LEFT, padx=(0, 5))
 
-        # Botón de búsqueda a la derecha del SearchBar
-        self.button_search = tb.Button(self.inner_frame, text="🔍")
+        # Botón de refresh a la derecha del SearchBar
+        self.button_search = tb.Button(self.inner_frame, text="Actualizar")
         self.button_search.pack(side=LEFT)
 
         self.incomplete_var = tb.BooleanVar()
