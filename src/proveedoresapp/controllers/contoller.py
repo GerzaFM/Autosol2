@@ -7,11 +7,14 @@ class Controller:
         self.model = model
         self.view = view
 
-        #self.view.search_frame.button_search.config(command=self.on_search)
-        #self.view.button_search.config(command=self.on_search)
-        #self.view.fill_data(["Hp"])
+        self.proveedores = []
 
-    def on_search(self):
-        search_query = self.view.search_frame.search_bar.get_search_text()
-        # Aquí puedes agregar la lógica para manejar la búsqueda
-        print(f"Buscando: {search_query}")
+        self.load_proveedores()
+        self.fill_list(self.proveedores)
+
+    def load_proveedores(self):
+        self.proveedores = self.model.obtener_todos()
+
+    def fill_list(self, proveedores):
+        table_data = [list(proveedor.values()) for proveedor in proveedores]
+        self.view.fill_list(table_data)

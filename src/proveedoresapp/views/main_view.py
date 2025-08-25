@@ -57,7 +57,7 @@ class ProveedoreView(tb.Frame):
     def clear(self):
         self.tree_frame.treeview.delete(*self.tree_frame.treeview.get_children())
 
-    def fill_data(self, data):
+    def fill_list(self, data):
         self.clear()
         for item in data:
             self.tree_frame.treeview.insert("", "end", values=item)
