@@ -13,7 +13,7 @@ try:
     from bd.models import Banco, OrdenCompra, Factura, Proveedor, Cheque as ChequeModel
     # Importar configuración para cuentas mayores
     sys.path.insert(0, os.path.join(parent_dir, '..', 'config'))
-    from app_config import AppConfig
+    from app_config import AppConfig # pyright: ignore[reportMissingImports]
     # Importar TIPO_VALE desde solicitudapp
     from solicitudapp.config.app_config import AppConfig as SolicitudAppConfig
 except ImportError:
