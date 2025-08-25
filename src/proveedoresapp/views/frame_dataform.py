@@ -48,7 +48,6 @@ class DataForm:
         self.entry_rfc = SearchBar(frame_midle , placeholder="RFC", width=small)
         self.entry_nombre_quiter = SearchBar(frame_midle, placeholder="Nombre quiter", width=large)
         self.entry_telefono = SearchBar(frame_midle, placeholder="Telefono", width=medium)
-        self.entry_cuenta_mayor = SearchBar(frame_midle, placeholder="Cuenta mayor", width=medium)
 
         # Empaquetar los widgets
         self.entry_codigo.pack(side=LEFT, fill=X, padx=5, pady=5)
@@ -58,8 +57,7 @@ class DataForm:
 
         self.entry_rfc.pack(side=LEFT, fill=X, padx=5, pady=5)       
         self.entry_nombre_quiter.pack(side=LEFT, fill=X, padx=5, pady=5)
-        self.entry_telefono.pack(side=LEFT, fill=X, padx=5, pady=5)       
-        self.entry_cuenta_mayor.pack(side=LEFT, fill=X, padx=5, pady=5)
+        self.entry_telefono.pack(side=LEFT, fill=X, padx=5, pady=5)
 
 
     def create_buttons(self):

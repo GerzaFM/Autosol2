@@ -42,8 +42,7 @@ class ProveedoreView(tb.Frame):
             "nombre_contacto": self.data_form.entry_nombre_contacto,
             "rfc": self.data_form.entry_rfc,
             "nombre_quiter": self.data_form.entry_nombre_quiter,
-            "telefono": self.data_form.entry_telefono,
-            "cuenta_mayor": self.data_form.entry_cuenta_mayor
+            "telefono": self.data_form.entry_telefono
         }
 
     # Métodos para obtener datos de la vista

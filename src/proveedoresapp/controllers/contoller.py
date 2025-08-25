@@ -177,8 +177,7 @@ class Controller:
             'nombre_contacto': proveedor_data.get('nombre_contacto', ''),
             'rfc': proveedor_data.get('rfc', ''),
             'nombre_quiter': proveedor_data.get('nombre_en_quiter', ''),
-            'telefono': proveedor_data.get('telefono', ''),
-            'cuenta_mayor': str(proveedor_data.get('cuenta_mayor', ''))
+            'telefono': proveedor_data.get('telefono', '')
         }
         
         self.view.fill_form(form_data)
@@ -201,8 +200,7 @@ class Controller:
             'rfc': form_data.get('rfc', '').strip(),
             'telefono': form_data.get('telefono', '').strip(),
             'email': form_data.get('email', '').strip(),
-            'nombre_contacto': form_data.get('nombre_contacto', '').strip(),
-            'cuenta_mayor': form_data.get('cuenta_mayor', '').strip() or None
+            'nombre_contacto': form_data.get('nombre_contacto', '').strip()
         }
         
         # Determinar si es nuevo o edición

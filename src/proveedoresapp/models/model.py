@@ -77,8 +77,7 @@ class ProveedorModel:
                 rfc=rfc or None,
                 telefono=datos.get('telefono', '').strip() or None,
                 email=datos.get('email', '').strip() or None,
-                nombre_contacto=datos.get('nombre_contacto', '').strip() or None,
-                cuenta_mayor=datos.get('cuenta_mayor') or None
+                nombre_contacto=datos.get('nombre_contacto', '').strip() or None
             )
             
             self.logger.info(f"Proveedor creado exitosamente: ID {proveedor.id}")
@@ -196,7 +195,7 @@ class ProveedorModel:
             Lista de diccionarios con datos de proveedores
         """
         if not self.db_available:
-            return self._get_sample_data()
+            return []
             
         try:
             query = Proveedor.select()
@@ -211,7 +210,7 @@ class ProveedorModel:
             
         except Exception as e:
             self.logger.error(f"Error obteniendo proveedores: {e}")
-            return self._get_sample_data()
+            return []
 
     def buscar_proveedores(self, filtros: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -227,7 +226,7 @@ class ProveedorModel:
             Lista de diccionarios con datos de proveedores
         """
         if not self.db_available:
-            return self._get_sample_data()
+            return []
             
         try:
             query = Proveedor.select()
@@ -269,7 +268,7 @@ class ProveedorModel:
             
         except Exception as e:
             self.logger.error(f"Error buscando proveedores: {e}")
-            return self._get_sample_data()
+            return []
 
     def obtener_por_id(self, proveedor_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -282,8 +281,7 @@ class ProveedorModel:
             Diccionario con datos del proveedor o None si no existe
         """
         if not self.db_available:
-            sample_data = self._get_sample_data()
-            return sample_data[0] if sample_data else None
+            return None
             
         try:
             proveedor = Proveedor.get_by_id(proveedor_id)
@@ -375,7 +373,6 @@ class ProveedorModel:
             'telefono': proveedor.telefono or '',
             'email': proveedor.email or '',
             'nombre_contacto': proveedor.nombre_contacto or '',
-            'cuenta_mayor': proveedor.cuenta_mayor,
             # Campo calculado para mostrar el nombre preferido
             'nombre_display': proveedor.nombre or proveedor.nombre_en_quiter or 'Sin nombre',
             # Campos de estado
@@ -398,55 +395,6 @@ class ProveedorModel:
             not proveedor.telefono or
             not proveedor.email
         )
-    
-    def _get_sample_data(self) -> List[Dict[str, Any]]:
-        """
-        Obtener datos de ejemplo cuando la BD no está disponible
-        
-        Returns:
-            Lista con datos de ejemplo
-        """
-        return [
-            {
-                'id': 1,
-                'codigo_quiter': 1001,
-                'nombre': 'Proveedor Ejemplo SA',
-                'nombre_en_quiter': 'PROV EJEMPLO',
-                'rfc': 'PEJ123456789',
-                'telefono': '444-123-4567',
-                'email': 'contacto@proveedorejemplo.com',
-                'nombre_contacto': 'Juan Pérez',
-                'cuenta_mayor': 2100,
-                'nombre_display': 'Proveedor Ejemplo SA',
-                'incompleto': False
-            },
-            {
-                'id': 2,
-                'codigo_quiter': 1002,
-                'nombre': '',
-                'nombre_en_quiter': 'SERV MANTEN',
-                'rfc': '',
-                'telefono': '',
-                'email': '',
-                'nombre_contacto': '',
-                'cuenta_mayor': None,
-                'nombre_display': 'SERV MANTEN',
-                'incompleto': True
-            },
-            {
-                'id': 3,
-                'codigo_quiter': 1003,
-                'nombre': 'Servicios Integrales XYZ',
-                'nombre_en_quiter': 'SERV INTEG XYZ',
-                'rfc': 'SIX890123456',
-                'telefono': '444-987-6543',
-                'email': 'admin@serviciosxyz.com',
-                'nombre_contacto': 'María González',
-                'cuenta_mayor': 2150,
-                'nombre_display': 'Servicios Integrales XYZ',
-                'incompleto': False
-            }
-        ]
 
     # ==================== MÉTODOS ADICIONALES ====================
     
@@ -461,7 +409,7 @@ class ProveedorModel:
             Número de proveedores
         """
         if not self.db_available:
-            return len(self._get_sample_data())
+            return 0
             
         try:
             query = Proveedor.select()
@@ -500,11 +448,11 @@ class ProveedorModel:
         """
         if not self.db_available:
             return {
-                'total': 3,
-                'incompletos': 1,
-                'completos': 2,
-                'con_rfc': 2,
-                'sin_rfc': 1
+                'total': 0,
+                'incompletos': 0,
+                'completos': 0,
+                'con_rfc': 0,
+                'sin_rfc': 0
             }
         
         try:
