@@ -50,42 +50,8 @@ class TreeFrame:
 
         self.treeview.config(yscroll=scrollbar.set)
 
-    def clear(self):
-        self.treeview.delete(*self.treeview.get_children())
-
-    def fill_data(self, data):
-        self.clear()
-        for item in data:
-            self.treeview.insert("", "end", values=item)
-
-    def get_selection(self):
-        selected_item = self.treeview.selection()
-        if selected_item:
-            return self.treeview.item(selected_item, "values")
-        return None
-    
-    def get_selected_id(self):
-        selected_item = self.treeview.selection()
-        if selected_item:
-            item_id = int(self.treeview.item(selected_item, "values")[0])
-            return item_id
-        return None
-
-    def add_item(self, item):
-        self.treeview.insert("", "end", values=item)
-
-    def remove_selected(self):
-        selected_item = self.treeview.selection()
-        if selected_item:
-            self.treeview.delete(selected_item)
-
-    def modify_selected(self, new_values):
-        selected_item = self.treeview.selection()
-        if selected_item:
-            self.treeview.item(selected_item, values=new_values)
-
     def sort_by_column(self, col, reverse):
-        data = [(self.treeview.set(k, col), k) for k in self.treeview.get_children("")]
+        data = [(self.tree_frame.treeview.set(k, col), k) for k in self.tree_frame.treeview.get_children("")]
         try:
             data.sort(key=lambda t: float(t[0]), reverse=reverse)
         except ValueError:

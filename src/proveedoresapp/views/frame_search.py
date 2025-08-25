@@ -20,5 +20,6 @@ class SearchFrame:
         self.button_search = tb.Button(self.inner_frame, text="🔍")
         self.button_search.pack(side=LEFT)
 
-        self.switch_incomplete = tb.Checkbutton(self.inner_frame, text="Incompletos", bootstyle="success-round-toggle")
+        self.incomplete_var = tb.BooleanVar()
+        self.switch_incomplete = tb.Checkbutton(self.inner_frame, text="Incompletos", bootstyle="success-round-toggle", variable=self.incomplete_var)
         self.switch_incomplete.pack(side=LEFT, padx=(15, 0))

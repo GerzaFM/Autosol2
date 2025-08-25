@@ -59,7 +59,7 @@ class DataForm:
         self.entry_rfc.pack(side=LEFT, fill=X, padx=5, pady=5)       
         self.entry_nombre_quiter.pack(side=LEFT, fill=X, padx=5, pady=5)
         self.entry_telefono.pack(side=LEFT, fill=X, padx=5, pady=5)       
-        self.entry_cuenta_mayor.pack(side=LEFT, fill=X, padx=5, pady=5)  
+        self.entry_cuenta_mayor.pack(side=LEFT, fill=X, padx=5, pady=5)
 
 
     def create_buttons(self):
