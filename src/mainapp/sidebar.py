@@ -16,62 +16,52 @@ class SidebarComponent(tb.Frame):
     
     def __init__(self, parent, width_expanded: int = 200, width_collapsed: int = 60, **kwargs):
         """
-        Inicializa la barra lateral.
+        Inicializa la navbar horizontal.
         
         Args:
             parent: Widget padre
-            width_expanded: Ancho cuando está expandida
-            width_collapsed: Ancho cuando está colapsada
+            width_expanded: No usado (mantenido para compatibilidad)
+            width_collapsed: No usado (mantenido para compatibilidad)
         """
         super().__init__(parent, **kwargs)
         
         self.logger = get_logger(__name__)
-        self.width_expanded = width_expanded
-        self.width_collapsed = width_collapsed
-        self.is_expanded = True
         
         # Lista de botones (btn, icon, text, callback)
         self.menu_buttons: List[Tuple[tb.Button, str, str, Optional[Callable]]] = []
         
-        # Configurar el frame
-        self.config(width=self.width_expanded, bootstyle="dark")
+        # Control de elemento activo
+        self.active_button = None
+        
+        # Configurar el frame como navbar horizontal
+        self.bar_color = "dark"
+        self.buton_color = "dark"
+        self.selected_color = "secondary"
+        self.config(height=50, bootstyle=self.bar_color)  # Altura fija para navbar con fondo gris
+        self.pack_propagate(False)  # Mantener altura fija
         
         self._create_widgets()
     
     def _create_widgets(self):
-        """Crea los widgets base de la barra lateral."""
-        # Botón de colapsar/expandir
-        self.toggle_button = tb.Button(
-            self,
-            text="≡",
-            width=3,
-            bootstyle="secondary",
-            command=self.toggle
-        )
-        self.toggle_button.pack(side=TOP, padx=5, pady=10, anchor='w')
+        """Crea los widgets base de la navbar horizontal."""
+        # Frame para botones principales (centrados horizontalmente)
+        self.top_frame = tb.Frame(self, bootstyle=self.bar_color)
+        self.top_frame.pack(side=LEFT, expand=True, padx=0, pady=4)
         
-        # Frame para botones superiores
-        self.top_frame = tb.Frame(self, bootstyle="dark")
-        self.top_frame.pack(side=TOP, fill="x", padx=5, pady=2)
-        
-        # Espaciador
-        self.spacer = tb.Label(self, text="", bootstyle="dark")
-        self.spacer.pack(side=TOP, fill="both", expand=True)
-        
-        # Frame para botones inferiores
-        self.bottom_frame = tb.Frame(self, bootstyle="dark")
-        self.bottom_frame.pack(side=BOTTOM, fill="x", padx=5, pady=2)
+        # Frame para botones secundarios (lado derecho)
+        self.bottom_frame = tb.Frame(self, bootstyle=self.bar_color)
+        self.bottom_frame.pack(side=RIGHT, padx=0, pady=4)
     
     def add_menu_item(self, text: str, icon: str, callback: Optional[Callable] = None, 
                      position: str = "top") -> tb.Button:
         """
-        Agrega un elemento al menú.
+        Agrega un elemento al menú navbar horizontal.
         
         Args:
             text: Texto del botón
             icon: Icono del botón
             callback: Función a ejecutar al hacer clic
-            position: "top" o "bottom"
+            position: "top" (centro) o "bottom" (derecha)
             
         Returns:
             El botón creado
@@ -80,92 +70,45 @@ class SidebarComponent(tb.Frame):
         
         btn = tb.Button(
             parent_frame,
-            text=f"{icon}   {text}",  # Sin formato de relleno
-            bootstyle="dark",
+            text=f"{icon}   {text}",  # Siempre mostrar icono y texto
+            bootstyle=self.buton_color,
             command=callback
         )
         
+        # Empaquetado horizontal
         if position == "top":
-            btn.pack(side=TOP, pady=2, anchor='w')  # Sin fill="x"
+            btn.pack(side=LEFT, padx=5, pady=2)  # Botones principales en el centro
         else:
-            btn.pack(side=BOTTOM, pady=2, anchor='w')
+            btn.pack(side=RIGHT, padx=5, pady=2)  # Botones secundarios a la derecha
 
-        # Agregar efectos hover
-        self._bind_hover_effects(btn)
-        
-        # Guardar referencia
+        # Agregar a la lista de referencias (sin efectos hover)
         self.menu_buttons.append((btn, icon, text, callback))
         
         self.logger.debug(f"Elemento de menú agregado: {text}")
         return btn
-    
-    def _bind_hover_effects(self, button: tb.Button):
+
+    def set_active_item(self, button: tb.Button):
         """
-        Agrega efectos de hover a un botón.
+        Establece el elemento activo usando un estilo outline más sutil.
         
         Args:
-            button: Botón al que agregar efectos
+            button: El botón a marcar como activo
         """
-        def on_enter(event):
-            button.config(bootstyle="success")
+        # Restaurar el botón anterior a su estado normal
+        if self.active_button:
+            try:
+                # Restaurar estilo normal
+                self.active_button.config(bootstyle=self.buton_color)
+            except Exception as e:
+                self.logger.debug(f"Error al restaurar estilo normal: {e}")
         
-        def on_leave(event):
-            button.config(bootstyle="dark")
-        
-        button.bind("<Enter>", on_enter)
-        button.bind("<Leave>", on_leave)
-    
-    def toggle(self):
-        """Alterna entre expandido y colapsado."""
-        self.is_expanded = not self.is_expanded
-        self._update_state()
-    
-    def expand(self):
-        """Expande la barra lateral."""
-        if not self.is_expanded:
-            self.is_expanded = True
-            self._update_state()
-    
-    def collapse(self):
-        """Colapsa la barra lateral."""
-        if self.is_expanded:
-            self.is_expanded = False
-            self._update_state()
-    
-    def _update_state(self):
-        """Actualiza el estado visual de la barra lateral."""
-        try:
-            if self.is_expanded:
-                self.config(width=self.width_expanded)
-                # Mostrar texto completo en botones
-                for btn, icon, text, _ in self.menu_buttons:
-                    btn.config(text=f"{icon}   {text}")
-            else:
-                self.config(width=self.width_collapsed)
-                # Mostrar solo iconos
-                for btn, icon, text, _ in self.menu_buttons:
-                    btn.config(text=icon)
-            
-            # Forzar actualización
-            self.update_idletasks()
-            
-        except Exception as e:
-            self.logger.error(f"Error al actualizar estado de barra lateral: {e}")
-    
-    def set_active_item(self, text: str):
-        """
-        Marca un elemento como activo.
-        
-        Args:
-            text: Texto del elemento a marcar como activo
-        """
-        for btn, icon, btn_text, _ in self.menu_buttons:
-            if btn_text == text:
-                btn.config(bootstyle="primary")
-            else:
-                btn.config(bootstyle="dark")
-    
-    def clear_active(self):
-        """Limpia la selección activa."""
-        for btn, _, _, _ in self.menu_buttons:
-            btn.config(bootstyle="dark")
+        # Establecer nuevo botón activo
+        self.active_button = button
+        if button:
+            try:
+                # Aplicar estilo outline para diferenciación visual sutil
+                button.config(bootstyle=self.selected_color)
+            except Exception as e:
+                self.logger.debug(f"Error al aplicar estilo activo: {e}")
+                # Fallback: mantener el botón como está
+                pass

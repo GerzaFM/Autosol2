@@ -79,6 +79,9 @@ class MainWindow(tb.Window):
         self._create_layout()
         self._setup_menu_items()
         
+        # Iniciar directamente con la vista de Nueva Solicitud
+        self._show_view("nueva")
+        
         self.logger.info("Ventana principal inicializada")
     
     def _center_window(self):
@@ -120,58 +123,23 @@ class MainWindow(tb.Window):
     
     def _create_layout(self):
         """Crea el layout principal de la ventana."""
-        # Barra superior
-        self.header_frame = tb.Frame(self, bootstyle="secondary", height=50)
-        self.header_frame.pack(side=TOP, fill=X)
-        self.header_frame.pack_propagate(False)
-        
-        # Contenedor principal
+        # Contenedor principal 
         self.main_container = tb.Frame(self)
-        self.main_container.pack(side=TOP, fill=BOTH, expand=True)
+        self.main_container.pack(fill=BOTH, expand=True)
         
-        # Barra lateral
+        # Barra lateral (ahora como navbar horizontal en la parte superior)
         self.sidebar = SidebarComponent(
             self.main_container,
             width_expanded=config.ui.sidebar_width_expanded,
             width_collapsed=config.ui.sidebar_width_collapsed
         )
-        self.sidebar.pack(side=LEFT, fill=Y)
+        self.sidebar.pack(side=TOP, fill=X)
         
-        # Área de contenido
+        # Área de contenido (ahora debajo de la navbar)
         self.content_frame = tb.Frame(self.main_container, bootstyle="dark")
-        self.content_frame.pack(side=RIGHT, fill=BOTH, expand=True)
+        self.content_frame.pack(side=TOP, fill=BOTH, expand=True)
         
-        self._create_header_content()
-        self._create_initial_content()
-    
-    def _create_header_content(self):
-        """Crea el contenido de la barra superior."""
-        # Título de la aplicación
-        title_label = tb.Label(
-            self.header_frame,
-            text=config.app_name,
-            font=("Segoe UI", 15, "bold"),
-            bootstyle="inverse-secondary"
-        )
-        title_label.pack(side=LEFT, padx=10, pady=10)
-        
-        # Información del usuario/departamento
-        info_label = tb.Label(
-            self.header_frame,
-            text="Administración",
-            font=("Segoe UI", 10),
-            bootstyle="inverse-secondary"
-        )
-        info_label.pack(side=RIGHT, padx=10, pady=10)
-        
-        # Versión (opcional)
-        version_label = tb.Label(
-            self.header_frame,
-            text=f"v{config.version}",
-            font=("Segoe UI", 8),
-            bootstyle="inverse-secondary"
-        )
-        version_label.pack(side=RIGHT, padx=(0, 10), pady=10)
+        # No crear contenido inicial, se mostrará la vista después de setup_menu_items
     
     def _create_initial_content(self):
         """Crea el contenido inicial del área principal."""
@@ -199,45 +167,48 @@ class MainWindow(tb.Window):
     
     def _setup_menu_items(self):
         """Configura los elementos del menú lateral."""
+        # Diccionario para mapear nombres de vista a botones
+        self.view_buttons = {}
+        
         # Elementos principales (parte superior)
-        self.sidebar.add_menu_item(
-            "Nueva Solicitud", "📄", 
+        self.view_buttons["nueva"] = self.sidebar.add_menu_item(
+            "Nueva", "📄", 
             lambda: self._show_view("nueva"), 
             "top"
         )
-        self.sidebar.add_menu_item(
+        self.view_buttons["buscar"] = self.sidebar.add_menu_item(
             "Buscar", "🔍", 
             lambda: self._show_view("buscar"), 
             "top"
         )
-        self.sidebar.add_menu_item(
+        self.view_buttons["cheques"] = self.sidebar.add_menu_item(
             "Cheques", "🏦", 
             lambda: self._show_view("cheques"), 
             "top"
         )
-        self.sidebar.add_menu_item(
+        self.view_buttons["proveedores"] = self.sidebar.add_menu_item(
             "Proveedores", "🏢",
             lambda: self._show_view("proveedores"),
             "top"
         )
 
         # Elementos de configuración (parte inferior)
-        self.sidebar.add_menu_item(
+        self.view_buttons["config"] = self.sidebar.add_menu_item(
             "Configuración", "⚙️", 
             lambda: self._show_view("config"), 
             "bottom"
         )
-        self.sidebar.add_menu_item(
+        self.view_buttons["database"] = self.sidebar.add_menu_item(
             "Base de Datos", "💾", 
             lambda: self._show_view("database"), 
             "bottom"
         )
-        self.sidebar.add_menu_item(
+        self.view_buttons["cuenta"] = self.sidebar.add_menu_item(
             "Cuenta", "👤", 
             lambda: self._show_view("cuenta"), 
             "bottom"
         )
-        self.sidebar.add_menu_item(
+        self.view_buttons["nueva_vista"] = self.sidebar.add_menu_item(
             "Usuarios", "👥", 
             lambda: self._show_view("nueva_vista"), 
             "bottom"
@@ -251,26 +222,12 @@ class MainWindow(tb.Window):
             view_name: Nombre de la vista a mostrar
         """
         try:
-            # Colapsar sidebar al seleccionar una opción
-            self.sidebar.collapse()
+            # Establecer el botón activo (fuente en negrita)
+            if view_name in self.view_buttons:
+                self.sidebar.set_active_item(self.view_buttons[view_name])
             
             # Limpiar contenido actual
             self._clear_content()
-            
-            # Marcar elemento activo en el sidebar
-            view_names = {
-                "nueva": "Nueva Solicitud",
-                "buscar": "Buscar",
-                "cheques": "Cheques",
-                "proveedores": "Proveedores",
-                "nueva_vista": "Usuarios",
-                "config": "Configuración",
-                "database": "Base de Datos",
-                "cuenta": "Cuenta"
-            }
-            
-            if view_name in view_names:
-                self.sidebar.set_active_item(view_names[view_name])
             
             # Mostrar la vista correspondiente
             if view_name == "nueva":
