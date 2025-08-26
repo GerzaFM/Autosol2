@@ -14,6 +14,7 @@ sys.path.insert(0, str(PROJECT_ROOT / 'src'))
 from config.settings import config, LOGS_DIR
 from app.core.application import Application
 from app.utils.logger import setup_logging
+from src.bd.database import db_manager
 
 def setup_environment():
     """Configura el entorno de la aplicación."""
@@ -26,6 +27,16 @@ def setup_environment():
     logger = logging.getLogger(__name__)
     logger.info(f"Iniciando {config.app_name} v{config.version}")
     logger.info(f"Directorio de trabajo: {PROJECT_ROOT}")
+    
+    # Probar conexión de base de datos
+    if not db_manager.test_connection():
+        logger.error("No se pudo establecer conexión con la base de datos")
+        raise ConnectionError("Base de datos no disponible")
+    
+    # Crear tablas si es necesario
+    from src.bd.models import ALL_MODELS
+    db_manager.create_tables(ALL_MODELS)
+    logger.info("Base de datos inicializada correctamente")
 
 def main():
     """Función principal de la aplicación."""

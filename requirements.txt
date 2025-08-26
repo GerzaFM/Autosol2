@@ -6,6 +6,8 @@ ttkbootstrap>=1.10.1
 
 # Base de datos
 peewee>=3.17.0
+psycopg2-binary>=2.9.0  # Driver PostgreSQL
+python-decouple>=3.6  # Para variables de entorno
 
 # Procesamiento de archivos
 lxml>=4.9.0

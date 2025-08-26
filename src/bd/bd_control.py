@@ -1,23 +1,21 @@
-from bd.models import db, Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario, RepartoFavorito
+from .models import Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario, RepartoFavorito
+from .database import db_manager
 import os
 
 class DBManager:
     def __init__(self):
-        # Configurar la ruta absoluta a la base de datos
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(current_dir))
-        db_path = os.path.join(project_root, "facturas.db")
+        # Usar el nuevo sistema de base de datos
+        self.db = db_manager.db
         
-        # Reconectar con la ruta correcta
-        if db.is_closed():
-            db.init(db_path)
+        # Asegurar que la conexión esté activa
+        if not db_manager.test_connection():
+            raise ConnectionError("No se pudo establecer conexión con la base de datos")
         
-        db.connect(reuse_if_open=True)
-        db.create_tables([Proveedor, Factura, Concepto, Reparto, Vale, OrdenCompra, Banco, Usuario, RepartoFavorito], safe=True)
+        # Las tablas ya están creadas por el sistema principal
 
     def guardar_formulario(self, data):
         try:
-            with db.atomic():  # Usar transacción atómica
+            with self.db.atomic():  # Usar transacción atómica
                 # Preparar serie para la factura ANTES de validar duplicados
                 serie_original = data.get("serie")
                 
@@ -221,8 +219,8 @@ class DBManager:
             raise
 
     def cerrar(self):
-        if not db.is_closed():
-            db.close()
+        # El nuevo sistema de base de datos maneja las conexiones automáticamente
+        pass
     
     def guardar_reparto_favorito(self, usuario_id, posicion, nombre, categorias):
         """Guarda un reparto como favorito para un usuario en una posición específica."""

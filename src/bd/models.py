@@ -1,190 +1,235 @@
-from peewee import SqliteDatabase, Model, CharField, DateField, DecimalField, ForeignKeyField, IntegerField, AutoField, BooleanField
+"""
+Modelos de base de datos usando Peewee ORM.
+Soporta SQLite y PostgreSQL.
+"""
+
+from peewee import (
+    Model, CharField, DateField, DecimalField, 
+    ForeignKeyField, IntegerField, AutoField, 
+    BooleanField, TextField
+)
 import os
+import logging
 
-# Configurar la ruta absoluta a la base de datos
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
-db_path = os.path.join(project_root, "facturas.db")
+# Importar la conexión de base de datos
+from .database import db
 
-db = SqliteDatabase(db_path)
+logger = logging.getLogger(__name__)
 
 class Proveedor(Model):
-    id = IntegerField(primary_key=True)  # Primary key autoincremental
+    """Modelo de proveedores."""
+    id = IntegerField(primary_key=True)
     codigo_quiter = IntegerField(null=True)
-    nombre = CharField(null=True)  # Permitir NULL - se llenará al procesar facturas
-    nombre_en_quiter = CharField(null=True)  # Nombre del proveedor en el sistema Quiter
-    rfc = CharField(null=True)     # Permitir NULL y quitar unique - se llenará al procesar facturas
-    telefono = CharField(null=True)
-    email = CharField(null=True)
-    nombre_contacto = CharField(null=True)
-    cuenta_mayor = IntegerField(null=True)  # Cuenta mayor, deberia ser una tabla de cuentas mayores
+    nombre = CharField(max_length=255, null=True)
+    nombre_en_quiter = CharField(max_length=255, null=True)
+    rfc = CharField(max_length=13, null=True)  # RFC máximo 13 caracteres
+    telefono = CharField(max_length=20, null=True)
+    email = CharField(max_length=100, null=True)
+    nombre_contacto = CharField(max_length=255, null=True)
+    cuenta_mayor = IntegerField(null=True)
     
     class Meta:
         database = db
+        table_name = 'proveedores'
 
 
 class Layout(Model):
+    """Modelo de layouts."""
     id = IntegerField(primary_key=True)
     fecha = DateField()
-    nombre = CharField()
-    monto = DecimalField()
+    nombre = CharField(max_length=255)
+    monto = DecimalField(max_digits=15, decimal_places=2)
 
     class Meta:
         database = db
+        table_name = 'layouts'
 
 class Cheque(Model):
-    id = AutoField()  # Primary key autoincremental
+    """Modelo de cheques."""
+    id = AutoField()
     fecha = DateField()
-    vale = CharField()
-    folio = CharField()
-    proveedor = ForeignKeyField(Proveedor, backref='cheques', null=True, column_name='proveedor')  # Especificar nombre de columna
-    monto = DecimalField()
-    banco = CharField()
-    layout = ForeignKeyField(Layout, backref='cheques', null=True, column_name='layout')  # Especificar nombre de columna
+    vale = CharField(max_length=50)
+    folio = CharField(max_length=50)
+    proveedor = ForeignKeyField(Proveedor, backref='cheques', null=True, column_name='proveedor_id')
+    monto = DecimalField(max_digits=15, decimal_places=2)
+    banco = CharField(max_length=100)
+    layout = ForeignKeyField(Layout, backref='cheques', null=True, column_name='layout_id')
 
     class Meta:
         database = db
+        table_name = 'cheques'
 
 class Factura(Model):
+    """Modelo de facturas."""
     folio_interno = IntegerField(primary_key=True)
-    serie = CharField()  # Cambiado de IntegerField a CharField para manejar "CC", "OLEK", etc.
+    serie = CharField(max_length=10)
+    folio = CharField(max_length=50)
     folio = CharField()
     fecha = DateField()
     fecha_emision = DateField()
-    tipo = CharField()
-    nombre_emisor = CharField()
-    rfc_emisor = CharField()
-    nombre_receptor = CharField()
-    rfc_receptor = CharField()
-    subtotal = DecimalField()
-    ret_iva = DecimalField(null=True)
-    ret_isr = DecimalField(null=True)
-    iva_trasladado = DecimalField(null=True)
-    total = DecimalField()
-    comentario = CharField(null=True)
-    clase = CharField(null=True)
-    departamento = CharField(null=True)
-    proveedor = ForeignKeyField(Proveedor, backref='facturas')
-    layout = ForeignKeyField(Layout, backref='facturas', null=True)
-    cheque = ForeignKeyField(Cheque, backref='facturas', null=True)
+    tipo = CharField(max_length=50)
+    nombre_emisor = CharField(max_length=255)
+    rfc_emisor = CharField(max_length=13)
+    nombre_receptor = CharField(max_length=255)
+    rfc_receptor = CharField(max_length=13)
+    subtotal = DecimalField(max_digits=15, decimal_places=2)
+    ret_iva = DecimalField(max_digits=15, decimal_places=2, null=True)
+    ret_isr = DecimalField(max_digits=15, decimal_places=2, null=True)
+    iva_trasladado = DecimalField(max_digits=15, decimal_places=2, null=True)
+    total = DecimalField(max_digits=15, decimal_places=2)
+    comentario = TextField(null=True)  # Usar TextField para comentarios largos
+    clase = CharField(max_length=50, null=True)
+    departamento = CharField(max_length=100, null=True)
+    proveedor = ForeignKeyField(Proveedor, backref='facturas', column_name='proveedor_id')
+    layout = ForeignKeyField(Layout, backref='facturas', null=True, column_name='layout_id')
+    cheque = ForeignKeyField(Cheque, backref='facturas', null=True, column_name='cheque_id')
     cargada = BooleanField(default=False)
     pagada = BooleanField(default=False)
     
     class Meta:
         database = db
+        table_name = 'facturas'
         indexes = (
-            (('proveedor', 'serie', 'folio'), True),  # Sin espacio extra
+            (('proveedor', 'serie', 'folio'), True),  # Índice único compuesto
         )
 
 
 class Concepto(Model):
+    """Modelo de conceptos de facturas."""
     id = IntegerField(primary_key=True)
-    descripcion = CharField()
-    cantidad = DecimalField()
-    precio_unitario = DecimalField()
-    total = DecimalField()
-    factura = ForeignKeyField(Factura, backref='conceptos')
+    descripcion = TextField()  # Usar TextField para descripciones largas
+    cantidad = DecimalField(max_digits=10, decimal_places=2)
+    precio_unitario = DecimalField(max_digits=15, decimal_places=2)
+    total = DecimalField(max_digits=15, decimal_places=2)
+    factura = ForeignKeyField(Factura, backref='conceptos', column_name='factura_id')
 
     class Meta:
         database = db
+        table_name = 'conceptos'
 
 class Reparto(Model):
+    """Modelo de reparto de facturas por departamentos."""
     id = IntegerField(primary_key=True)
-    comercial = DecimalField(null=True)
-    fleet = DecimalField(null=True)
-    seminuevos = DecimalField(null=True)
-    refacciones = DecimalField(null=True)
-    servicio = DecimalField(null=True)
-    hyp = DecimalField(null=True)
-    administracion = DecimalField(null=True)
-    factura = ForeignKeyField(Factura, backref='reparto', unique=True, null=True)  # Relación uno a uno
+    comercial = DecimalField(max_digits=5, decimal_places=2, null=True)
+    fleet = DecimalField(max_digits=5, decimal_places=2, null=True)
+    seminuevos = DecimalField(max_digits=5, decimal_places=2, null=True)
+    refacciones = DecimalField(max_digits=5, decimal_places=2, null=True)
+    servicio = DecimalField(max_digits=5, decimal_places=2, null=True)
+    hyp = DecimalField(max_digits=5, decimal_places=2, null=True)
+    administracion = DecimalField(max_digits=5, decimal_places=2, null=True)
+    factura = ForeignKeyField(Factura, backref='reparto', unique=True, null=True, column_name='factura_id')
 
     class Meta:
         database = db
+        table_name = 'repartos'
 
 class Vale(Model):
-    id = IntegerField(primary_key=True)  # Primary key autoincremental
-    noVale = CharField(unique=True)  # Único pero no primary key
-    tipo = CharField()
-    noDocumento = CharField()
-    descripcion = CharField()
+    """Modelo de vales."""
+    id = IntegerField(primary_key=True)
+    noVale = CharField(max_length=50, unique=True)
+    tipo = CharField(max_length=50)
+    noDocumento = CharField(max_length=50)
+    descripcion = TextField()
     referencia = IntegerField()
-    total = CharField()
+    total = CharField(max_length=50)  # Mantenido como CharField por compatibilidad
     cuenta = IntegerField(null=True) 
     fechaVale = DateField(null=True)
     departamento = IntegerField(null=True) 
     sucursal = IntegerField(null=True)
     marca = IntegerField(null=True)
     responsable = IntegerField(null=True)
-    proveedor = CharField(null=True)
-    codigo = CharField(null=True)  # Código del proveedor extraído del vale
-    factura = ForeignKeyField(Factura, backref='vale', unique=True, null=True, db_column='factura')  # Relación uno a uno con factura
+    proveedor = CharField(max_length=255, null=True)
+    codigo = CharField(max_length=50, null=True)
+    factura = ForeignKeyField(Factura, backref='vale', unique=True, null=True, column_name='factura_id')
 
     class Meta:
         database = db
+        table_name = 'vales'
 
 class OrdenCompra(Model):
+    """Modelo de órdenes de compra."""
     id = IntegerField(primary_key=True)
-    factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True)
-    cuenta = IntegerField()  # Cuenta del proveedor
-    nombre = CharField()  # Nombre del proveedor
-    referencia = IntegerField()  # Campo legacy requerido (referencia)
-    fecha = DateField()  # Campo legacy requerido (fecha)
-    importe = DecimalField()  # Importe de la orden
-    importe_en_letras = CharField()  # Importe en letras
-    iva = DecimalField(null=True)  # Campo legacy opcional
-    cuenta_mayor = IntegerField(null=True)  # Campo legacy opcional
-    ref_movimiento = CharField(null=True)  # Referencia del movimiento (nuevo)
-    codigo_banco = CharField(null=True)  # Código del banco (ej: BTC23)
-    folio_factura = CharField(null=True)  # Folio de la factura extraído
-    archivo_original = CharField(null=True)  # Nombre del archivo PDF original
-    fecha_procesamiento = DateField(null=True)  # Fecha cuando se procesó
+    factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True, column_name='factura_id')
+    cuenta = IntegerField()
+    nombre = CharField(max_length=255)
+    referencia = IntegerField()
+    fecha = DateField()
+    importe = DecimalField(max_digits=15, decimal_places=2)
+    importe_en_letras = TextField()
+    iva = DecimalField(max_digits=15, decimal_places=2, null=True)
+    cuenta_mayor = IntegerField(null=True)
+    ref_movimiento = CharField(max_length=100, null=True)
+    codigo_banco = CharField(max_length=10, null=True)
+    folio_factura = CharField(max_length=50, null=True)
+    archivo_original = CharField(max_length=255, null=True)
+    fecha_procesamiento = DateField(null=True)
 
     class Meta:
         database = db
+        table_name = 'ordenes_compra'
 
 class Banco(Model):
+    """Modelo de bancos."""
     id = IntegerField(primary_key=True)
-    nombre = CharField()
-    cuenta = CharField(unique=True)
-    codigo = CharField(unique=True)
+    nombre = CharField(max_length=255)
+    cuenta = CharField(max_length=50, unique=True)
+    codigo = CharField(max_length=10, unique=True)
     cuenta_mayor = IntegerField(null=True)
 
     class Meta:
         database = db
+        table_name = 'bancos'
 
 class Usuario(Model):
+    """Modelo de usuarios del sistema."""
     codigo = IntegerField(primary_key=True)
-    nombre = CharField()
+    nombre = CharField(max_length=255)
     empresa = IntegerField()
     centro = IntegerField()
     sucursal = IntegerField()
     marca = IntegerField()
-    email = CharField(null=True)
-    permisos = CharField(null=True)
-    responsable = ForeignKeyField('self', null=True, backref='subordinados')
-
-    username = CharField(unique=True)
-    password = CharField()
+    email = CharField(max_length=100, null=True)
+    permisos = CharField(max_length=500, null=True)
+    responsable = ForeignKeyField('self', null=True, backref='subordinados', column_name='responsable_id')
+    username = CharField(max_length=50, unique=True)
+    password = CharField(max_length=255)
 
     class Meta:
         database = db
+        table_name = 'usuarios'
 
 class RepartoFavorito(Model):
-    usuario = ForeignKeyField(Usuario, backref='repartos_favoritos')
-    nombre_personalizado = CharField()  # Nombre que aparecerá en el botón
-    comercial = DecimalField(null=True)
-    fleet = DecimalField(null=True)
-    seminuevos = DecimalField(null=True)
-    refacciones = DecimalField(null=True)
-    servicio = DecimalField(null=True)
-    hyp = DecimalField(null=True)
-    administracion = DecimalField(null=True)
-    posicion = IntegerField()  # Para saber qué botón es (0-4)
+    """Modelo de repartos favoritos por usuario."""
+    usuario = ForeignKeyField(Usuario, backref='repartos_favoritos', column_name='usuario_id')
+    nombre_personalizado = CharField(max_length=100)
+    comercial = DecimalField(max_digits=5, decimal_places=2, null=True)
+    fleet = DecimalField(max_digits=5, decimal_places=2, null=True)
+    seminuevos = DecimalField(max_digits=5, decimal_places=2, null=True)
+    refacciones = DecimalField(max_digits=5, decimal_places=2, null=True)
+    servicio = DecimalField(max_digits=5, decimal_places=2, null=True)
+    hyp = DecimalField(max_digits=5, decimal_places=2, null=True)
+    administracion = DecimalField(max_digits=5, decimal_places=2, null=True)
+    posicion = IntegerField()
 
     class Meta:
         database = db
+        table_name = 'repartos_favoritos'
         indexes = (
-            (('usuario', 'posicion'), True),  # Un usuario no puede tener dos favoritos en la misma posición
+            (('usuario', 'posicion'), True),  # Índice único compuesto
         )
+
+# Lista de todos los modelos para facilitar operaciones de migración
+ALL_MODELS = [
+    Proveedor,
+    Layout,
+    Cheque,
+    Factura,
+    Concepto,
+    Reparto,
+    Vale,
+    OrdenCompra,
+    Banco,
+    Usuario,
+    RepartoFavorito
+]
 

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List
+from decouple import config as env_config, Csv
 
 # Rutas del proyecto
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -21,8 +22,31 @@ for directory in [DATABASE_DIR, LOGS_DIR]:
 @dataclass
 class DatabaseConfig:
     """Configuración de la base de datos."""
-    path: str = str(DATABASE_DIR / "facturas.db")
+    # SQLite (por defecto/desarrollo)
+    sqlite_path: str = str(DATABASE_DIR / "facturas.db")
     backup_dir: str = str(DATABASE_DIR / "backups")
+    
+    # PostgreSQL (producción)
+    db_type: str = "sqlite"  # "sqlite" o "postgresql"
+    pg_host: str = "localhost"
+    pg_port: int = 5432
+    pg_database: str = "tcm_matehuala"
+    pg_user: str = "postgres"
+    pg_password: str = ""
+    
+    def __post_init__(self):
+        """Configurar desde variables de entorno si están disponibles."""
+        try:
+            from decouple import config as env_config
+            self.db_type = env_config('DB_TYPE', default=self.db_type)
+            self.pg_host = env_config('DB_HOST', default=self.pg_host)
+            self.pg_port = env_config('DB_PORT', default=self.pg_port, cast=int)
+            self.pg_database = env_config('DB_NAME', default=self.pg_database)
+            self.pg_user = env_config('DB_USER', default=self.pg_user)
+            self.pg_password = env_config('DB_PASSWORD', default=self.pg_password)
+        except ImportError:
+            # python-decouple no disponible, usar valores por defecto
+            pass
 
 @dataclass
 class UIConfig:

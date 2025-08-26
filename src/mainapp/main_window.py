@@ -266,7 +266,10 @@ class MainWindow(tb.Window):
             self.logger.info("Aplicación de solicitud cargada directamente")
             
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             self.logger.error(f"Error al crear aplicación de solicitud: {e}")
+            self.logger.error(f"Traceback completo: {error_details}")
             self._show_error_view(f"Error al cargar solicitud: {str(e)}")
     
     def _show_facturas_view(self):
