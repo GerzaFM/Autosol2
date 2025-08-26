@@ -186,8 +186,8 @@ class MainWindow(tb.Window):
             lambda: self._show_view("cheques"), 
             "top"
         )
-        self.view_buttons["proveedores"] = self.sidebar.add_menu_item(
-            "Proveedores", "🏢",
+        #self.view_buttons["proveedores"] = self.sidebar.add_menu_item(
+        """    "Proveedores", "🏢",
             lambda: self._show_view("proveedores"),
             "top"
         )
@@ -212,7 +212,7 @@ class MainWindow(tb.Window):
             "Usuarios", "👥", 
             lambda: self._show_view("nueva_vista"), 
             "bottom"
-        )
+        )"""
     
     def _show_view(self, view_name: str):
         """
