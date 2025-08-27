@@ -27,7 +27,7 @@ class DatabaseConfig:
     backup_dir: str = str(DATABASE_DIR / "backups")
     
     # PostgreSQL (producción)
-    db_type: str = "sqlite"  # "sqlite" o "postgresql"
+    db_type: str = "postgresql"  # "sqlite" o "postgresql" - FORZADO A POSTGRESQL
     pg_host: str = "localhost"
     pg_port: int = 5432
     pg_database: str = "tcm_matehuala"

@@ -10,7 +10,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 try:
-    from bd.models import Banco, OrdenCompra, Factura, Proveedor, Cheque as ChequeModel
+    from src.bd.models import Banco, OrdenCompra, Factura, Proveedor, Cheque as ChequeModel
     # Importar configuración para cuentas mayores
     sys.path.insert(0, os.path.join(parent_dir, '..', 'config'))
     from app_config import AppConfig # pyright: ignore[reportMissingImports]

@@ -38,7 +38,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 try:
-    from bd.models import Proveedor
+    from src.bd.models import Proveedor
 except ImportError:
     # Fallback si no se puede importar
     print("⚠️ No se pudo importar el modelo Proveedor")

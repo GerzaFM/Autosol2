@@ -17,10 +17,13 @@ sys.path.insert(0, current_dir)
 
 # Importar la clase Cheque
 try:
-    from ctr_cheque import Cheque
+    from .ctr_cheque import Cheque
 except ImportError:
-    print("Advertencia: No se pudo importar la clase Cheque")
-    Cheque = None
+    try:
+        from ctr_cheque import Cheque
+    except ImportError:
+        # La clase Cheque no es crítica para el funcionamiento
+        Cheque = None
 
 # Intentar imports relativos primero, luego absolutos
 try:
@@ -57,7 +60,7 @@ except ImportError:
 # Intentar importar base de datos
 try:
     from bd.bd_control import DBManager
-    from bd.models import Factura, Proveedor, Concepto, Vale, Reparto
+    from src.bd.models import Factura, Proveedor, Concepto, Vale, Reparto
     BD_AVAILABLE = True
 except ImportError as e:
     print(f"Advertencia: No se pudo importar base de datos: {e}")
@@ -107,7 +110,7 @@ class BuscarAppRefactored(ttk.Frame):
                 self.logger.info("Conexión a base de datos establecida")
             else:
                 self.bd_control = None
-                self.logger.warning("Base de datos no disponible - usando datos de ejemplo")
+                self.logger.warning("Base de datos no disponible")
         except Exception as e:
             self.logger.error(f"Error inicializando base de datos: {e}")
             self.bd_control = None
@@ -166,7 +169,7 @@ class BuscarAppRefactored(ttk.Frame):
             self.dialog_utils.show_warning(
                 "Base de datos no disponible",
                 "La base de datos no está disponible. "
-                "Se mostrarán datos de ejemplo para demostración."
+                "No se mostrarán datos hasta conectar a la base de datos."
             )
     
     def _load_initial_data(self):
@@ -300,8 +303,8 @@ class BuscarAppRefactored(ttk.Frame):
                         else:
                             self.info_panels_frame.clear_all_info()
                 else:
-                    # Solo mostrar información básica para datos de ejemplo
-                    self.info_panels_frame.update_factura_info(selected_data)
+                    # Sin detalles disponibles
+                    self.info_panels_frame.clear_all_info()
             else:
                 self.info_panels_frame.clear_all_info()
                 

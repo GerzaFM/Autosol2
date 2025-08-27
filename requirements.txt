@@ -1,5 +1,5 @@
 # TCM Matehuala - Sistema de Gestión de Solicitudes
-# Dependencias del proyecto
+# Dependencias del proyecto - VERSIÓN COMPLETA
 
 # Interfaz de usuario
 ttkbootstrap>=1.10.1
@@ -7,17 +7,46 @@ ttkbootstrap>=1.10.1
 # Base de datos
 peewee>=3.17.0
 psycopg2-binary>=2.9.0  # Driver PostgreSQL
+
+# Configuración y entorno  
 python-decouple>=3.6  # Para variables de entorno
 
-# Procesamiento de archivos
+# Procesamiento PDF
+PyPDFForm>=3.4.0  # Para formularios PDF
+PyPDF2>=3.0.1  # Para lectura de PDFs
+pdfplumber>=0.11.0  # Para extracción de datos de PDFs
+pdfminer.six>=20250506  # Dependencia de pdfplumber
+
+# Generación de reportes
+reportlab>=4.0.0  # Para generar PDFs y reportes
+openpyxl>=3.1.0  # Para trabajar con Excel
+
+# Análisis de datos
+pandas>=2.3.0  # Para análisis y manipulación de datos
+numpy>=2.3.0  # Para operaciones numéricas
+
+# Imágenes
+Pillow>=10.4.0  # Para procesamiento de imágenes (PIL)
+pypdfium2>=4.30.0  # Para rendering de PDFs
+
+# Procesamiento XML/HTML
 lxml>=4.9.0
-reportlab>=4.0.0
 
-# Utilidades
-python-dateutil>=2.8.0
-pathlib2>=2.3.0
+# Fechas y tiempo
+python-dateutil>=2.9.0
+pytz>=2025.2
+tzdata>=2025.2
 
-# Desarrollo (opcional)
+# Criptografía y seguridad
+cryptography>=45.0.0
+
+# Utilidades generales
+charset-normalizer>=3.4.0
+cffi>=1.17.0
+pycparser>=2.22
+six>=1.17.0
+
+# Desarrollo y testing (opcional)
 pytest>=7.0.0
 pytest-cov>=4.0.0
 black>=23.0.0

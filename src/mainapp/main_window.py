@@ -15,21 +15,30 @@ from logapp import AuthUtils
 
 from app.utils.logger import get_logger
 
-# Importar aplicaciones directamente (estamos en src/)
+# Importar aplicaciones - corrección de paths
 try:
     from solicitudapp.solicitud_app_professional import SolicitudApp
 except ImportError:
-    SolicitudApp = None
+    try:
+        from src.solicitudapp.solicitud_app_professional import SolicitudApp
+    except ImportError:
+        SolicitudApp = None
 
 try:
     from buscarapp.buscar_app_refactored import BuscarAppRefactored
 except ImportError:
-    BuscarAppRefactored = None
+    try:
+        from src.buscarapp.buscar_app_refactored import BuscarAppRefactored
+    except ImportError:
+        BuscarAppRefactored = None
 
 try:
     from chequeapp.cheque_app_professional import ChequeAppProfessional
 except ImportError:
-    ChequeAppProfessional = None
+    try:
+        from src.chequeapp.cheque_app_professional import ChequeAppProfessional
+    except ImportError:
+        ChequeAppProfessional = None
 
 try:
     from useradminapp import UserAdminApp

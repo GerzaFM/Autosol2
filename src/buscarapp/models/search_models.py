@@ -46,7 +46,6 @@ class SearchState:
     all_facturas: List[Dict[str, Any]] = field(default_factory=list)
     filtered_facturas: List[Dict[str, Any]] = field(default_factory=list)
     proveedores_data: List[Dict[str, Any]] = field(default_factory=list)
-    using_sample_data: bool = False
     database_available: bool = False
     
     def get_results_count(self) -> int:

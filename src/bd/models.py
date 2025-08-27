@@ -6,7 +6,7 @@ Soporta SQLite y PostgreSQL.
 from peewee import (
     Model, CharField, DateField, DecimalField, 
     ForeignKeyField, IntegerField, AutoField, 
-    BooleanField, TextField
+    BooleanField, TextField, BigIntegerField
 )
 import os
 import logging
@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 class Proveedor(Model):
     """Modelo de proveedores."""
     id = AutoField()
-    codigo_quiter = IntegerField(null=True)
+    codigo_quiter = BigIntegerField(null=True)
     nombre = CharField(max_length=255, null=True)
     nombre_en_quiter = CharField(max_length=255, null=True)
     rfc = CharField(max_length=13, null=True)  # RFC máximo 13 caracteres
     telefono = CharField(max_length=20, null=True)
     email = CharField(max_length=100, null=True)
     nombre_contacto = CharField(max_length=255, null=True)
-    cuenta_mayor = IntegerField(null=True)
+    cuenta_mayor = BigIntegerField(null=True)
     
     class Meta:
         database = db
@@ -129,9 +129,9 @@ class Vale(Model):
     tipo = CharField(max_length=50)
     noDocumento = CharField(max_length=50)
     descripcion = TextField()
-    referencia = IntegerField()
+    referencia = BigIntegerField()
     total = CharField(max_length=50)  # Mantenido como CharField por compatibilidad
-    cuenta = IntegerField(null=True) 
+    cuenta = BigIntegerField(null=True) 
     fechaVale = DateField(null=True)
     departamento = IntegerField(null=True) 
     sucursal = IntegerField(null=True)
@@ -149,14 +149,14 @@ class OrdenCompra(Model):
     """Modelo de órdenes de compra."""
     id = AutoField()
     factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True, column_name='factura_id')
-    cuenta = IntegerField()
+    cuenta = BigIntegerField()
     nombre = CharField(max_length=255)
-    referencia = IntegerField()
+    referencia = BigIntegerField()
     fecha = DateField()
     importe = DecimalField(max_digits=15, decimal_places=2)
     importe_en_letras = TextField()
     iva = DecimalField(max_digits=15, decimal_places=2, null=True)
-    cuenta_mayor = IntegerField(null=True)
+    cuenta_mayor = BigIntegerField(null=True)
     ref_movimiento = CharField(max_length=100, null=True)
     codigo_banco = CharField(max_length=10, null=True)
     folio_factura = CharField(max_length=50, null=True)
@@ -173,7 +173,7 @@ class Banco(Model):
     nombre = CharField(max_length=255)
     cuenta = CharField(max_length=50, unique=True)
     codigo = CharField(max_length=10, unique=True)
-    cuenta_mayor = IntegerField(null=True)
+    cuenta_mayor = BigIntegerField(null=True)
 
     class Meta:
         database = db

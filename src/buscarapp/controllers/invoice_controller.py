@@ -49,7 +49,7 @@ class InvoiceController:
                 self.logger.warning("Base de datos no disponible")
                 return None
             
-            from bd.models import Factura, Proveedor, Concepto, Vale, Reparto, OrdenCompra
+            from src.bd.models import Factura, Proveedor, Concepto, Vale, Reparto, OrdenCompra
             
             # Buscar la factura
             try:
@@ -308,7 +308,7 @@ class InvoiceController:
                 self.logger.warning("Base de datos no disponible")
                 return False
             
-            from bd.models import Factura
+            from src.bd.models import Factura
             
             # Buscar la factura
             try:
@@ -344,7 +344,7 @@ class InvoiceController:
                 self.logger.warning("Base de datos no disponible")
                 return False
             
-            from bd.models import Factura
+            from src.bd.models import Factura
             
             # Buscar la factura
             try:

@@ -359,43 +359,5 @@ def generar_reporte_cheque_multiple(facturas_data, ruta_pdf=None, info_cheque=No
     return ruta_generada
 
 
-# Ejemplo de uso
-if __name__ == "__main__":
-    # Datos de ejemplo que replican el formato de la imagen
-    facturas_ejemplo = [
-        {
-            'no_vale': 'V157031',
-            'conceptos': 'GASOLINA ADMON',
-            'folio': '10733',
-            'subtotal': 1000.00,  # Importe
-            'iva_trasladado': 160.00,  # Iva
-            'ret_iva': 0.00,  # RetIva
-            'ret_isr': 0.00,  # RetIsr
-            'total': 1160.00,
-            'nombre_emisor': 'Servicio Nava Merdrano'
-        },
-        {
-            'no_vale': 'V157035',
-            'conceptos': 'GAOLINA VENTAS',
-            'folio': '10731',
-            'subtotal': 1000.00,
-            'iva_trasladado': 160.00,
-            'ret_iva': 0.00,
-            'ret_isr': 0.00,
-            'total': 1160.00,
-            'nombre_emisor': 'Servicio Nava Merdrano'
-        }
-    ]
-    
-    # Información del cheque
-    info_cheque = {
-        'numero_cheque': 'CH-2025-001',
-        'proveedor': 'Servicio Nava Merdrano'
-    }
-    
-    # Generar relación de vales
-    ruta = generar_reporte_cheque_multiple(
-        facturas_data=facturas_ejemplo,
-        info_cheque=info_cheque
-    )
+# Este archivo contiene el generador de reportes de cheques múltiples
     print(f"Relación de vales generada en: {ruta}")

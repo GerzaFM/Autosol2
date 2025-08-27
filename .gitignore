@@ -161,3 +161,6 @@ config/local.py
 # Test files (mantener archivos de test existentes pero ignorar nuevos temporales)
 test_*.py.bak
 *_test_backup.py
+
+migrate_*.py
+test_*.py

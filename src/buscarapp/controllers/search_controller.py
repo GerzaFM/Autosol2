@@ -14,13 +14,13 @@ sys.path.insert(0, parent_dir)
 
 try:
     from ..models.search_models import SearchFilters, SearchState, FacturaData
-    from bd.models import Factura, Proveedor, Vale
+    from src.bd.models import Factura, Proveedor, Vale
 except ImportError:
     from models.search_models import SearchFilters, SearchState, FacturaData
     # Fallback import para Vale
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'src'))
     try:
-        from bd.models import Factura, Proveedor, Vale
+        from src.bd.models import Factura, Proveedor, Vale
     except ImportError:
         # Último fallback
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -48,7 +48,6 @@ class SearchController:
             if not self.bd_control:
                 self.logger.warning("Base de datos no disponible")
                 self.state.database_available = False
-                self.state.using_sample_data = False
                 self.state.all_facturas.clear()
                 return False
             
@@ -57,7 +56,6 @@ class SearchController:
             if facturas_count == 0:
                 self.logger.info("No hay facturas en la base de datos")
                 self.state.database_available = True
-                self.state.using_sample_data = False
                 self.state.all_facturas.clear()
                 return True
             
@@ -106,7 +104,6 @@ class SearchController:
             
             self.state.all_facturas = facturas_data
             self.state.database_available = True
-            self.state.using_sample_data = False
             self.state.clear_results()  # Iniciar con tabla vacía
             
             self.logger.info(f"Cargadas {len(facturas_data)} facturas correctamente")
@@ -116,7 +113,6 @@ class SearchController:
             self.logger.error(f"Error al cargar facturas: {e}")
             traceback.print_exc()
             self.state.database_available = False
-            self.state.using_sample_data = False
             self.state.all_facturas.clear()
             return False
     
@@ -129,18 +125,11 @@ class SearchController:
         """
         try:
             if not self.bd_control:
-                # Datos de ejemplo
-                self.state.proveedores_data = [
-                    {'id': 1, 'nombre': 'ABC Proveedores', 'rfc': 'ABC123456789', 
-                     'telefono': '555-1234', 'email': 'contacto@abc.com', 'nombre_contacto': 'Juan Pérez'},
-                    {'id': 2, 'nombre': 'XYZ Servicios', 'rfc': 'XYZ987654321', 
-                     'telefono': '555-5678', 'email': 'info@xyz.com', 'nombre_contacto': 'María González'},
-                    {'id': 3, 'nombre': 'Proveedores Varios', 'rfc': 'VAR456789123', 
-                     'telefono': '555-9012', 'email': 'ventas@varios.com', 'nombre_contacto': 'Carlos López'}
-                ]
-                return True
+                # Sin base de datos, no hay proveedores
+                self.state.proveedores_data = []
+                return False
             
-            from bd.models import Proveedor
+            from src.bd.models import Proveedor
             
             proveedores = list(Proveedor.select().order_by(Proveedor.nombre))
             

@@ -13,7 +13,7 @@ try:
     bd_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'bd')
     sys.path.insert(0, bd_path)
     
-    from models import Cheque, Proveedor, Layout
+    from src.bd.models import Cheque, Proveedor, Layout
     from peewee import fn
     DATABASE_AVAILABLE = True
     DATABASE_AVAILABLE = True
@@ -37,7 +37,7 @@ class ChequeDatabase:
                 self.logger.error(f"Error conectando a BD: {e}")
                 self.db_available = False
         else:
-            self.logger.warning("Base de datos no disponible, usando datos de ejemplo")
+            self.logger.warning("Base de datos no disponible")
     
     def search_cheques(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -50,7 +50,7 @@ class ChequeDatabase:
             Lista de diccionarios con datos de cheques
         """
         if not self.db_available:
-            return self._get_sample_cheques(filters)
+            return []
         
         try:
             # Construir consulta base
@@ -74,7 +74,7 @@ class ChequeDatabase:
                 if clase:
                     # Importar Factura para hacer el join
                     try:
-                        from models import Factura
+                        from src.bd.models import Factura
                         # Filtrar cheques que tengan facturas con la clase especificada
                         # Usar la relación inversa: cheques que tienen facturas con esa clase
                         query = query.join(Factura, on=(Cheque.id == Factura.cheque)).where(
@@ -124,7 +124,7 @@ class ChequeDatabase:
             
         except Exception as e:
             self.logger.error(f"Error en búsqueda de cheques: {e}")
-            return self._get_sample_cheques(filters)
+            return []
     
     def search_layouts(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -468,89 +468,3 @@ class ChequeDatabase:
         except Exception as e:
             self.logger.error(f"Error actualizando nombre del layout {layout_id}: {e}")
             return False
-
-    def _get_sample_cheques(self) -> List[Dict[str, Any]]:
-        """
-        Retorna datos de ejemplo cuando la base de datos no está disponible
-        
-        Returns:
-            Lista de diccionarios con datos de ejemplo de cheques
-        """
-    def _get_sample_cheques(self, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """
-        Retorna datos de ejemplo cuando la base de datos no está disponible
-        
-        Args:
-            filters: Filtros a aplicar a los datos de ejemplo
-            
-        Returns:
-            Lista de diccionarios con datos de ejemplo de cheques
-        """
-        sample_data = [
-            {
-                'id': 1,
-                'fecha': '2024-01-15',
-                'vale': 'V001',
-                'folio': 'F001',
-                'proveedor': 'Proveedor Ejemplo 1',
-                'monto': '1000.00',
-                'clase': '33',
-                'layout': None,
-                'layout_nombre': None
-            },
-            {
-                'id': 2,
-                'fecha': '2024-01-16',
-                'vale': 'V002',
-                'folio': 'F002',
-                'proveedor': 'Proveedor Ejemplo 2',
-                'monto': '2000.00',
-                'clase': '35',
-                'layout': None,
-                'layout_nombre': None
-            },
-            {
-                'id': 3,
-                'fecha': '2024-01-17',
-                'vale': 'V003',
-                'folio': 'F003',
-                'proveedor': 'Proveedor Ejemplo 3',
-                'monto': '1500.00',
-                'clase': '33',
-                'layout': None,
-                'layout_nombre': None
-            }
-        ]
-        
-        # Aplicar filtros si están especificados
-        if filters:
-            filtered_data = []
-            
-            for cheque in sample_data:
-                # Filtro de fecha inicial
-                if filters.get('fecha_inicial'):
-                    if cheque['fecha'] < filters['fecha_inicial']:
-                        continue
-                
-                # Filtro de fecha final
-                if filters.get('fecha_final'):
-                    if cheque['fecha'] > filters['fecha_final']:
-                        continue
-                
-                # Filtro de clase
-                if filters.get('clase'):
-                    clase_filtro = filters['clase'].strip()
-                    if clase_filtro and clase_filtro not in cheque['clase']:
-                        continue
-                
-                # Filtro de proveedor
-                if filters.get('proveedor'):
-                    proveedor_filtro = filters['proveedor'].strip().lower()
-                    if proveedor_filtro and proveedor_filtro not in cheque['proveedor'].lower():
-                        continue
-                
-                filtered_data.append(cheque)
-            
-            return filtered_data
-        
-        return sample_data

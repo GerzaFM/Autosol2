@@ -571,7 +571,7 @@ class ChequeAppProfessional(tb.Frame):
                 
         except Exception as e:
             self.logger.error(f"Error en búsqueda: {e}")
-            # En caso de error, mostrar datos de ejemplo
+            # En caso de error, mostrar tabla vacía
 
     def on_search_layout(self):
         """Manejador del botón de búsqueda en layout."""

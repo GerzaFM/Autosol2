@@ -29,7 +29,7 @@ class AutocargaController:
     def _procesar_orden_individual(self, orden_data: Dict, contadores: Dict):
         """Procesa una orden individual para guardar en la BD y asociar con factura"""
         try:
-            from bd.models import OrdenCompra, Factura, Proveedor
+            from src.bd.models import OrdenCompra, Factura, Proveedor
             from datetime import date
             
             self.logger.info(f"🔍 Procesando orden: {orden_data.get('archivo_original', 'Sin nombre')}")
@@ -190,7 +190,7 @@ class AutocargaController:
             tuple: (Factura, Vale) o (None, None) si no hay coincidencia
         """
         try:
-            from bd.models import Factura, Proveedor, Vale
+            from src.bd.models import Factura, Proveedor, Vale
         except ImportError:
             sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
             from src.bd.models import Factura, Proveedor, Vale
@@ -718,7 +718,7 @@ class AutocargaController:
             facturas_seleccionadas: Lista de facturas seleccionadas para asociación
         """
         try:
-            from bd.models import Factura, Proveedor, Vale, Concepto
+            from src.bd.models import Factura, Proveedor, Vale, Concepto
             
             # Contadores para el reporte
             contadores = {
@@ -773,7 +773,7 @@ class AutocargaController:
             import sys
             src_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             sys.path.insert(0, src_path)
-            from bd.models import Proveedor
+            from src.bd.models import Proveedor
             
             nombre_proveedor = datos_procesados.get('proveedor')
             codigo_vale = datos_procesados.get('codigo')
@@ -848,7 +848,7 @@ class AutocargaController:
             import sys
             src_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             sys.path.insert(0, src_path)
-            from bd.models import Vale, Factura
+            from src.bd.models import Vale, Factura
 
             def normalizar_documento(doc):
                 """Normaliza un documento para comparación: elimina espacios y guiones"""
@@ -1071,7 +1071,7 @@ class AutocargaController:
                                     if resultado == 'asociar' and factura_seleccionada:
                                         # Usuario seleccionó una factura para asociar
                                         try:
-                                            from bd.models import Factura
+                                            from src.bd.models import Factura
                                             serie = factura_seleccionada.get('serie', '')
                                             folio = factura_seleccionada.get('folio', 0)
                                             
@@ -1146,7 +1146,7 @@ class AutocargaController:
                             if resultado == 'asociar' and factura_seleccionada:
                                 # Usuario seleccionó una factura para asociar
                                 try:
-                                    from bd.models import Factura
+                                    from src.bd.models import Factura
                                     serie = factura_seleccionada.get('serie', '')
                                     folio = factura_seleccionada.get('folio', 0)
                                     
@@ -1227,7 +1227,7 @@ class AutocargaController:
         Estrategia simplificada: cuenta=codigo_quiter, luego match por proveedor+importe
         """
         try:
-            from bd.models import Factura, Proveedor
+            from src.bd.models import Factura, Proveedor
         except ImportError:
             from src.bd.models import Factura, Proveedor
             
@@ -1286,7 +1286,7 @@ class AutocargaController:
             List[Dict]: Lista de vales disponibles del proveedor
         """
         try:
-            from bd.models import Vale, Proveedor
+            from src.bd.models import Vale, Proveedor
             from ..autocarga.provider_matcher import ProviderMatcher
             
             vales_disponibles = []
@@ -1336,7 +1336,7 @@ class AutocargaController:
             List[Dict]: Lista de facturas del proveedor sin asociar
         """
         try:
-            from bd.models import Vale, Factura
+            from src.bd.models import Vale, Factura
             from ..autocarga.provider_matcher import ProviderMatcher
             
             facturas_disponibles = []
@@ -1430,7 +1430,7 @@ class AutocargaController:
             Proveedor: Instancia del proveedor encontrado o None
         """
         try:
-            from bd.models import Proveedor
+            from src.bd.models import Proveedor
             
             self.logger.info(f"🔍 Buscando proveedor: cuenta={cuenta}, nombre='{nombre_proveedor}'")
             
