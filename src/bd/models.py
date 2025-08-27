@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class Proveedor(Model):
     """Modelo de proveedores."""
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     codigo_quiter = IntegerField(null=True)
     nombre = CharField(max_length=255, null=True)
     nombre_en_quiter = CharField(max_length=255, null=True)
@@ -35,7 +35,7 @@ class Proveedor(Model):
 
 class Layout(Model):
     """Modelo de layouts."""
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     fecha = DateField()
     nombre = CharField(max_length=255)
     monto = DecimalField(max_digits=15, decimal_places=2)
@@ -61,10 +61,9 @@ class Cheque(Model):
 
 class Factura(Model):
     """Modelo de facturas."""
-    folio_interno = IntegerField(primary_key=True)
+    folio_interno = AutoField()
     serie = CharField(max_length=10)
     folio = CharField(max_length=50)
-    folio = CharField()
     fecha = DateField()
     fecha_emision = DateField()
     tipo = CharField(max_length=50)
@@ -96,7 +95,7 @@ class Factura(Model):
 
 class Concepto(Model):
     """Modelo de conceptos de facturas."""
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     descripcion = TextField()  # Usar TextField para descripciones largas
     cantidad = DecimalField(max_digits=10, decimal_places=2)
     precio_unitario = DecimalField(max_digits=15, decimal_places=2)
@@ -109,7 +108,7 @@ class Concepto(Model):
 
 class Reparto(Model):
     """Modelo de reparto de facturas por departamentos."""
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     comercial = DecimalField(max_digits=5, decimal_places=2, null=True)
     fleet = DecimalField(max_digits=5, decimal_places=2, null=True)
     seminuevos = DecimalField(max_digits=5, decimal_places=2, null=True)
@@ -125,7 +124,7 @@ class Reparto(Model):
 
 class Vale(Model):
     """Modelo de vales."""
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     noVale = CharField(max_length=50, unique=True)
     tipo = CharField(max_length=50)
     noDocumento = CharField(max_length=50)
@@ -148,7 +147,7 @@ class Vale(Model):
 
 class OrdenCompra(Model):
     """Modelo de órdenes de compra."""
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     factura = ForeignKeyField(Factura, backref='ordenes_compra', null=True, column_name='factura_id')
     cuenta = IntegerField()
     nombre = CharField(max_length=255)
@@ -170,7 +169,7 @@ class OrdenCompra(Model):
 
 class Banco(Model):
     """Modelo de bancos."""
-    id = IntegerField(primary_key=True)
+    id = AutoField()
     nombre = CharField(max_length=255)
     cuenta = CharField(max_length=50, unique=True)
     codigo = CharField(max_length=10, unique=True)

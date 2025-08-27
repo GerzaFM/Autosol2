@@ -16,9 +16,9 @@ class UsuarioService:
     # Roles disponibles
     ROLES_DISPONIBLES = [
         "Administrador",
-        "Supervisor", 
+        "Supervisor",
+        "Gerente",
         "Usuario",
-        "Contador",
         "Consultor"
     ]
     
@@ -38,8 +38,8 @@ class UsuarioService:
             errors.append("El nombre de usuario es requerido")
         elif len(username) < 3:
             errors.append("El nombre de usuario debe tener al menos 3 caracteres")
-        elif not re.match(r'^[a-zA-Z0-9_]+$', username):
-            errors.append("El nombre de usuario solo puede contener letras, números y guiones bajos")
+        elif not re.match(r'^[a-zA-Z0-9_.]+$', username):
+            errors.append("El nombre de usuario solo puede contener letras, números, puntos y guiones bajos")
         elif UsuarioModel.username_exists(username, user_id if is_edit else None):
             errors.append("El nombre de usuario ya existe")
         
@@ -82,11 +82,8 @@ class UsuarioService:
             user_data["password"] = UsuarioService._hash_password(user_data["password"])
         
         # Crear usuario
-        success = UsuarioModel.create_usuario(user_data)
-        if success:
-            return True, "Usuario creado exitosamente"
-        else:
-            return False, "Error al crear usuario"
+        success, message = UsuarioModel.create_usuario(user_data)
+        return success, message
     
     @staticmethod
     def update_usuario(user_id: int, data: Dict) -> Tuple[bool, str]:
@@ -102,20 +99,14 @@ class UsuarioService:
             user_data["password"] = UsuarioService._hash_password(user_data["password"])
         
         # Actualizar usuario
-        success = UsuarioModel.update_usuario(user_id, user_data)
-        if success:
-            return True, "Usuario actualizado exitosamente"
-        else:
-            return False, "Error al actualizar usuario"
+        success, message = UsuarioModel.update_usuario(user_id, user_data)
+        return success, message
     
     @staticmethod
     def delete_usuario(user_id: int) -> Tuple[bool, str]:
         """Elimina un usuario."""
-        success = UsuarioModel.delete_usuario(user_id)
-        if success:
-            return True, "Usuario eliminado exitosamente"
-        else:
-            return False, "Error al eliminar usuario"
+        success, message = UsuarioModel.delete_usuario(user_id)
+        return success, message
     
     @staticmethod
     def _hash_password(password: str) -> str:

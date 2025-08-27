@@ -36,6 +36,29 @@ class Application:
             self.logger.error(f"Error al inicializar componentes: {e}")
             raise
     
+    def show_login_modal(self):
+        """
+        Muestra el diálogo de login modal sobre la ventana principal.
+        
+        Returns:
+            Datos del usuario autenticado o None
+        """
+        from src.logapp import LoginWindow, SessionManager
+        
+        # Crear login window como modal sobre la ventana principal
+        login = LoginWindow(parent=self.app.main_window)
+        success, user_data = login.show_login()
+        
+        if success and user_data:
+            # Guardar sesión
+            session_manager = SessionManager()
+            session_manager.save_session(user_data)
+            self.logger.info(f"Usuario autenticado exitosamente: {user_data['username']}")
+            return user_data
+        else:
+            self.logger.info("Login cancelado o fallido")
+            return None
+    
     def run(self):
         """Ejecuta la aplicación."""
         try:

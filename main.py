@@ -15,6 +15,7 @@ from config.settings import config, LOGS_DIR
 from app.core.application import Application
 from app.utils.logger import setup_logging
 from src.bd.database import db_manager
+from src.logapp import LoginWindow, SessionManager
 
 def setup_environment():
     """Configura el entorno de la aplicación."""
@@ -38,13 +39,50 @@ def setup_environment():
     db_manager.create_tables(ALL_MODELS)
     logger.info("Base de datos inicializada correctamente")
 
+def authenticate_user():
+    """
+    Maneja la autenticación del usuario.
+    
+    Returns:
+        Datos del usuario autenticado o None si no se autentica
+    """
+    session_manager = SessionManager()
+    
+    # Verificar si hay una sesión válida
+    current_user = session_manager.get_current_user()
+    if current_user:
+        logger = logging.getLogger(__name__)
+        logger.info(f"Sesión válida encontrada para usuario: {current_user['username']}")
+        return current_user
+    
+    # No hay sesión válida, retornar None para manejo posterior
+    logger = logging.getLogger(__name__)
+    logger.info("No hay sesión válida, se requerirá login modal")
+    return None
+
 def main():
     """Función principal de la aplicación."""
     try:
         setup_environment()
-         
-        # Crear e iniciar la aplicación
+        
+        # Verificar si hay sesión válida ANTES de crear la aplicación
+        user_data = authenticate_user()
+        
+        # Crear la aplicación principal
         app = Application()
+        
+        # Si no hay usuario autenticado, mostrar login modal dentro de la app
+        if not user_data:
+            user_data = app.show_login_modal()
+            if not user_data:
+                print("❌ Autenticación requerida. Cerrando aplicación...")
+                sys.exit(0)
+        
+        print(f"✅ Bienvenido, {user_data.get('nombre', user_data['username'])}!")
+        print(f"👤 Usuario: {user_data['username']} | 🏢 Empresa: {user_data.get('empresa', 'N/A')} | 🎭 Permisos: {user_data.get('permisos', 'Usuario')}")
+        print("=" * 80)
+        
+        # Ejecutar la aplicación
         app.run()
         
     except Exception as e:

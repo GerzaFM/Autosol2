@@ -46,12 +46,17 @@ class UsuarioModel:
             usuarios = Usuario.select()
             for usuario in usuarios:
                 usuarios_data.append({
-                    "id": usuario.codigo,  # El primary key es 'codigo', no 'id'
+                    "id": usuario.codigo,  # El primary key es 'codigo'
                     "username": usuario.username,
-                    "email": usuario.email,
-                    "rol": getattr(usuario, 'rol', 'Usuario'),  # Usar getattr con default
-                    "activo": getattr(usuario, 'activo', True),  # Usar getattr con default
-                    "fecha_creacion": getattr(usuario, 'fecha_creacion', '').strftime("%Y-%m-%d %H:%M") if hasattr(usuario, 'fecha_creacion') and usuario.fecha_creacion else ""
+                    "email": usuario.email or "",
+                    "rol": usuario.permisos or "Usuario",  # Mapear permisos a rol
+                    "activo": True,  # Valor fijo ya que no existe en BD
+                    "fecha_creacion": "",  # Valor fijo ya que no existe en BD
+                    "nombre": usuario.nombre or "",
+                    "empresa": usuario.empresa,
+                    "centro": usuario.centro,
+                    "sucursal": usuario.sucursal,
+                    "marca": usuario.marca
                 })
         except Exception as e:
             print(f"Error al cargar usuarios: {e}")
@@ -59,88 +64,98 @@ class UsuarioModel:
         return usuarios_data
     
     @staticmethod
-    def create_usuario(data: Dict) -> bool:
+    def create_usuario(data: Dict) -> tuple[bool, str]:
         """Crea un nuevo usuario."""
         if Usuario is None:
             print("Modo demo: Usuario creado (simulado)")
-            return True
+            return True, "Usuario creado (modo demo)"
             
         try:
-            # Crear usuario con los campos que existen en el modelo
+            # Crear usuario solo con los campos reales del modelo PostgreSQL
             usuario_data = {
                 'username': data["username"],
                 'password': data["password"],  # Ya viene hasheada
                 'email': data.get("email", ""),
-                'nombre': data.get("username", ""),  # Usar username como nombre si no se proporciona
-                'empresa': 1,  # Valores por defecto
-                'centro': 1,
-                'sucursal': 1,
-                'marca': 1
+                'nombre': data.get("nombre", data["username"]),  # Usar nombre o username
+                'empresa': data.get("empresa", 1),  # Valores por defecto
+                'centro': data.get("centro", 1),
+                'sucursal': data.get("sucursal", 1),
+                'marca': data.get("marca", 1),
+                'permisos': data.get("rol", "Usuario"),  # Mapear rol a permisos
+                'responsable': data.get("responsable")  # Puede ser None
             }
             
-            # Agregar campos adicionales si existen en el modelo
-            if hasattr(Usuario, 'rol'):
-                usuario_data['rol'] = data["rol"]
-            if hasattr(Usuario, 'activo'):
-                usuario_data['activo'] = data.get("activo", True)
-            if hasattr(Usuario, 'fecha_creacion'):
-                usuario_data['fecha_creacion'] = datetime.now()
+            # Agregar código si se especifica
+            if 'codigo' in data and data['codigo']:
+                usuario_data['codigo'] = data['codigo']
             
             Usuario.create(**usuario_data)
-            return True
-        except IntegrityError:
-            return False
+            return True, "Usuario creado exitosamente"
+        except IntegrityError as e:
+            error_msg = f"Error de integridad: {str(e)}"
+            print(error_msg)
+            return False, error_msg
         except Exception as e:
-            print(f"Error al crear usuario: {e}")
-            return False
+            error_msg = f"Error al crear usuario: {str(e)}"
+            print(error_msg)
+            return False, error_msg
     
     @staticmethod
-    def update_usuario(user_id: int, data: Dict) -> bool:
+    def update_usuario(user_id: int, data: Dict) -> tuple[bool, str]:
         """Actualiza un usuario existente."""
         if Usuario is None:
             print(f"Modo demo: Usuario {user_id} actualizado (simulado)")
-            return True
+            return True, "Usuario actualizado (modo demo)"
             
         try:
-            usuario = Usuario.get(Usuario.codigo == user_id)  # Usar codigo en lugar de get_by_id
+            usuario = Usuario.get(Usuario.codigo == user_id)
             usuario.username = data["username"]
-            usuario.email = data["email"]
-            usuario.nombre = data.get("username", usuario.nombre)
+            usuario.email = data.get("email", "")
+            usuario.nombre = data.get("nombre", data["username"])
             
-            # Solo actualizar campos si existen en el modelo
-            if hasattr(Usuario, 'rol') and 'rol' in data:
-                usuario.rol = data["rol"]
-            if hasattr(Usuario, 'activo') and 'activo' in data:
-                usuario.activo = data.get("activo", True)
+            # Mapear rol a permisos (campo real en PostgreSQL)
+            if 'rol' in data:
+                usuario.permisos = data["rol"]
+            
+            # Actualizar otros campos si se proporcionan
+            for field in ['empresa', 'centro', 'sucursal', 'marca']:
+                if field in data:
+                    setattr(usuario, field, data[field])
             
             # Solo actualizar password si se proporcionó
             if data.get("password"):
                 usuario.password = data["password"]
             
             usuario.save()
-            return True
+            return True, "Usuario actualizado exitosamente"
         except DoesNotExist:
-            return False
+            error_msg = f"Usuario con ID {user_id} no encontrado"
+            print(error_msg)
+            return False, error_msg
         except Exception as e:
-            print(f"Error al actualizar usuario: {e}")
-            return False
+            error_msg = f"Error al actualizar usuario: {str(e)}"
+            print(error_msg)
+            return False, error_msg
     
     @staticmethod
-    def delete_usuario(user_id: int) -> bool:
+    def delete_usuario(user_id: int) -> tuple[bool, str]:
         """Elimina un usuario."""
         if Usuario is None:
             print(f"Modo demo: Usuario {user_id} eliminado (simulado)")
-            return True
+            return True, "Usuario eliminado (modo demo)"
             
         try:
-            usuario = Usuario.get(Usuario.codigo == user_id)  # Usar codigo en lugar de get_by_id
+            usuario = Usuario.get(Usuario.codigo == user_id)
             usuario.delete_instance()
-            return True
+            return True, "Usuario eliminado exitosamente"
         except DoesNotExist:
-            return False
+            error_msg = f"Usuario con ID {user_id} no encontrado"
+            print(error_msg)
+            return False, error_msg
         except Exception as e:
-            print(f"Error al eliminar usuario: {e}")
-            return False
+            error_msg = f"Error al eliminar usuario: {str(e)}"
+            print(error_msg)
+            return False, error_msg
     
     @staticmethod
     def username_exists(username: str, exclude_id: Optional[int] = None) -> bool:

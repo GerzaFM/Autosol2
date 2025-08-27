@@ -105,8 +105,8 @@ class SolicitudApp(tb.Frame):
         self.lbl_sol_rest: Optional[tb.Label] = None
         self.dividir_var: Optional[tb.BooleanVar] = None
         
-        # ID del usuario actual (deberías obtenerlo del login)
-        self.usuario_actual_id = 294379  # Reemplaza con el sistema de login real
+        # ID del usuario actual (Usuario migrado de SQLite)
+        self.usuario_actual_id = 294379  # Usuario Gerzahin Flores Martinez
         
         # Lista para guardar referencias a los botones de favoritos
         self.botones_favoritos = []

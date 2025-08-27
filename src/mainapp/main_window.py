@@ -11,6 +11,7 @@ import os
 
 from config.settings import config
 from .sidebar import SidebarComponent
+from logapp import AuthUtils
 
 from app.utils.logger import get_logger
 
@@ -208,12 +209,42 @@ class MainWindow(tb.Window):
             lambda: self._show_view("cuenta"), 
             "bottom"
         )
+        """
+        # Botón de logout (siempre a la derecha)
+        self.view_buttons["logout"] = self.sidebar.add_menu_item(
+            "Cerrar Sesión", "🚪", 
+            lambda: self._handle_logout(), 
+            "bottom"
+        )
+        
         self.view_buttons["nueva_vista"] = self.sidebar.add_menu_item(
             "Usuarios", "👥", 
             lambda: self._show_view("nueva_vista"), 
             "bottom"
-        )"""
-    
+        )
+
+    def _handle_logout(self):
+        """Maneja el cierre de sesión del usuario."""
+        from tkinter import messagebox
+        
+        # Confirmar logout
+        result = messagebox.askyesno(
+            "Cerrar Sesión",
+            "¿Estás seguro de que quieres cerrar la sesión?\n\nLa aplicación se cerrará.",
+            icon='question'
+        )
+        
+        if result:
+            self.logger.info("Usuario solicitó cerrar sesión")
+            try:
+                # Cerrar sesión y salir
+                AuthUtils.logout_and_exit()
+            except Exception as e:
+                self.logger.error(f"Error al cerrar sesión: {e}")
+                # Fallback: cerrar aplicación directamente
+                self.quit()
+                sys.exit(0)
+
     def _show_view(self, view_name: str):
         """
         Muestra una vista específica en el área de contenido.

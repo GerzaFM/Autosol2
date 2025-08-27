@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 
 class UsuariosView(tb.Frame):
     """
-    Vista principal para la gestión de usuarios.
+    Vista principal para gestión de usuarios.
     Solo maneja la interfaz de usuario.
     """
     
@@ -95,24 +95,26 @@ class UsuariosView(tb.Frame):
         panel.grid_columnconfigure(0, weight=1)
         
         # Crear Treeview
-        columns = ("ID", "Usuario", "Email", "Rol", "Estado", "Creado")
+        columns = ("ID", "Usuario", "Nombre", "Email", "Empresa", "Centro", "Permisos")
         self.tree = tb.Treeview(panel, columns=columns, show="headings", height=15)
         
         # Configurar columnas
         self.tree.heading("ID", text="ID")
         self.tree.heading("Usuario", text="Usuario")
+        self.tree.heading("Nombre", text="Nombre Completo")
         self.tree.heading("Email", text="Email")
-        self.tree.heading("Rol", text="Rol")
-        self.tree.heading("Estado", text="Estado")
-        self.tree.heading("Creado", text="Fecha Creación")
+        self.tree.heading("Empresa", text="Empresa")
+        self.tree.heading("Centro", text="Centro")
+        self.tree.heading("Permisos", text="Permisos")
         
         # Ancho de columnas
         self.tree.column("ID", width=50, anchor=CENTER)
         self.tree.column("Usuario", width=100, anchor=W)
-        self.tree.column("Email", width=200, anchor=W)
-        self.tree.column("Rol", width=100, anchor=CENTER)
-        self.tree.column("Estado", width=80, anchor=CENTER)
-        self.tree.column("Creado", width=120, anchor=CENTER)
+        self.tree.column("Nombre", width=150, anchor=W)
+        self.tree.column("Email", width=180, anchor=W)
+        self.tree.column("Empresa", width=80, anchor=CENTER)
+        self.tree.column("Centro", width=80, anchor=CENTER)
+        self.tree.column("Permisos", width=100, anchor=CENTER)
         
         # Scrollbar
         scrollbar = tb.Scrollbar(panel, orient=VERTICAL, command=self.tree.yview)
@@ -143,10 +145,16 @@ class UsuariosView(tb.Frame):
         form_frame.pack(fill=BOTH, expand=True, pady=(0, 10))
         
         fields = [
+            ("codigo", "🔢 Código:", tb.Entry),
             ("username", "👤 Usuario:", tb.Entry),
+            ("nombre", "📝 Nombre Completo:", tb.Entry),
             ("email", "✉️ Email:", tb.Entry),
             ("password", "🔒 Contraseña:", lambda parent, **kwargs: tb.Entry(parent, show="*", **kwargs)),
-            ("rol", "🎭 Rol:", lambda parent, **kwargs: tb.Combobox(parent, values=self.controller.get_roles(), state="readonly", **kwargs))
+            ("empresa", "🏢 Empresa:", tb.Entry),
+            ("centro", "🏪 Centro:", tb.Entry),
+            ("sucursal", "🏬 Sucursal:", tb.Entry),
+            ("marca", "🏷️ Marca:", tb.Entry),
+            ("rol", "🎭 Permisos:", lambda parent, **kwargs: tb.Combobox(parent, values=self.controller.get_roles(), state="readonly", **kwargs))
         ]
         
         for i, (field_name, label_text, widget_class) in enumerate(fields):
@@ -159,16 +167,6 @@ class UsuariosView(tb.Frame):
             widget.grid(row=i, column=1, sticky="ew", pady=5)
             
             self.form_entries[field_name] = widget
-        
-        # Checkbox activo
-        self.activo_var = tb.BooleanVar(value=True)
-        activo_check = tb.Checkbutton(
-            form_frame,
-            text="✅ Usuario activo",
-            variable=self.activo_var,
-            bootstyle="success"
-        )
-        activo_check.grid(row=len(fields), column=0, columnspan=2, sticky="w", pady=10)
         
         # Configurar grid
         form_frame.grid_columnconfigure(1, weight=1)
@@ -230,14 +228,14 @@ class UsuariosView(tb.Frame):
         
         # Insertar usuarios
         for usuario in usuarios:
-            estado = "✅ Activo" if usuario.get("activo", True) else "❌ Inactivo"
             self.tree.insert("", "end", values=(
                 usuario["id"],
                 usuario["username"],
+                usuario.get("nombre", ""),
                 usuario["email"],
-                usuario["rol"],
-                estado,
-                usuario["fecha_creacion"]
+                usuario.get("empresa", ""),
+                usuario.get("centro", ""),
+                usuario["rol"]  # Esto es permisos mapeado como rol
             ))
     
     def _on_user_select(self, event):
@@ -250,10 +248,11 @@ class UsuariosView(tb.Frame):
             self.selected_user = {
                 "id": values[0],
                 "username": values[1],
-                "email": values[2],
-                "rol": values[3],
-                "activo": "Activo" in values[4],
-                "fecha_creacion": values[5]
+                "nombre": values[2],
+                "email": values[3],
+                "empresa": values[4],
+                "centro": values[5],
+                "rol": values[6]  # Permisos mapeado como rol
             }
             
             self._update_button_states()
@@ -297,31 +296,61 @@ class UsuariosView(tb.Frame):
                 entry.delete(0, 'end')
             elif hasattr(entry, 'set'):
                 entry.set("")
-        self.activo_var.set(True)
+        
+        # Habilitar campo código para nuevos usuarios
+        self.form_entries["codigo"].config(state="normal")
     
     def _fill_form(self, user_data: Dict):
         """Llena el formulario con datos del usuario."""
+        self.form_entries["codigo"].delete(0, 'end')
+        self.form_entries["codigo"].insert(0, str(user_data.get("id", "")))
+        self.form_entries["codigo"].config(state="readonly")  # Solo lectura para edición
+        
         self.form_entries["username"].delete(0, 'end')
         self.form_entries["username"].insert(0, user_data["username"])
+        
+        self.form_entries["nombre"].delete(0, 'end')
+        self.form_entries["nombre"].insert(0, user_data.get("nombre", ""))
         
         self.form_entries["email"].delete(0, 'end')
         self.form_entries["email"].insert(0, user_data["email"])
         
         self.form_entries["password"].delete(0, 'end')
         
-        self.form_entries["rol"].set(user_data["rol"])
+        self.form_entries["empresa"].delete(0, 'end')
+        self.form_entries["empresa"].insert(0, str(user_data.get("empresa", "")))
         
-        self.activo_var.set(user_data["activo"])
+        self.form_entries["centro"].delete(0, 'end')
+        self.form_entries["centro"].insert(0, str(user_data.get("centro", "")))
+        
+        self.form_entries["sucursal"].delete(0, 'end')
+        self.form_entries["sucursal"].insert(0, str(user_data.get("sucursal", "")))
+        
+        self.form_entries["marca"].delete(0, 'end')
+        self.form_entries["marca"].insert(0, str(user_data.get("marca", "")))
+        
+        self.form_entries["rol"].set(user_data["rol"])
     
     def _get_form_data(self) -> Dict:
         """Obtiene los datos del formulario."""
-        return {
+        data = {
             "username": self.form_entries["username"].get().strip(),
+            "nombre": self.form_entries["nombre"].get().strip(),
             "email": self.form_entries["email"].get().strip(),
             "password": self.form_entries["password"].get().strip(),
-            "rol": self.form_entries["rol"].get(),
-            "activo": self.activo_var.get()
+            "empresa": int(self.form_entries["empresa"].get().strip()) if self.form_entries["empresa"].get().strip() else 1,
+            "centro": int(self.form_entries["centro"].get().strip()) if self.form_entries["centro"].get().strip() else 1,
+            "sucursal": int(self.form_entries["sucursal"].get().strip()) if self.form_entries["sucursal"].get().strip() else 1,
+            "marca": int(self.form_entries["marca"].get().strip()) if self.form_entries["marca"].get().strip() else 1,
+            "rol": self.form_entries["rol"].get()
         }
+        
+        # Agregar código si se especifica (para usuarios nuevos)
+        codigo_text = self.form_entries["codigo"].get().strip()
+        if codigo_text:
+            data["codigo"] = int(codigo_text)
+            
+        return data
     
     # Métodos públicos (comandos de botones)
     def refresh_usuarios(self):
