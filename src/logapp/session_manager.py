@@ -19,7 +19,7 @@ class SessionManager:
             session_file: Archivo donde se guardará la sesión
         """
         self.session_file = session_file
-        self.session_duration = timedelta(hours=8)  # Sesión válida por 8 horas
+        self.session_duration = None  # Sin límite de tiempo - sesión permanente
     
     def save_session(self, user_data: Dict):
         """
@@ -32,7 +32,7 @@ class SessionManager:
             session_data = {
                 'user': user_data,
                 'login_time': datetime.now().isoformat(),
-                'expires_at': (datetime.now() + self.session_duration).isoformat()
+                'expires_at': None  # Sin fecha de expiración - sesión permanente
             }
             
             with open(self.session_file, 'w', encoding='utf-8') as f:
@@ -55,12 +55,16 @@ class SessionManager:
             with open(self.session_file, 'r', encoding='utf-8') as f:
                 session_data = json.load(f)
             
-            # Verificar si la sesión no ha expirado
-            expires_at = datetime.fromisoformat(session_data['expires_at'])
-            if datetime.now() > expires_at:
-                # Sesión expirada, eliminar archivo
-                self.clear_session()
-                return None
+            # Verificar si hay fecha de expiración (compatibilidad con sesiones antiguas)
+            expires_at = session_data.get('expires_at')
+            if expires_at is not None:
+                # Solo verificar expiración si hay fecha definida
+                expires_at = datetime.fromisoformat(expires_at)
+                if datetime.now() > expires_at:
+                    # Sesión expirada, eliminar archivo
+                    self.clear_session()
+                    return None
+            # Si expires_at es None, la sesión nunca expira
             
             return session_data['user']
             

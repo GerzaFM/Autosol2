@@ -196,12 +196,12 @@ class MainWindow(tb.Window):
             lambda: self._show_view("cheques"), 
             "top"
         )
-        #self.view_buttons["proveedores"] = self.sidebar.add_menu_item(
-        """    "Proveedores", "🏢",
+        self.view_buttons["proveedores"] = self.sidebar.add_menu_item(
+           "Proveedores", "🏢",
             lambda: self._show_view("proveedores"),
-            "top"
+            "bottom"
         )
-
+        """
         # Elementos de configuración (parte inferior)
         self.view_buttons["config"] = self.sidebar.add_menu_item(
             "Configuración", "⚙️", 

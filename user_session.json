@@ -1,13 +1,13 @@
 {
   "user": {
-    "id": 178729,
-    "username": "sandra.hernandez",
-    "nombre": "Sandra Hernandez Sandoval",
-    "email": "ga.matehuala@gtcnissan.com",
+    "id": 294379,
+    "username": "gerzahin.flores",
+    "nombre": "Gerzahin Flores Martinez",
+    "email": "sistemas.matehuala@gtcnissan.com",
     "empresa": 6,
     "centro": 15,
-    "permisos": "Gerente"
+    "permisos": "Administrador"
   },
-  "login_time": "2025-08-27T09:08:38.144588",
-  "expires_at": "2025-08-27T17:08:38.144600"
+  "login_time": "2025-08-27T18:04:35.631860",
+  "expires_at": null
 }

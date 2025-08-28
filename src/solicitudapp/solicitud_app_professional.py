@@ -75,6 +75,8 @@ class SolicitudApp(tb.Frame):
         # Valores originales para calcular complementos
         self.valores_originales_totales = {}  # Almacenar totales originales del XML
         self.valores_originales_conceptos = []  # Almacenar conceptos originales del XML
+        self.valores_antes_dividir_totales = {}  # Almacenar totales antes de dividir para calcular complementos
+        self.valores_antes_dividir_conceptos = []  # Almacenar conceptos antes de dividir para calcular complementos
         
         # Componentes UI
         self.proveedor_frame: Optional[ProveedorFrame] = None
@@ -860,7 +862,30 @@ class SolicitudApp(tb.Frame):
                 messagebox.showwarning("Advertencia", "Los valores ya han sido divididos. Use 'Calcular' para restaurar los valores originales antes de dividir nuevamente.")
                 return
             
-            # Obtener totales actuales
+            # GUARDAR VALORES ANTES DE DIVIDIR para poder calcular complementos correctamente
+            # Obtener totales actuales ANTES de dividir
+            totales_antes_dividir = {k: v.get() for k, v in self.entries_totales.items()}
+            self.valores_antes_dividir_totales = totales_antes_dividir.copy()
+            logger.info(f"Valores totales guardados antes de dividir: {self.valores_antes_dividir_totales}")
+            
+            # Guardar conceptos ANTES de dividir
+            self.valores_antes_dividir_conceptos = []
+            for item_id in self.tree.get_children():
+                try:
+                    valores = list(self.tree.item(item_id, "values"))
+                    if len(valores) >= 4:
+                        self.valores_antes_dividir_conceptos.append({
+                            "cantidad": valores[0],
+                            "descripcion": valores[1],
+                            "precio_unitario": float(valores[2]),
+                            "total": float(valores[3])
+                        })
+                except (ValueError, TypeError, IndexError) as e:
+                    logger.error(f"Error al guardar concepto antes de dividir: {e}")
+                    continue
+            logger.info(f"Conceptos guardados antes de dividir: {len(self.valores_antes_dividir_conceptos)} conceptos")
+            
+            # Obtener totales actuales para dividir
             totales = {k: v.get() for k, v in self.entries_totales.items()}
             
             # Dividir totales
@@ -923,29 +948,29 @@ class SolicitudApp(tb.Frame):
         try:
             logger.info("Iniciando cálculo de valores complementarios")
             
-            # Verificar que tengamos valores originales guardados
-            if not hasattr(self, 'valores_originales_totales') or not self.valores_originales_totales:
-                logger.error("No se encontraron valores originales para calcular complementos")
-                messagebox.showerror("Error", "No se encontraron valores originales. Cargue el XML nuevamente.")
+            # Verificar que tengamos valores antes de dividir guardados
+            if not hasattr(self, 'valores_antes_dividir_totales') or not self.valores_antes_dividir_totales:
+                logger.error("No se encontraron valores antes de dividir para calcular complementos")
+                messagebox.showerror("Error", "No se encontraron valores antes de dividir. Divida los valores nuevamente.")
                 return
             
             # Obtener valores actuales de la primera factura desde la interfaz
             totales_primera = {k: v.get() for k, v in self.entries_totales.items()}
             logger.info(f"Totales primera factura: {totales_primera}")
-            logger.info(f"Valores originales: {self.valores_originales_totales}")
+            logger.info(f"Valores antes de dividir: {self.valores_antes_dividir_totales}")
             
             # Calcular complementos para totales
             for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
                 try:
-                    valor_original = float(self.valores_originales_totales.get(k, "0"))
+                    valor_antes_dividir = float(self.valores_antes_dividir_totales.get(k, "0"))
                     valor_primera = float(totales_primera.get(k, "0"))
-                    valor_complemento = valor_original - valor_primera
+                    valor_complemento = valor_antes_dividir - valor_primera
                     
                     # Actualizar en la interfaz
                     self.entries_totales[k].delete(0, "end")
                     self.entries_totales[k].insert(0, f"{valor_complemento:.2f}")
                     
-                    logger.info(f"{k}: Original={valor_original:.2f}, Primera={valor_primera:.2f}, Complemento={valor_complemento:.2f}")
+                    logger.info(f"{k}: Antes de dividir={valor_antes_dividir:.2f}, Primera={valor_primera:.2f}, Complemento={valor_complemento:.2f}")
                     
                 except (ValueError, TypeError) as e:
                     logger.error(f"Error al calcular complemento para {k}: {e}")
@@ -968,35 +993,35 @@ class SolicitudApp(tb.Frame):
                     logger.error(f"Error al procesar concepto {item_id}: {e}")
                     continue
             
-            # Verificar que tengamos conceptos originales
-            if not hasattr(self, 'valores_originales_conceptos') or not self.valores_originales_conceptos:
-                logger.error("No se encontraron conceptos originales")
+            # Verificar que tengamos conceptos antes de dividir
+            if not hasattr(self, 'valores_antes_dividir_conceptos') or not self.valores_antes_dividir_conceptos:
+                logger.error("No se encontraron conceptos antes de dividir")
                 return
             
             # Calcular complementos para cada concepto
-            for i, (concepto_original, concepto_primera) in enumerate(zip(self.valores_originales_conceptos, conceptos_primera)):
+            for i, (concepto_antes_dividir, concepto_primera) in enumerate(zip(self.valores_antes_dividir_conceptos, conceptos_primera)):
                 try:
                     # Precio unitario complementario
-                    precio_original = concepto_original["precio_unitario"]
+                    precio_antes_dividir = concepto_antes_dividir["precio_unitario"]
                     precio_primera = concepto_primera["precio_unitario"]
-                    precio_complemento = precio_original - precio_primera
+                    precio_complemento = precio_antes_dividir - precio_primera
                     
                     # Total complementario
-                    total_original = concepto_original["total"]
+                    total_antes_dividir = concepto_antes_dividir["total"]
                     total_primera = concepto_primera["total"]
-                    total_complemento = total_original - total_primera
+                    total_complemento = total_antes_dividir - total_primera
                     
                     # Actualizar en la tabla (cantidad y descripción permanecen iguales)
                     item_id = list(self.tree.get_children())[i]
                     nuevos_valores = [
-                        concepto_original["cantidad"],  # Cantidad igual
-                        concepto_original["descripcion"],  # Descripción igual
+                        concepto_antes_dividir["cantidad"],  # Cantidad igual
+                        concepto_antes_dividir["descripcion"],  # Descripción igual
                         f"{precio_complemento:.2f}",  # Precio complementario
                         f"{total_complemento:.2f}"  # Total complementario
                     ]
                     
                     self.tree.item(item_id, values=nuevos_valores)
-                    logger.info(f"Concepto {i+1}: {concepto_original['descripcion']} - "
+                    logger.info(f"Concepto {i+1}: {concepto_antes_dividir['descripcion']} - "
                               f"Precio complemento: {precio_complemento:.2f}, Total complemento: {total_complemento:.2f}")
                     
                 except (ValueError, TypeError, IndexError) as e:

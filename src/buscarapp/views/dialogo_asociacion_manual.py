@@ -50,7 +50,7 @@ class DialogoAsociacionManual:
         
         # Configurar tamaño y posición
         ancho = 900
-        alto = 600
+        alto = 650  # Aumentado de 600 a 650 para dar más espacio a los botones
         
         # Centrar en la pantalla
         screen_width = self.ventana.winfo_screenwidth()
@@ -151,7 +151,7 @@ class DialogoAsociacionManual:
     def _crear_seccion_facturas(self, parent):
         """Crea la sección con la lista de facturas disponibles"""
         facturas_frame = ttk.LabelFrame(parent, text=f"Facturas Disponibles del Mismo Proveedor ({len(self.facturas_disponibles)})", padding="10")
-        facturas_frame.pack(fill=BOTH, expand=True)
+        facturas_frame.pack(fill=BOTH, expand=True, pady=(0, 10))
         
         if not self.facturas_disponibles:
             # No hay facturas disponibles
@@ -188,16 +188,13 @@ class DialogoAsociacionManual:
         
         # Scrollbars
         v_scrollbar = ttk.Scrollbar(tree_frame, orient=VERTICAL, command=self.tree.yview)
-        h_scrollbar = ttk.Scrollbar(tree_frame, orient=HORIZONTAL, command=self.tree.xview)
-        self.tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        self.tree.configure(yscrollcommand=v_scrollbar.set)
         
-        # Empaquetar TreeView y scrollbars
-        self.tree.grid(row=0, column=0, sticky=(N, S, E, W))
-        v_scrollbar.grid(row=0, column=1, sticky=(N, S))
-        h_scrollbar.grid(row=1, column=0, sticky=(E, W))
+        # Empaquetar TreeView y scrollbars usando pack
+        self.tree.pack(side=LEFT, fill=BOTH, expand=True)
+        v_scrollbar.pack(side=RIGHT, fill=Y)
         
-        tree_frame.rowconfigure(0, weight=1)
-        tree_frame.columnconfigure(0, weight=1)
+        tree_frame.pack(fill=BOTH, expand=True)
         
         # Llenar TreeView con datos
         self._llenar_treeview()
@@ -231,19 +228,16 @@ class DialogoAsociacionManual:
                 total_formatted,
                 fecha,
                 estado
-            ))
-            
-            # Guardar referencia a la factura original
-            self.tree.set(item_id, '#0', i)  # Índice de la factura en la lista
+            ), tags=(str(i),))  # Usar tags en lugar de column #0
             
     def _crear_botones(self, parent):
         """Crea los botones de acción"""
         botones_frame = ttk.Frame(parent)
-        botones_frame.pack(fill=X, pady=(10, 0))
+        botones_frame.pack(fill=X, side=BOTTOM, pady=(10, 0))
         
         # Frame para centrar botones
         center_frame = ttk.Frame(botones_frame)
-        center_frame.pack()
+        center_frame.pack(expand=True)
         
         # Botón Asociar
         self.btn_asociar = ttk_bootstrap.Button(
@@ -296,13 +290,18 @@ class DialogoAsociacionManual:
         # Obtener la factura seleccionada
         item_id = seleccion[0]
         try:
-            indice_factura = int(self.tree.set(item_id, '#0'))
-            self.factura_seleccionada = self.facturas_disponibles[indice_factura]
-            self.resultado = 'asociar'
-            
-            self.logger.info(f"Usuario seleccionó factura para asociar: {self.factura_seleccionada.get('serie', 'N/A')}-{self.factura_seleccionada.get('folio', 'N/A')}")
-            self.ventana.destroy()
-            
+            # Obtener el índice de la factura desde los tags
+            tags = self.tree.item(item_id, 'tags')
+            if tags:
+                indice_factura = int(tags[0])
+                self.factura_seleccionada = self.facturas_disponibles[indice_factura]
+                self.resultado = 'asociar'
+                
+                self.logger.info(f"Usuario seleccionó factura para asociar: {self.factura_seleccionada.get('serie', 'N/A')}-{self.factura_seleccionada.get('folio', 'N/A')}")
+                self.ventana.destroy()
+            else:
+                raise ValueError("No se encontraron tags en el item seleccionado")
+                
         except (ValueError, IndexError) as e:
             self.logger.error(f"Error obteniendo factura seleccionada: {e}")
             tk.messagebox.showerror(

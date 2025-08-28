@@ -936,6 +936,10 @@ class AutocargaController:
                         folio = str(factura_data.get('folio', '')).strip()
                         folio_interno = factura_data.get('folio_interno', '')
                         
+                        # Inicializar variables para extracción
+                        serie_original = serie  # Inicializar con la serie disponible
+                        folio_original = folio  # Inicializar con el folio disponible
+                        
                         self.logger.debug(f"   🔍 FACTURA {i+1}: serie='{serie}', folio='{folio}', serie_folio='{serie_folio}'")
                         
                         # ESTRATEGIA 1: Coincidencia exacta completa
