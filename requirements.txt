@@ -1,53 +1,54 @@
 # TCM Matehuala - Sistema de Gestión de Solicitudes
 # Dependencias del proyecto - VERSIÓN COMPLETA
+# Generado automáticamente por análisis de dependencias
+
+# === DEPENDENCIAS ESENCIALES DEL PROYECTO ===
 
 # Interfaz de usuario
-ttkbootstrap>=1.10.1
+ttkbootstrap>=1.10.1  # Framework UI para tkinter con temas modernos
 
 # Base de datos
-peewee>=3.17.0
-psycopg2-binary>=2.9.0  # Driver PostgreSQL
+peewee>=3.17.0  # ORM ligero para bases de datos
+psycopg2-binary>=2.9.0  # Driver PostgreSQL con binarios incluidos
 
-# Configuración y entorno  
-python-decouple>=3.6  # Para variables de entorno
+# Configuración y entorno
+python-decouple>=3.6  # Manejo de variables de entorno y configuración
 
-# Procesamiento PDF
-PyPDFForm>=3.4.0  # Para formularios PDF
-PyPDF2>=3.0.1  # Para lectura de PDFs
-pdfplumber>=0.11.0  # Para extracción de datos de PDFs
-pdfminer.six>=20250506  # Dependencia de pdfplumber
+# Procesamiento PDF (Principal funcionalidad del sistema)
+PyPDFForm>=3.4.0  # Manipulación de formularios PDF
+PyPDF2>=3.0.1  # Lectura y escritura de archivos PDF
+pdfplumber>=0.11.0  # Extracción avanzada de datos de PDFs
+pdfminer.six>=20250506  # Motor de análisis de PDFs
+pypdfium2>=4.30.0  # Renderizado de PDFs a imágenes
 
 # Generación de reportes
-reportlab>=4.0.0  # Para generar PDFs y reportes
-openpyxl>=3.1.0  # Para trabajar con Excel
+reportlab>=4.0.0  # Generación de PDFs y gráficos
+openpyxl>=3.1.0  # Manipulación de archivos Excel (layouts)
 
 # Análisis de datos
-pandas>=2.3.0  # Para análisis y manipulación de datos
-numpy>=2.3.0  # Para operaciones numéricas
+pandas>=2.3.0  # Análisis y manipulación de datos tabulares
+numpy>=2.3.0  # Operaciones numéricas y arrays
 
-# Imágenes
-Pillow>=10.4.0  # Para procesamiento de imágenes (PIL)
-pypdfium2>=4.30.0  # Para rendering de PDFs
+# Procesamiento de imágenes
+Pillow>=10.4.0  # Biblioteca de imágenes Python (PIL Fork)
 
 # Procesamiento XML/HTML
-lxml>=4.9.0
+lxml>=4.9.0  # Parser XML/HTML de alta performance
 
 # Fechas y tiempo
-python-dateutil>=2.9.0
-pytz>=2025.2
-tzdata>=2025.2
+python-dateutil>=2.9.0  # Extensiones para datetime
+pytz>=2025.2  # Zona horaria
 
-# Criptografía y seguridad
-cryptography>=45.0.0
+# Seguridad y criptografía
+cryptography>=45.0.0  # Primitivas criptográficas
 
-# Utilidades generales
-charset-normalizer>=3.4.0
-cffi>=1.17.0
-pycparser>=2.22
-six>=1.17.0
+# === DEPENDENCIAS AUXILIARES ===
+# (Requeridas por las dependencias principales)
 
-# Desarrollo y testing (opcional)
-pytest>=7.0.0
-pytest-cov>=4.0.0
-black>=23.0.0
-flake8>=6.0.0
+# Utilidades de codificación
+charset-normalizer>=3.4.0  # Detección y normalización de codificación
+six>=1.17.0  # Compatibilidad Python 2/3
+
+# Compilación y FFI
+cffi>=1.17.0  # Foreign Function Interface para Python
+pycparser>=2.22  # Parser de C para Python
