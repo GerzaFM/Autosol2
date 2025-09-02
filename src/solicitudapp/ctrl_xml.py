@@ -73,15 +73,43 @@ class XMLFactura:
                     elif impuesto == "001":  # ISR retenido
                         self.isr_ret = importe
 
-        # Conceptos
+        # Conceptos y descuentos
         conceptos_factura = self.root.find("cfdi:Conceptos", self.NAMESPACES)
+        descuentos_totales = 0.0
+        
         if conceptos_factura is not None:
             for concepto in conceptos_factura.findall("cfdi:Concepto", self.NAMESPACES):
                 cantidad = concepto.attrib.get("Cantidad", "")
                 descripcion = concepto.attrib.get("Descripcion", "")
                 precio_unitario = concepto.attrib.get("ValorUnitario", "")
                 importe = concepto.attrib.get("Importe", "")
+                descuento = concepto.attrib.get("Descuento", "0")
+                
+                # Agregar concepto normal
                 self.conceptos.append((cantidad, descripcion, precio_unitario, importe))
+                
+                # Acumular descuentos si existen
+                if descuento and float(descuento) > 0:
+                    descuentos_totales += float(descuento)
+                    print(f"📋 Descuento encontrado en '{descripcion}': ${descuento}")
+            
+            # Si hay descuentos, agregar concepto de descuento total
+            if descuentos_totales > 0:
+                descuento_negativo = -descuentos_totales
+                self.conceptos.append((
+                    "1", 
+                    "DESCUENTOS APLICADOS", 
+                    str(descuento_negativo), 
+                    str(descuento_negativo)
+                ))
+                print(f"💰 Descuento total agregado como concepto: ${descuento_negativo}")
+                
+                # Ajustar subtotal considerando descuentos
+                if self.subtotal:
+                    subtotal_original = float(self.subtotal)
+                    subtotal_ajustado = subtotal_original - descuentos_totales
+                    self.subtotal = str(subtotal_ajustado)
+                    print(f"📊 Subtotal ajustado: ${subtotal_original} - ${descuentos_totales} = ${subtotal_ajustado}")
         else:
             print("No se encontraron elementos cfdi:Conceptos")
 
