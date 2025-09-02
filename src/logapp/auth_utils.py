@@ -28,6 +28,12 @@ class AuthUtils:
         return session_manager.is_session_valid()
     
     @staticmethod
+    def is_admin():
+        """Verifica si el usuario actual tiene permisos de administrador."""
+        current_user = AuthUtils.get_current_user()
+        return current_user and current_user.get('permisos') == 'Administrador'
+    
+    @staticmethod
     def logout_and_exit():
         """Cierra la sesión y termina la aplicación."""
         AuthUtils.logout()

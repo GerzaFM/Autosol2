@@ -196,11 +196,7 @@ class MainWindow(tb.Window):
             lambda: self._show_view("cheques"), 
             "top"
         )
-        self.view_buttons["proveedores"] = self.sidebar.add_menu_item(
-           "Proveedores", "🏢",
-            lambda: self._show_view("proveedores"),
-            "bottom"
-        )
+        
         """
         # Elementos de configuración (parte inferior)
         self.view_buttons["config"] = self.sidebar.add_menu_item(
@@ -219,18 +215,30 @@ class MainWindow(tb.Window):
             "bottom"
         )
         """
-        # Botón de logout (siempre a la derecha)
-        self.view_buttons["logout"] = self.sidebar.add_menu_item(
-            "Cerrar Sesión", "🚪", 
-            lambda: self._handle_logout(), 
-            "bottom"
-        )
         
-        self.view_buttons["nueva_vista"] = self.sidebar.add_menu_item(
-            "Usuarios", "👥", 
-            lambda: self._show_view("nueva_vista"), 
-            "bottom"
-        )
+        # Verificar si el usuario es administrador para mostrar botones administrativos
+        is_admin = AuthUtils.is_admin()
+        
+        # Botones solo para administradores
+        if is_admin:
+            self.view_buttons["proveedores"] = self.sidebar.add_menu_item(
+               "Proveedores", "🏢",
+                lambda: self._show_view("proveedores"),
+                "bottom"
+            )
+            
+            self.view_buttons["nueva_vista"] = self.sidebar.add_menu_item(
+                "Usuarios", "👥", 
+                lambda: self._show_view("nueva_vista"), 
+                "bottom"
+            )
+        
+            # Botón de logout
+            self.view_buttons["logout"] = self.sidebar.add_menu_item(
+                "Cerrar Sesión", "🚪", 
+                lambda: self._handle_logout(), 
+                "bottom"
+            )
 
     def _handle_logout(self):
         """Maneja el cierre de sesión del usuario."""
@@ -354,6 +362,11 @@ class MainWindow(tb.Window):
     
     def _administrador_usuarios(self):
         """Muestra la aplicación de administración de usuarios (MVC)."""
+        # Verificar permisos de administrador
+        if not AuthUtils.is_admin():
+            self._show_error_view("Acceso denegado: Solo los administradores pueden acceder a esta sección")
+            return
+            
         try:
             # Limpiar contenido anterior
             self._clear_content()
@@ -377,6 +390,11 @@ class MainWindow(tb.Window):
     
     def _show_proveedores_view(self):
         """Muestra la aplicación de proveedores directamente."""
+        # Verificar permisos de administrador
+        if not AuthUtils.is_admin():
+            self._show_error_view("Acceso denegado: Solo los administradores pueden acceder a esta sección")
+            return
+            
         try:
             # Limpiar contenido anterior
             self._clear_content()

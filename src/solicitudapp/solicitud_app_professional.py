@@ -102,6 +102,31 @@ class SolicitudApp(tb.Frame):
             logger.warning(f"Error al obtener próximo folio interno: {e}")
             return "001"  # Fallback
     
+    def sincronizar_secuencia_folio(self):
+        """Sincroniza la secuencia PostgreSQL con el máximo folio_interno actual."""
+        try:
+            from src.bd.database import db
+            
+            # Obtener el máximo folio_interno actual
+            ultima_factura = Factura.select().order_by(Factura.folio_interno.desc()).first()
+            if ultima_factura:
+                max_folio = ultima_factura.folio_interno
+                
+                # Ajustar la secuencia al valor máximo actual
+                db.execute_sql(f"SELECT setval('facturas_folio_interno_seq', {max_folio}, true);")
+                logger.info(f"Secuencia PostgreSQL sincronizada al folio_interno máximo: {max_folio}")
+                
+                # Verificar que la sincronización funcionó
+                cursor = db.execute_sql('SELECT last_value FROM facturas_folio_interno_seq;')
+                nuevo_valor = cursor.fetchone()[0]
+                logger.info(f"Secuencia ahora está en: {nuevo_valor} (próximo será: {nuevo_valor + 1})")
+            else:
+                logger.warning("No hay facturas en la base de datos para sincronizar la secuencia")
+        except Exception as e:
+            logger.error(f"Error al sincronizar la secuencia: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+    
     def setup_ui(self):
         """Configura la interfaz de usuario."""
         self.lbl_sol_rest: Optional[tb.Label] = None
@@ -583,7 +608,7 @@ class SolicitudApp(tb.Frame):
     def _rellenar_totales(self, datos):
         """Rellena los campos de totales."""
         try:
-            # Guardar valores originales para cálculos de complemento
+            # Guardar valores originales para cálculos de complemento (SOLO del XML, sin modificaciones)
             self.valores_originales_totales = {
                 "Subtotal": str(getattr(datos, "subtotal", "")),
                 "IVA": str(getattr(datos, "iva", "")),
@@ -594,13 +619,13 @@ class SolicitudApp(tb.Frame):
             try:
                 iva_ret = float(getattr(datos, "iva_ret", 0))
                 isr_ret = float(getattr(datos, "isr_ret", 0))
-                ret_total = str(iva_ret + isr_ret)
+                ret_total = str(iva_ret + isr_ret) if (iva_ret + isr_ret) > 0 else ""
                 self.valores_originales_totales["Ret"] = ret_total
             except (ValueError, TypeError):
                 ret_total = ""
                 self.valores_originales_totales["Ret"] = ret_total
             
-            logger.info(f"Valores originales guardados: {self.valores_originales_totales}")
+            logger.info(f"Valores originales del XML guardados para complementarios: {self.valores_originales_totales}")
             
             # Rellenar campos en la interfaz
             self.entries_totales["Subtotal"].delete(0, "end")
@@ -621,7 +646,7 @@ class SolicitudApp(tb.Frame):
     def rellenar_conceptos(self, conceptos):
         """Rellena la tabla de conceptos."""
         try:
-            # Guardar conceptos originales para cálculos de complemento
+            # Guardar conceptos originales para cálculos de complemento (SOLO del XML, sin modificaciones)
             self.valores_originales_conceptos = []
             for concepto in conceptos:
                 if len(concepto) >= 4:  # [cantidad, descripcion, precio_unitario, total]
@@ -632,7 +657,7 @@ class SolicitudApp(tb.Frame):
                         "total": float(concepto[3]) if concepto[3] else 0.0
                     })
             
-            logger.info(f"Conceptos originales guardados: {len(self.valores_originales_conceptos)} conceptos")
+            logger.info(f"Conceptos originales del XML guardados para complementarios: {len(self.valores_originales_conceptos)} conceptos")
             
             # Limpiar tabla
             self.borrar_conceptos()
@@ -817,6 +842,8 @@ class SolicitudApp(tb.Frame):
     def calcular_totales(self):
         """Calcula Subtotal, IVA (16%) y Total en los campos correspondientes."""
         try:
+            logger.info("Iniciando cálculo de totales...")
+            
             # Sumar columna 'Total' para obtener el Subtotal
             subtotal = 0.0
             for item in self.tree.get_children():
@@ -832,15 +859,23 @@ class SolicitudApp(tb.Frame):
             # Calcular Total (subtotal + iva)
             total = subtotal + iva
 
+            logger.info(f"Valores calculados antes de actualizar campos: Subtotal={subtotal:.2f}, IVA={iva:.2f}, Total={total:.2f}")
+
             # Actualizar los campos
             self.entries_totales["Subtotal"].delete(0, "end")
             self.entries_totales["Subtotal"].insert(0, f"{subtotal:.2f}")
+            logger.info(f"Campo Subtotal actualizado: {self.entries_totales['Subtotal'].get()}")
 
             self.entries_totales["IVA"].delete(0, "end")
             self.entries_totales["IVA"].insert(0, f"{iva:.2f}")
+            logger.info(f"Campo IVA actualizado: {self.entries_totales['IVA'].get()}")
 
             self.entries_totales["TOTAL"].delete(0, "end")
             self.entries_totales["TOTAL"].insert(0, f"{total:.2f}")
+            logger.info(f"Campo TOTAL actualizado: {self.entries_totales['TOTAL'].get()}")
+
+            # Forzar actualización de la interfaz
+            self.update()
 
             # Resetear el flag de división al recalcular
             if hasattr(self, 'valores_ya_divididos'):
@@ -863,8 +898,12 @@ class SolicitudApp(tb.Frame):
                 return
             
             # GUARDAR VALORES ANTES DE DIVIDIR para poder calcular complementos correctamente
-            # Obtener totales actuales ANTES de dividir
-            totales_antes_dividir = {k: v.get() for k, v in self.entries_totales.items()}
+            # Obtener totales actuales ANTES de dividir con manejo de valores vacíos
+            totales_antes_dividir = {}
+            for k, v in self.entries_totales.items():
+                valor = v.get().strip()
+                totales_antes_dividir[k] = valor if valor else "0"
+            
             self.valores_antes_dividir_totales = totales_antes_dividir.copy()
             logger.info(f"Valores totales guardados antes de dividir: {self.valores_antes_dividir_totales}")
             
@@ -891,13 +930,21 @@ class SolicitudApp(tb.Frame):
             # Dividir totales
             for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
                 try:
-                    valor = float(totales.get(k, "0"))
+                    valor_str = totales.get(k, "0").strip()
+                    # Manejar valores vacíos
+                    if not valor_str:
+                        valor_str = "0"
+                    
+                    valor = float(valor_str)
                     nuevo_valor = valor / 2
                     totales[k] = f"{nuevo_valor:.2f}"
                     self.entries_totales[k].delete(0, "end")
                     self.entries_totales[k].insert(0, totales[k])
-                except (ValueError, TypeError):
-                    logger.error(f"Error al dividir el total para {k}")
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error al dividir el total para {k}: {e}")
+                    # En caso de error, poner 0
+                    self.entries_totales[k].delete(0, "end")
+                    self.entries_totales[k].insert(0, "0.00")
                     pass
             logger.info(f"Totales divididos: {totales}")
             
@@ -948,32 +995,48 @@ class SolicitudApp(tb.Frame):
         try:
             logger.info("Iniciando cálculo de valores complementarios")
             
-            # Verificar que tengamos valores antes de dividir guardados
-            if not hasattr(self, 'valores_antes_dividir_totales') or not self.valores_antes_dividir_totales:
-                logger.error("No se encontraron valores antes de dividir para calcular complementos")
-                messagebox.showerror("Error", "No se encontraron valores antes de dividir. Divida los valores nuevamente.")
+            # Verificar que tengamos valores originales guardados (del XML)
+            if not hasattr(self, 'valores_originales_totales') or not self.valores_originales_totales:
+                logger.error("No se encontraron valores originales para calcular complementos")
+                messagebox.showerror("Error", 
+                    "No se encontraron valores originales para calcular complementos.\n\n"
+                    "Los valores originales se guardan automáticamente cuando se carga el XML.\n"
+                    "Por favor, cargue nuevamente el archivo XML.")
                 return
             
-            # Obtener valores actuales de la primera factura desde la interfaz
+            # Obtener valores actuales de la primera factura desde la interfaz (valores modificados por el usuario)
             totales_primera = {k: v.get() for k, v in self.entries_totales.items()}
-            logger.info(f"Totales primera factura: {totales_primera}")
-            logger.info(f"Valores antes de dividir: {self.valores_antes_dividir_totales}")
+            logger.info(f"Totales primera factura (modificados por usuario): {totales_primera}")
+            logger.info(f"Valores originales del XML (sin modificaciones): {self.valores_originales_totales}")
             
-            # Calcular complementos para totales
+            # Calcular complementos para totales: Original - Primera = Complemento
             for k in ["Subtotal", "Ret", "IVA", "TOTAL"]:
                 try:
-                    valor_antes_dividir = float(self.valores_antes_dividir_totales.get(k, "0"))
-                    valor_primera = float(totales_primera.get(k, "0"))
-                    valor_complemento = valor_antes_dividir - valor_primera
+                    # Manejar valores vacíos o None
+                    valor_original_str = self.valores_originales_totales.get(k, "0")
+                    valor_primera_str = totales_primera.get(k, "0")
+                    
+                    # Convertir valores vacíos o None a "0"
+                    if not valor_original_str or valor_original_str.strip() == "":
+                        valor_original_str = "0"
+                    if not valor_primera_str or valor_primera_str.strip() == "":
+                        valor_primera_str = "0"
+                    
+                    valor_original = float(valor_original_str)
+                    valor_primera = float(valor_primera_str)
+                    valor_complemento = valor_original - valor_primera
                     
                     # Actualizar en la interfaz
                     self.entries_totales[k].delete(0, "end")
                     self.entries_totales[k].insert(0, f"{valor_complemento:.2f}")
                     
-                    logger.info(f"{k}: Antes de dividir={valor_antes_dividir:.2f}, Primera={valor_primera:.2f}, Complemento={valor_complemento:.2f}")
+                    logger.info(f"{k}: Original={valor_original:.2f}, Primera={valor_primera:.2f}, Complemento={valor_complemento:.2f}")
                     
                 except (ValueError, TypeError) as e:
                     logger.error(f"Error al calcular complemento para {k}: {e}")
+                    # En caso de error, poner 0 como valor complementario
+                    self.entries_totales[k].delete(0, "end")
+                    self.entries_totales[k].insert(0, "0.00")
                     continue
             
             # Calcular complementos para conceptos
@@ -993,36 +1056,40 @@ class SolicitudApp(tb.Frame):
                     logger.error(f"Error al procesar concepto {item_id}: {e}")
                     continue
             
-            # Verificar que tengamos conceptos antes de dividir
-            if not hasattr(self, 'valores_antes_dividir_conceptos') or not self.valores_antes_dividir_conceptos:
-                logger.error("No se encontraron conceptos antes de dividir")
+            # Verificar que tengamos conceptos originales
+            if not hasattr(self, 'valores_originales_conceptos') or not self.valores_originales_conceptos:
+                logger.error("No se encontraron conceptos originales")
+                messagebox.showwarning("Advertencia", 
+                    "No se encontraron conceptos originales.\n"
+                    "Los complementos de totales se calcularon correctamente,\n"
+                    "pero los conceptos permanecerán sin cambios.")
                 return
             
-            # Calcular complementos para cada concepto
-            for i, (concepto_antes_dividir, concepto_primera) in enumerate(zip(self.valores_antes_dividir_conceptos, conceptos_primera)):
+            # Calcular complementos para cada concepto: Original - Primera = Complemento
+            for i, (concepto_original, concepto_primera) in enumerate(zip(self.valores_originales_conceptos, conceptos_primera)):
                 try:
                     # Precio unitario complementario
-                    precio_antes_dividir = concepto_antes_dividir["precio_unitario"]
+                    precio_original = concepto_original["precio_unitario"]
                     precio_primera = concepto_primera["precio_unitario"]
-                    precio_complemento = precio_antes_dividir - precio_primera
+                    precio_complemento = precio_original - precio_primera
                     
                     # Total complementario
-                    total_antes_dividir = concepto_antes_dividir["total"]
+                    total_original = concepto_original["total"]
                     total_primera = concepto_primera["total"]
-                    total_complemento = total_antes_dividir - total_primera
+                    total_complemento = total_original - total_primera
                     
                     # Actualizar en la tabla (cantidad y descripción permanecen iguales)
                     item_id = list(self.tree.get_children())[i]
                     nuevos_valores = [
-                        concepto_antes_dividir["cantidad"],  # Cantidad igual
-                        concepto_antes_dividir["descripcion"],  # Descripción igual
+                        concepto_original["cantidad"],  # Cantidad igual
+                        concepto_original["descripcion"],  # Descripción igual
                         f"{precio_complemento:.2f}",  # Precio complementario
                         f"{total_complemento:.2f}"  # Total complementario
                     ]
                     
                     self.tree.item(item_id, values=nuevos_valores)
-                    logger.info(f"Concepto {i+1}: {concepto_antes_dividir['descripcion']} - "
-                              f"Precio complemento: {precio_complemento:.2f}, Total complemento: {total_complemento:.2f}")
+                    logger.info(f"Concepto {i+1}: {concepto_original['descripcion']} - "
+                              f"Precio original: {precio_original:.2f}, Primera: {precio_primera:.2f}, Complemento: {precio_complemento:.2f}")
                     
                 except (ValueError, TypeError, IndexError) as e:
                     logger.error(f"Error al calcular complemento para concepto {i}: {e}")
@@ -1106,6 +1173,14 @@ class SolicitudApp(tb.Frame):
             self.folio_segunda_factura = None
             self.valores_ya_divididos = False
             self.division_con_duplicado = False
+            
+            # Limpiar valores originales del XML (para cálculo de complementarios)
+            self.valores_originales_totales = {}
+            self.valores_originales_conceptos = []
+            
+            # Limpiar valores antes de dividir (para el método dividir_totales_conceptos)
+            self.valores_antes_dividir_totales = {}
+            self.valores_antes_dividir_conceptos = []
             
             # Limpiar frames principales
             self.proveedor_frame.clear_entries()
@@ -1716,6 +1791,9 @@ class SolicitudApp(tb.Frame):
                     if factura and hasattr(factura, 'folio_interno') and factura.folio_interno:
                         logger.info(f"Factura guardada en la base de datos con folio_interno: {factura.folio_interno}")
                         data["FOLIO"] = str(factura.folio_interno)
+                        
+                        # Sincronizar la secuencia PostgreSQL después de guardar
+                        self.sincronizar_secuencia_folio()
                     else:
                         logger.warning("Factura guardada pero sin folio_interno válido")
                         data["FOLIO"] = "SIN_FOLIO"
@@ -1798,8 +1876,8 @@ class SolicitudApp(tb.Frame):
                         
                 logger.info("Checkbox dividir deshabilitado y tipo de vale establecido a VC por defecto")
                 
-                # CALCULAR VALORES COMPLEMENTARIOS INMEDIATAMENTE
-                logger.info("Calculando valores complementarios para la segunda factura")
+                # CALCULAR VALORES COMPLEMENTARIOS INMEDIATAMENTE ANTES DEL SIGUIENTE GENERAR
+                logger.info("Calculando valores complementarios para actualizar la interfaz")
                 self.calcular_valores_complementarios()
                 
                 # Mostrar mensaje al usuario indicando que debe generar nuevamente
@@ -1820,8 +1898,15 @@ class SolicitudApp(tb.Frame):
                 self.valores_ya_divididos = False  # Resetear flag de división
                 self.division_con_duplicado = False  # Resetear flag de división con duplicado
                 self.folio_segunda_factura = None  # Resetear folio segunda factura
+                
+                # Limpiar valores originales y de división después de completar la división
+                self.valores_originales_totales = {}
+                self.valores_originales_conceptos = []
+                self.valores_antes_dividir_totales = {}
+                self.valores_antes_dividir_conceptos = []
+                
                 logger.info("Segunda factura (VC) completada, checkbox dividir habilitado y desmarcado")
-                logger.info("Flags de división reseteados después de completar división")
+                logger.info("Flags de división y valores originales reseteados después de completar división")
             else:
                 self.chb_dividir.config(state="normal")
                 logger.info("Checkbox dividir habilitado")
