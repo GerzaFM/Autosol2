@@ -52,3 +52,8 @@ six>=1.17.0  # Compatibilidad Python 2/3
 # Compilación y FFI
 cffi>=1.17.0  # Foreign Function Interface para Python
 pycparser>=2.22  # Parser de C para Python
+
+# === HERRAMIENTAS DE DESARROLLO ===
+
+# Generación de ejecutables
+pyinstaller>=6.0.0  # Creación de ejecutables independientes
