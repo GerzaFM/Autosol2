@@ -789,7 +789,7 @@ class BuscarAppRefactored(ttk.Frame):
                 no_vale = self._limpiar_nombre_archivo(no_vale)
                 proveedor = self._limpiar_nombre_archivo(proveedor)
                 folio_factura = self._limpiar_nombre_archivo(folio_factura)
-                clase = self._limpiar_nombre_archivo(clase)
+                clase = self._limpiar_clase(clase)  # CAMBIADO: usar _limpiar_clase para preservar formato completo
                 
                 # Crear nombre del archivo - solo incluir clase si no está vacía
                 if clase and clase not in ['Vacio', 'SinClase', 'Item']:

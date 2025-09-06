@@ -32,31 +32,35 @@ class DatabaseManager:
         """Inicializa la conexión de base de datos según la configuración."""
         db_type = self._connection_config.db_type.lower()
         
-        # Forzar PostgreSQL para migración
+        # Obtener información de conexión
+        conn_info = self._connection_config.get_connection_info()
+        
         if db_type == "postgresql":
-            logger.info("Configurando PostgreSQL...")
+            logger.info(f"Configurando PostgreSQL para entorno: {conn_info['environment'].upper()}")
             try:
                 db = PostgresqlDatabase(
-                    database="tcm_matehuala",
-                    host="localhost",
-                    port=5432,
-                    user="postgres",
-                    password="Nissan#2024",
+                    database=self._connection_config.pg_database,
+                    host=self._connection_config.pg_host,
+                    port=self._connection_config.pg_port,
+                    user=self._connection_config.pg_user,
+                    password=self._connection_config.pg_password,
                     autorollback=True,
-                    autocommit=True
+                    autocommit=True,
+                    # Configuración de codificación para Windows
+                    options="-c client_encoding=utf8"
                 )
                 
                 # Probar conexión
                 db.connect()
-                logger.info(f"✓ Conectado a PostgreSQL: localhost:5432/tcm_matehuala")
+                logger.info(f"OK - Conectado a PostgreSQL: {conn_info['host']}:{conn_info['port']}/{conn_info['database']}")
                 db.close()
                 
                 self.db = db
-                logger.info(f"Base de datos inicializada: PostgreSQL")
+                logger.info(f"Base de datos inicializada: PostgreSQL ({conn_info['environment'].upper()})")
                 return
                 
             except Exception as e:
-                logger.error(f"Error conectando a PostgreSQL: {e}")
+                logger.error(f"Error conectando a PostgreSQL ({conn_info['environment'].upper()}): {e}")
                 logger.info("Fallback a SQLite")
         
         # Fallback a SQLite

@@ -7,6 +7,13 @@ from dataclasses import dataclass
 from typing import Dict, List
 from decouple import config as env_config, Csv
 
+# =============================================================================
+# CONFIGURACIÓN DE ENTORNO - CAMBIAR AQUÍ PARA ELEGIR BASE DE DATOS
+# =============================================================================
+# Opciones disponibles: 'test' o 'production'
+ENVIRONMENT = 'production'  # Cambiar a 'production' para usar la base centralizada
+# =============================================================================
+
 # Rutas del proyecto
 PROJECT_ROOT = Path(__file__).parent.parent
 APP_DIR = PROJECT_ROOT / "app"
@@ -21,21 +28,41 @@ for directory in [DATABASE_DIR, LOGS_DIR]:
 
 @dataclass
 class DatabaseConfig:
-    """Configuración de la base de datos."""
-    # SQLite (por defecto/desarrollo)
+    """Configuración de la base de datos con soporte para TEST y PRODUCTION."""
+    # SQLite (desarrollo/fallback)
     sqlite_path: str = str(DATABASE_DIR / "facturas.db")
     backup_dir: str = str(DATABASE_DIR / "backups")
     
-    # PostgreSQL (producción)
-    db_type: str = "postgresql"  # "sqlite" o "postgresql" - FORZADO A POSTGRESQL
-    pg_host: str = "localhost"
+    # Configuración dinámica basada en ENVIRONMENT
+    db_type: str = "postgresql"
+    pg_host: str = ""
     pg_port: int = 5432
-    pg_database: str = "tcm_matehuala"
-    pg_user: str = "postgres"
+    pg_database: str = ""
+    pg_user: str = ""
     pg_password: str = ""
     
     def __post_init__(self):
-        """Configurar desde variables de entorno si están disponibles."""
+        """Configurar base de datos según el entorno elegido."""
+        global ENVIRONMENT
+        
+        if ENVIRONMENT.lower() == 'test':
+            # Configuración para TEST (tcm_matehuala local)
+            self.pg_host = "localhost"
+            self.pg_database = "tcm_matehuala"
+            self.pg_user = "postgres"
+            self.pg_password = "Nissan#2024"
+            
+        elif ENVIRONMENT.lower() == 'production':
+            # Configuración para PRODUCTION (autoforms servidor)
+            self.pg_host = "10.90.101.51"
+            self.pg_database = "autoforms"
+            self.pg_user = "sistemas"
+            self.pg_password = "Postgresql#495"
+            
+        else:
+            raise ValueError(f"ENVIRONMENT debe ser 'test' o 'production', recibido: {ENVIRONMENT}")
+        
+        # Intentar leer desde variables de entorno (opcional)
         try:
             from decouple import config as env_config
             self.db_type = env_config('DB_TYPE', default=self.db_type)
@@ -45,14 +72,30 @@ class DatabaseConfig:
             self.pg_user = env_config('DB_USER', default=self.pg_user)
             self.pg_password = env_config('DB_PASSWORD', default=self.pg_password)
         except ImportError:
-            # python-decouple no disponible, usar valores por defecto
+            # python-decouple no disponible, usar valores configurados
             pass
+        
+        # Log de configuración (sin mostrar contraseña)
+        print(f"[CONFIG] Entorno: {ENVIRONMENT.upper()}")
+        print(f"[CONFIG] Base de datos: {self.pg_host}:{self.pg_port}/{self.pg_database}")
+        print(f"[CONFIG] Usuario: {self.pg_user}")
+    
+    def get_connection_info(self):
+        """Retorna información de conexión para logging."""
+        return {
+            'environment': ENVIRONMENT,
+            'host': self.pg_host,
+            'port': self.pg_port,
+            'database': self.pg_database,
+            'user': self.pg_user
+        }
 
 @dataclass
 class UIConfig:
     """Configuración de la interfaz de usuario."""
     theme: str = "darkly"
     window_size: str = "1200x900"
+    #1200x768
     min_window_size: tuple = (800, 600)
     sidebar_width_expanded: int = 200
     sidebar_width_collapsed: int = 60

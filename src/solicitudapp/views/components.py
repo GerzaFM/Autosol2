@@ -261,7 +261,7 @@ class SolicitudFrame(BaseFrame):
                         items=tipos_data,
                         search_fields=['clave', 'descripcion'],
                         display_columns=[
-                            {'name': 'clave', 'text': 'Clave', 'width': 80},
+                            {'name': 'clave', 'text': 'Clave', 'width': 60},
                             {'name': 'descripcion', 'text': 'Descripción', 'width': 200}
                         ],
                         entity_type="Tipo de Vale",

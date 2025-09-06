@@ -89,6 +89,9 @@ class SolicitudApp(tb.Frame):
         # Inicializar la interfaz de usuario
         self.setup_ui()
         
+        # Sincronizar secuencia de folio al inicializar
+        self.sincronizar_secuencia_folio()
+        
     def obtener_proximo_folio_interno(self):
         """Obtiene el próximo folio interno que sería asignado en la base de datos."""
         try:

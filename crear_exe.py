@@ -63,7 +63,7 @@ a = Analysis(
         'decouple', 'python_decouple',
         'ttkbootstrap', 'tkinter', 'tkinter.ttk', 'tkinter.messagebox', 'tkinter.filedialog',
         'sqlite3', 'pandas', 'openpyxl', 'xlsxwriter', 'reportlab',
-        'PyPDF2', 'pdfplumber', 'xml.etree.ElementTree', 'requests',
+        'PyPDF2', 'pdfplumber', 'PyPDFForm', 'xml.etree.ElementTree', 'requests',
         'lxml', 'lxml.etree', 'lxml.html',
         'Pillow', 'PIL', 'PIL.Image', 'PIL.ImageTk',
         'fpdf', 'fpdf2',

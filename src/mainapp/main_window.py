@@ -16,13 +16,15 @@ from logapp import AuthUtils
 from app.utils.logger import get_logger
 
 # Importar aplicaciones - corrección de paths
+solicitud_app_error = None
 try:
     from solicitudapp.solicitud_app_professional import SolicitudApp
-except ImportError:
+except ImportError as e1:
     try:
         from src.solicitudapp.solicitud_app_professional import SolicitudApp
-    except ImportError:
+    except ImportError as e2:
         SolicitudApp = None
+        solicitud_app_error = f"Error importando SolicitudApp:\n1. solicitudapp.solicitud_app_professional: {str(e1)}\n2. src.solicitudapp.solicitud_app_professional: {str(e2)}"
 
 try:
     from buscarapp.buscar_app_refactored import BuscarAppRefactored
@@ -304,7 +306,8 @@ class MainWindow(tb.Window):
             self._clear_content()
             
             if SolicitudApp is None:
-                self._show_error_view("SolicitudApp no está disponible")
+                error_msg = solicitud_app_error if solicitud_app_error else "SolicitudApp no está disponible"
+                self._show_error_view(error_msg)
                 return
             
             # Instanciar directamente la aplicación legacy
@@ -318,6 +321,7 @@ class MainWindow(tb.Window):
             error_details = traceback.format_exc()
             self.logger.error(f"Error al crear aplicación de solicitud: {e}")
             self.logger.error(f"Traceback completo: {error_details}")
+            self._show_error_view(f"Error al crear SolicitudApp:\n{error_details}")
             self._show_error_view(f"Error al cargar solicitud: {str(e)}")
     
     def _show_facturas_view(self):
@@ -473,13 +477,26 @@ class MainWindow(tb.Window):
         )
         error_label.pack(pady=50)
         
-        message_label = tb.Label(
-            error_frame,
-            text=error_message,
-            font=("Segoe UI", 12),
-            bootstyle="inverse-dark"
+        # Crear un área con scroll para errores largos
+        text_frame = tb.Frame(error_frame)
+        text_frame.pack(fill=BOTH, expand=True, padx=20, pady=20)
+        
+        # Usar Text widget con scrollbar para errores largos
+        import tkinter as tk
+        from tkinter import scrolledtext
+        
+        text_widget = scrolledtext.ScrolledText(
+            text_frame,
+            font=("Consolas", 10),
+            wrap=tk.WORD,
+            height=15,
+            bg="#2b2b2b",
+            fg="#ffffff",
+            insertbackground="#ffffff"
         )
-        message_label.pack(pady=20)
+        text_widget.pack(fill=BOTH, expand=True)
+        text_widget.insert("1.0", error_message)
+        text_widget.config(state=tk.DISABLED)  # Solo lectura
         
         self.current_view = error_frame
     

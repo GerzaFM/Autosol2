@@ -102,7 +102,12 @@ class SearchDialog(tb.Toplevel):
         
         for col in self.display_columns:
             self.treeview.heading(col["name"], text=col["text"])
-            self.treeview.column(col["name"], width=col.get("width", 100))
+            width = col.get("width", 100)
+            # Configurar columna con ancho específico y sin estiramiento para columnas pequeñas
+            if width <= 80:  # Para columnas pequeñas como 'Clave'
+                self.treeview.column(col["name"], width=width, minwidth=width, stretch=False)
+            else:  # Para columnas más grandes como 'Descripción'
+                self.treeview.column(col["name"], width=width, minwidth=width, stretch=True)
         
         # Scrollbars
         v_scrollbar = ttk.Scrollbar(tree_frame, orient=VERTICAL, command=self.treeview.yview)

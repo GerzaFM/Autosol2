@@ -128,8 +128,9 @@ class LoginWindow:
             bootstyle="success",
             width=20
         )
-        login_button.pack(side=LEFT, padx=(0, 10))
+        login_button.pack(side=RIGHT, padx=(0, 10))
 
+        """
         exit_button = tb.Button(
             button_frame,
             text="❌ Salir",
@@ -138,6 +139,7 @@ class LoginWindow:
             width=15
         )
         exit_button.pack(side=RIGHT)
+        """
 
         # Enter key binding
         self.password_entry.bind('<Return>', lambda e: self._handle_login())

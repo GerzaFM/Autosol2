@@ -1,4 +1,3 @@
-import dbm
 import sys
 import os
 
