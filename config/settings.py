@@ -122,7 +122,7 @@ class BusinessConfig:
 @dataclass
 class AppConfig:
     """Configuración general de la aplicación."""
-    app_name: str = "TCM Matehuala - Sistema de Gestión"
+    app_name: str = "Autoforms"
     version: str = "2.0.0"
     author: str = "TCM Matehuala Development Team"
     

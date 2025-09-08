@@ -91,6 +91,20 @@ class SolicitudApp(tb.Frame):
         
         # Sincronizar secuencia de folio al inicializar
         self.sincronizar_secuencia_folio()
+    
+    def destroy(self):
+        """Limpia los recursos cuando se destruye la vista."""
+        try:
+            # Limpiar bindings globales si los hay
+            if hasattr(self, 'canvas') and self.canvas.winfo_exists():
+                self.canvas.unbind("<MouseWheel>")
+                self.canvas.unbind("<Button-4>")
+                self.canvas.unbind("<Button-5>")
+        except (AttributeError, tk.TclError):
+            pass
+        
+        # Llamar al destroy padre
+        super().destroy()
         
     def obtener_proximo_folio_interno(self):
         """Obtiene el próximo folio interno que sería asignado en la base de datos."""
@@ -147,18 +161,76 @@ class SolicitudApp(tb.Frame):
     
     def _build_ui(self):
         """Construye la interfaz de usuario."""
+        # Crear canvas y scrollbar para toda la ventana
+        self.canvas = tb.Canvas(self)
+        self.scrollbar = tb.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tb.Frame(self.canvas)
+        
+        # Configurar el scroll y el redimensionamiento
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+        
+        # Binding para redimensionar el frame scrollable cuando cambie el canvas
+        self.canvas.bind(
+            "<Configure>",
+            lambda e: self._on_canvas_configure(e)
+        )
+        
+        # Crear ventana en el canvas y guardar referencia
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        # Empaquetar canvas y scrollbar
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        # Binding para scroll con mouse wheel - específico para este canvas
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind("<Button-4>", self._on_mousewheel)  # Linux scroll up
+        self.canvas.bind("<Button-5>", self._on_mousewheel)  # Linux scroll down
+        
+        # Crear contenido dentro del frame scrollable
         self._create_top_frame()
         self._create_table_frame()
         self._create_bottom_frame()
         self._create_comments_section()
         self._create_status_bar()
     
+    def _on_canvas_configure(self, event):
+        """Maneja el redimensionamiento del canvas para expandir el contenido."""
+        # Actualizar el ancho del frame scrollable
+        self.canvas.itemconfig(self.canvas_window, width=event.width)
+        
+        # Si el contenido es menor que la altura del canvas, expandir para llenar
+        canvas_height = event.height
+        frame_height = self.scrollable_frame.winfo_reqheight()
+        
+        if frame_height < canvas_height:
+            self.canvas.itemconfig(self.canvas_window, height=canvas_height)
+    
+    def _on_mousewheel(self, event):
+        """Maneja el scroll con la rueda del mouse."""
+        try:
+            # Verificar que el canvas existe y está válido
+            if hasattr(self, 'canvas') and self.canvas.winfo_exists():
+                # Diferentes tipos de eventos de scroll
+                if event.num == 4 or event.delta > 0:
+                    self.canvas.yview_scroll(-1, "units")
+                elif event.num == 5 or event.delta < 0:
+                    self.canvas.yview_scroll(1, "units")
+                else:
+                    # Evento Windows/Mac normal
+                    self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        except (AttributeError, tk.TclError):
+            # Si hay algún error, simplemente ignorar el evento
+            pass
+
     def _create_top_frame(self):
         """Crea el frame superior con datos de proveedor y solicitud."""
-        frame_sup = tb.Frame(self)
-        frame_sup.pack(fill=X, padx=15, pady=10)
-        
-        # Frame de proveedor (ahora con db_manager)
+        frame_sup = tb.Frame(self.scrollable_frame)
+        frame_sup.pack(fill=X, padx=15, pady=10)        # Frame de proveedor (ahora con db_manager)
         self.proveedor_frame = ProveedorFrame(frame_sup, db_manager=self.db_manager)
         self.proveedor_frame.pack(side=LEFT, fill=Y, expand=False, padx=(0, 10), pady=0)
         
@@ -168,16 +240,16 @@ class SolicitudApp(tb.Frame):
     
     def _create_table_frame(self):
         """Crea el frame con la tabla de conceptos."""
-        frame_tabla = tb.Frame(self)
+        frame_tabla = tb.Frame(self.scrollable_frame)
         frame_tabla.pack(fill=BOTH, expand=True, padx=15, pady=10)
         
-        # Tabla de conceptos
+        # Tabla de conceptos con altura mínima para 4 conceptos
         cols = ("Cantidad", "Descripción", "Precio", "Total")
         self.tree = tb.Treeview(
             frame_tabla, 
             columns=cols, 
             show="headings", 
-            height=6, 
+            height=4,  # Altura mínima para 4 conceptos
             bootstyle="dark"
         )
         
@@ -247,7 +319,7 @@ class SolicitudApp(tb.Frame):
     
     def _create_bottom_frame(self):
         """Crea el frame inferior con categorías y totales."""
-        frame_inf = tb.Frame(self)
+        frame_inf = tb.Frame(self.scrollable_frame)
         frame_inf.pack(fill=X, padx=15, pady=10)
         
         # Frame de categorías
@@ -362,13 +434,13 @@ class SolicitudApp(tb.Frame):
     
     def _create_comments_section(self):
         """Crea la sección de comentarios."""
-        tb.Label(self, text="Comentarios").pack(anchor=W, padx=18, pady=(10, 0))
-        self.comentarios = tb.Text(self, height=3)
+        tb.Label(self.scrollable_frame, text="Comentarios").pack(anchor=W, padx=18, pady=(10, 0))
+        self.comentarios = tb.Text(self.scrollable_frame, height=3)
         self.comentarios.pack(fill=X, padx=15, pady=5)
     
     def _create_status_bar(self):
         """Crea la barra de estado y botones principales."""
-        frame_barra = tb.Frame(self)
+        frame_barra = tb.Frame(self.scrollable_frame)
         frame_barra.pack(fill=X, side=BOTTOM, padx=15, pady=10)
         
         # Label de solicitudes restantes
