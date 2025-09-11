@@ -8,33 +8,57 @@ from typing import Optional
 from config.settings import config
 from mainapp import MainApp
 from app.utils.logger import get_logger
+from splash_window import SplashWindow
 
 class Application:
     """
     Clase principal que coordina todos los componentes de la aplicación.
     """
     
-    def __init__(self):
+    def __init__(self, splash_callback=None):
         """Inicializa la aplicación."""
         self.logger = get_logger(__name__)
         self.app: Optional[MainApp] = None
+        self.splash: Optional[SplashWindow] = None
+        self.splash_callback = splash_callback
         
-        self._initialize_components()
-    
-    def _initialize_components(self):
-        """Inicializa los componentes principales de la aplicación."""
+    def initialize_with_splash(self):
+        """Inicializa la aplicación con splash screen."""
         try:
-            # Inicializar aplicación principal
+            # Primero crear la ventana principal (invisible)
             self.app = MainApp(
                 title=config.app_name,
                 size=config.ui.window_size,
                 theme=config.ui.theme
             )
-            self.logger.info("Ventana principal inicializada")
+            
+            # Crear y mostrar splash como ventana hija
+            self.splash = SplashWindow(self.app.main_window)
+            self.splash.create_splash()
+            
+            self.logger.info("Aplicación y splash inicializados")
+            return True
             
         except Exception as e:
-            self.logger.error(f"Error al inicializar componentes: {e}")
+            self.logger.error(f"Error al inicializar aplicación con splash: {e}")
             raise
+    
+    def update_splash(self, progress, message):
+        """Actualiza el splash screen."""
+        if self.splash:
+            self.splash.update_progress(progress, message)
+    
+    def finish_loading(self):
+        """Termina la carga y muestra la aplicación principal."""
+        if self.splash:
+            self.splash.close_and_show_main()
+            self.splash = None
+        self.logger.info("Carga completada - aplicación principal visible")
+    
+    def _initialize_components(self):
+        """Inicializa los componentes principales de la aplicación (método legacy)."""
+        # Este método ya no se usa - se reemplaza por initialize_with_splash
+        pass
     
     def show_login_modal(self):
         """

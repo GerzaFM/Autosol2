@@ -69,6 +69,9 @@ class MainWindow(tb.Window):
         """
         super().__init__(themename=theme)
         
+        # Ocultar la ventana inmediatamente después de crearla
+        self.withdraw()
+        
         self.logger = get_logger(__name__)
         
         # Configurar ventana
