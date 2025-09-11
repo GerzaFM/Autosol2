@@ -8,7 +8,7 @@ from typing import Optional
 from config.settings import config
 from mainapp import MainApp
 from app.utils.logger import get_logger
-from splash_window import SplashWindow
+from src.splashscreen.splash_window import SplashWindow
 
 class Application:
     """
