@@ -147,6 +147,9 @@ temp/
 .DS_Store
 Thumbs.db
 
+# Archivos y carpetas específicas del proyecto
+FormatosSolicitud/
+
 # IDE
 .vscode/
 .idea/
