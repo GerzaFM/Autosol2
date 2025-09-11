@@ -61,11 +61,11 @@ class SplashWindow:
     def _create_content(self):
         """Crea el contenido del splash con diseño profesional."""
         # Frame principal con fondo oscuro
-        main_frame = tb.Frame(self.splash, bootstyle="dark")
+        main_frame = tb.Frame(self.splash)
         main_frame.pack(fill=BOTH, expand=True)
         
         # Frame superior para el logo/imagen (si tienes una)
-        header_frame = tb.Frame(main_frame, bootstyle="dark", padding=20)
+        header_frame = tb.Frame(main_frame, padding=20)
         header_frame.pack(fill=X, pady=(30, 20))
         
         # Título principal con estilo más moderno
@@ -73,7 +73,6 @@ class SplashWindow:
             header_frame,
             text="AUTOFORMS",
             font=("Segoe UI", 28, "bold"),
-            bootstyle="inverse-primary",
             anchor=CENTER
         )
         title_label.pack()
@@ -83,13 +82,12 @@ class SplashWindow:
             header_frame,
             text="Sistema de Gestión de Solicitudes",
             font=("Segoe UI", 14),
-            bootstyle="inverse-secondary",
             anchor=CENTER
         )
         subtitle_label.pack(pady=(5, 0))
         
         # Frame central para la barra de progreso
-        progress_frame = tb.Frame(main_frame, bootstyle="dark", padding=30)
+        progress_frame = tb.Frame(main_frame, padding=30)
         progress_frame.pack(fill=X, expand=True)
         
         # Barra de progreso más moderna
@@ -98,7 +96,6 @@ class SplashWindow:
             mode='determinate',
             length=320,
             maximum=100,
-            bootstyle="success-striped",
             style="success.Striped.Horizontal.TProgressbar"
         )
         self.progress.pack(pady=20)
@@ -108,7 +105,6 @@ class SplashWindow:
             progress_frame,
             text="Iniciando aplicación...",
             font=("Segoe UI", 11),
-            bootstyle="inverse-light",
             anchor=CENTER
         )
         self.status_label.pack(pady=(10, 0))
@@ -120,9 +116,8 @@ class SplashWindow:
         # Información de empresa/sistema
         company_label = tb.Label(
             footer_frame,
-            text="TCM Matehuala - Sistema Corporativo",
+            text="TCM Matehuala - Todos los derechos reservados",
             font=("Segoe UI", 9),
-            bootstyle="inverse-secondary",
             anchor=CENTER
         )
         company_label.pack()
@@ -130,9 +125,8 @@ class SplashWindow:
         # Versión en la esquina
         version_label = tb.Label(
             footer_frame,
-            text="v2.0.0",
+            text="v0.0.0",
             font=("Segoe UI", 8),
-            bootstyle="inverse-dark",
             anchor=CENTER
         )
         version_label.pack(pady=(5, 0))
