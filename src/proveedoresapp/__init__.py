@@ -18,7 +18,7 @@ Características principales:
 - Logging completo de operaciones
 
 Autor: Sistema TCM Matehuala
-Versión: 2.0.0
+Versión: 0.0.0
 """
 
 import ttkbootstrap as tb

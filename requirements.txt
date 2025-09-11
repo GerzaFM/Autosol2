@@ -14,6 +14,10 @@ psycopg2-binary>=2.9.0  # Driver PostgreSQL con binarios incluidos
 # Configuración y entorno
 python-decouple>=3.6  # Manejo de variables de entorno y configuración
 
+# HTTP y actualizaciones
+requests>=2.32.0  # Cliente HTTP para Python
+packaging>=24.1  # Utilidades para manejo de versiones de paquetes
+
 # Procesamiento PDF (Principal funcionalidad del sistema)
 PyPDFForm>=3.4.0  # Manipulación de formularios PDF
 PyPDF2>=3.0.1  # Lectura y escritura de archivos PDF

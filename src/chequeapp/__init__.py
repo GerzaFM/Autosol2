@@ -13,6 +13,6 @@ try:
 except ImportError:
     ChequeAppProfessional = None
 
-__version__ = '1.0.0'
+__version__ = '0.0.0'
 __author__ = 'Desarrollo Autosol'
 __all__ = ['ChequeApp', 'ChequeAppProfessional']

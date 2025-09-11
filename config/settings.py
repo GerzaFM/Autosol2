@@ -11,7 +11,7 @@ from decouple import config as env_config, Csv
 # CONFIGURACIÓN DE ENTORNO - CAMBIAR AQUÍ PARA ELEGIR BASE DE DATOS
 # =============================================================================
 # Opciones disponibles: 'test' o 'production'
-ENVIRONMENT = 'production'  # Cambiar a 'production' para usar la base centralizada
+ENVIRONMENT = 'test'  # Cambiar a 'production' para usar la base centralizada
 # =============================================================================
 
 # Rutas del proyecto
@@ -123,9 +123,9 @@ class BusinessConfig:
 class AppConfig:
     """Configuración general de la aplicación."""
     app_name: str = "Autoforms"
-    version: str = "2.0.0"
-    author: str = "TCM Matehuala Development Team"
-    
+    version: str = "0.0.0"
+    author: str = "Gerzahin Flores Martinez"
+
     # Configuraciones específicas
     database: DatabaseConfig = None
     ui: UIConfig = None
