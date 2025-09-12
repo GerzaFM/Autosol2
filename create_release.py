@@ -13,21 +13,31 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from config.settings import config
 
-def compile_executable():
-    """Compila el ejecutable usando crear_exe.py"""
+def compile_executables():
+    """Compila ambos ejecutables (Autoforms.exe y updater.exe) usando crear_exe.py"""
     try:
         print("[COMPILE] Ejecutando crear_exe.py...")
         result = subprocess.run([sys.executable, 'crear_exe.py'], 
                               capture_output=True, text=True, cwd=PROJECT_ROOT)
         
         if result.returncode == 0:
-            print("[OK] Ejecutable compilado exitosamente")
-            return True
+            print("[OK] Ejecutables compilados exitosamente")
+            
+            # Verificar que ambos ejecutables fueron creados
+            autoforms_exe = Path('dist/Autoforms.exe')
+            updater_exe = Path('dist/updater.exe')  # Ahora ambos están en dist/
+            
+            if autoforms_exe.exists() and updater_exe.exists():
+                print("[OK] Ambos ejecutables encontrados en dist/")
+                return True
+            else:
+                print("[ERROR] No se encontraron todos los ejecutables después de compilar")
+                return False
         else:
-            print(f"[ERROR] Error compilando ejecutable: {result.stderr}")
+            print(f"[ERROR] Error compilando ejecutables: {result.stderr}")
             return False
     except Exception as e:
-        print(f"[ERROR] Error inesperado compilando ejecutable: {e}")
+        print(f"[ERROR] Error inesperado compilando ejecutables: {e}")
         return False
 
 def upload_asset_to_release(release_id, file_path, github_token=None):
@@ -121,21 +131,31 @@ def create_release(prerelease=False, include_exe=True):
     
     print(f"[INFO] Nombre: {release_name}")
     
-    # Compilar ejecutable si se solicita
-    exe_path = None
+    # Compilar ejecutables si se solicita
+    exe_paths = []
     if include_exe:
-        print(f"\n[BUILD] Compilando ejecutable...")
-        if not compile_executable():
-            print("[ERROR] Error al compilar ejecutable")
+        print(f"\n[BUILD] Compilando ejecutables...")
+        if not compile_executables():
+            print("[ERROR] Error al compilar ejecutables")
             return False
         
-        exe_path = Path('dist/Autoforms.exe')
-        if not exe_path.exists():
-            print("[ERROR] Ejecutable no encontrado después de compilar")
+        # Verificar que ambos ejecutables existen
+        autoforms_exe = Path('dist/Autoforms.exe')
+        updater_exe = Path('dist/updater.exe')
+        
+        if not autoforms_exe.exists():
+            print("[ERROR] Autoforms.exe no encontrado después de compilar")
+            return False
+        if not updater_exe.exists():
+            print("[ERROR] updater.exe no encontrado después de compilar")
             return False
         
-        size_mb = exe_path.stat().st_size / (1024 * 1024)
-        print(f"[OK] Ejecutable compilado: {size_mb:.1f} MB")
+        exe_paths = [autoforms_exe, updater_exe]
+        
+        # Mostrar información de los ejecutables
+        for exe_path in exe_paths:
+            size_mb = exe_path.stat().st_size / (1024 * 1024)
+            print(f"[OK] {exe_path.name}: {size_mb:.1f} MB")
     
     # Verificar si git está configurado
     try:
@@ -178,21 +198,30 @@ def create_release(prerelease=False, include_exe=True):
     
     # Preparar descripción de la release
     exe_info = ""
-    if include_exe and exe_path and exe_path.exists():
-        size_mb = exe_path.stat().st_size / (1024 * 1024)
+    if include_exe and exe_paths:
+        autoforms_size = exe_paths[0].stat().st_size / (1024 * 1024)  # Autoforms.exe
+        updater_size = exe_paths[1].stat().st_size / (1024 * 1024)    # updater.exe
         exe_info = f"""
 
-### [EXECUTABLE] Ejecutable incluido:
-- **Autoforms.exe** ({size_mb:.1f} MB) - Versión standalone, no requiere Python instalado
+### [EXECUTABLES] Ejecutables incluidos:
+- **updater.exe** ({updater_size:.1f} MB) - Ejecutable principal con auto-actualizador
+- **Autoforms.exe** ({autoforms_size:.1f} MB) - Aplicación principal (se actualiza automáticamente)
 - Compatible con Windows 10/11
-- Incluye todas las dependencias"""
+- Incluye todas las dependencias
+- **Instrucciones**: Ejecutar `updater.exe` como programa principal"""
 
-    release_body = f"""## [RELEASE] Autoforms v{version}
+    release_body = f"""## [PRE-RELEASE] Autoforms v{version} {'(Pre-release)' if prerelease else '(Release Estable)'}
+
+### [NEW] Nuevas características en esta versión:
+- [AUTO-UPDATE] ✨ **Sistema de actualización automática completamente funcional**
+- [DUAL-EXE] 🔄 **Arquitectura dual-ejecutable** (updater.exe + Autoforms.exe)
+- [SEAMLESS] 🚀 **Actualizaciones transparentes sin intervención del usuario**
+- [SMART-LAUNCH] 🎯 **Lanzamiento inteligente con verificación de versiones**
 
 ### [FEATURES] Características principales:
 - [UPDATE] Sistema de actualización automática desde GitHub Releases
 - [UI] Interfaz moderna con ttkbootstrap y tema darkly
-- [DB] Soporte para bases de datos PostgreSQL
+- [DB] Soporte para bases de datos PostgreSQL con configuración dual (TEST/PRODUCTION)
 - [REPORTS] Sistema de gestión de solicitudes y reportes
 - [AUTH] Sistema de autenticación de usuarios
 - [SPLASH] Pantalla de splash profesional{exe_info}
@@ -203,18 +232,32 @@ def create_release(prerelease=False, include_exe=True):
 - PostgreSQL (Base de datos)
 - Peewee ORM
 - PyPDF2 (Procesamiento PDF)
+- PyInstaller (Compilación de ejecutables)
+
+### [AUTO-UPDATE] Cómo funciona el sistema de actualización:
+1. **updater.exe** se ejecuta como programa principal
+2. Verifica automáticamente si hay nuevas versiones en GitHub
+3. Si hay actualizaciones disponibles, descarga el nuevo **Autoforms.exe**
+4. Reemplaza la versión anterior automáticamente
+5. Lanza la aplicación actualizada
 
 ### 📥 Instalación:
 
-#### 🚀 Opción 1: Ejecutable (Recomendado)
-1. Descargar `Autoforms.exe` de los assets
-2. Ejecutar directamente - No requiere instalación
+#### 🚀 Opción 1: Ejecutables (Recomendado)
+1. Descargar **AMBOS** ejecutables de los assets: `updater.exe` y `Autoforms.exe`
+2. Colocar ambos archivos en la misma carpeta
+3. Ejecutar **`updater.exe`** como programa principal
+4. El updater verificará actualizaciones y lanzará Autoforms automáticamente
 
 #### 🛠️ Opción 2: Código fuente
 1. Descargar el código fuente
 2. Instalar dependencias: `pip install -r requirements.txt`
 3. Configurar base de datos en `config/settings.py`
 4. Ejecutar: `python main.py`
+
+⚠️ **IMPORTANTE**: 
+- Para el funcionamiento del auto-updater, ambos ejecutables deben estar en la misma carpeta
+- {'Esta es una PRE-RELEASE para pruebas y desarrollo' if prerelease else 'Esta es una RELEASE ESTABLE para producción'}
 
 ---
 **Desarrollado por Gerzahin Flores Martinez**
@@ -257,14 +300,18 @@ def create_release(prerelease=False, include_exe=True):
             if prerelease:
                 print("[PRERELEASE] Marcada como PRE-RELEASE")
             
-            # Subir ejecutable si está disponible
-            if include_exe and exe_path and exe_path.exists():
-                print(f"\n[UPLOAD] Subiendo ejecutable...")
-                # Usar el mismo token que para crear la release
-                if upload_asset_to_release(release_info['id'], exe_path, github_token):
-                    print("[OK] Ejecutable subido a la release")
-                else:
-                    print("[WARN] Release creada pero ejecutable no subido")
+            # Subir ejecutables si están disponibles
+            if include_exe and exe_paths:
+                print(f"\n[UPLOAD] Subiendo ejecutables...")
+                
+                for exe_path in exe_paths:
+                    print(f"[UPLOAD] Subiendo {exe_path.name}...")
+                    if upload_asset_to_release(release_info['id'], exe_path, github_token):
+                        print(f"[OK] {exe_path.name} subido a la release")
+                    else:
+                        print(f"[WARN] {exe_path.name} no pudo subirse")
+                
+                print("[OK] Proceso de subida completado")
             
             return True
         else:
@@ -279,13 +326,13 @@ def create_release(prerelease=False, include_exe=True):
         return False
 
 if __name__ == "__main__":
-    prerelease = False
+    prerelease = True  # Por defecto siempre pre-release
     include_exe = True
     
     # Verificar argumentos
     if len(sys.argv) > 1:
-        if "--prerelease" in sys.argv or "--pre" in sys.argv:
-            prerelease = True
+        if "--release" in sys.argv or "--stable" in sys.argv:
+            prerelease = False  # Solo si se especifica explícitamente
         if "--no-exe" in sys.argv:
             include_exe = False
         if "--confirm" in sys.argv:
@@ -299,33 +346,33 @@ if __name__ == "__main__":
             else:
                 print("[TYPE] Tipo: RELEASE ESTABLE")
             if include_exe:
-                print("[INCLUDE] Incluye: Ejecutable compilado automáticamente")
+                print("[INCLUDE] Incluye: Ejecutables compilados automáticamente (updater.exe + Autoforms.exe)")
             else:
                 print("[INCLUDE] Incluye: Solo código fuente")
             print("")
             print("[OPTIONS] Opciones disponibles:")
             print("  --confirm          Confirmar y crear release")
-            print("  --prerelease       Marcar como pre-release")
-            print("  --pre              Alias para --prerelease")
-            print("  --no-exe           No incluir ejecutable (solo código fuente)")
+            print("  --release          Crear release ESTABLE (por defecto es pre-release)")
+            print("  --stable           Alias para --release")
+            print("  --no-exe           No incluir ejecutables (solo código fuente)")
             print("")
             print("[EXAMPLES] Ejemplos:")
-            print("  python create_release.py --confirm")
-            print("  python create_release.py --prerelease --confirm")
-            print("  python create_release.py --no-exe --confirm")
+            print("  python create_release.py --confirm                    # Pre-release (por defecto)")
+            print("  python create_release.py --release --confirm          # Release estable")
+            print("  python create_release.py --no-exe --confirm           # Pre-release sin ejecutables")
     else:
         print("[WARN] Este script creará una release en GitHub")
         print(f"[TAG] Tag: v{config.version}")
         print(f"[NAME] Nombre: Autoforms v{config.version}")
-        print("[INCLUDE] Incluye: Ejecutable compilado automáticamente")
+        print("[INCLUDE] Incluye: Ejecutables compilados automáticamente (updater.exe + Autoforms.exe)")
         print("")
         print("[OPTIONS] Opciones disponibles:")
         print("  --confirm          Confirmar y crear release")
-        print("  --prerelease       Marcar como pre-release")
-        print("  --pre              Alias para --prerelease")
-        print("  --no-exe           No incluir ejecutable (solo código fuente)")
+        print("  --release          Crear release ESTABLE (por defecto es pre-release)")
+        print("  --stable           Alias para --release")
+        print("  --no-exe           No incluir ejecutables (solo código fuente)")
         print("")
         print("[EXAMPLES] Ejemplos:")
-        print("  python create_release.py --confirm")
-        print("  python create_release.py --prerelease --confirm")
-        print("  python create_release.py --no-exe --confirm")
+        print("  python create_release.py --confirm                    # Pre-release (por defecto)")
+        print("  python create_release.py --release --confirm          # Release estable")
+        print("  python create_release.py --no-exe --confirm           # Pre-release sin ejecutables")

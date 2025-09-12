@@ -225,7 +225,17 @@ def main():
             if proceso.poll() is None:
                 print("[OK] Ejecutable iniciado correctamente")
                 proceso.terminate()  # Cerrar el proceso de prueba
-                print("[SUCCESS] ¡Proceso de creación completado con éxito!")
+                
+                # Crear también el updater.exe
+                print("\n" + "=" * 70)
+                print("[BUILD] Ahora creando updater.exe...")
+                if crear_updater_exe(python_cmd):
+                    print("[SUCCESS] ¡Ambos ejecutables creados con éxito!")
+                    print("[INFO] - Autoforms.exe: Aplicación principal")
+                    print("[INFO] - updater.exe: Actualizador automático")
+                else:
+                    print("[WARN] Error creando updater.exe, pero Autoforms.exe está listo")
+                    
             else:
                 stdout, stderr = proceso.communicate()
                 print("[WARN] El ejecutable se cerró inmediatamente")
@@ -237,6 +247,51 @@ def main():
     else:
         print("[ERROR] No se pudo crear el ejecutable")
         sys.exit(1)
+
+def crear_updater_exe(python_cmd):
+    """Crea el updater.exe independiente"""
+    print("\n" + "=" * 70)
+    print("[BUILD] Creando updater.exe independiente...")
+    print("=" * 70)
+    
+    # Usar el archivo spec existente en utils/
+    updater_spec_path = 'utils/updater_simple.spec'
+    if not os.path.exists(updater_spec_path):
+        print(f"[ERROR] No se encontró el archivo {updater_spec_path}")
+        return False
+    
+    print(f"[OK] Usando {updater_spec_path}")
+    
+    # Compilar updater.exe usando el spec de utils/
+    comando_updater = f'"{python_cmd}" -m PyInstaller {updater_spec_path} --clean --noconfirm'
+    
+    if ejecutar_comando(comando_updater, "Compilando updater.exe"):
+        # Verificar que se creó el ejecutable - debe estar en dist/
+        updater_exe_paths = ['dist/updater_simple.exe', 'dist/updater.exe']
+        updater_exe = None
+        
+        for path in updater_exe_paths:
+            if os.path.exists(path):
+                updater_exe = path
+                break
+        
+        if updater_exe:
+            # Si el archivo no se llama updater.exe, renombrarlo en dist/
+            if updater_exe == 'dist/updater_simple.exe':
+                final_updater_path = 'dist/updater.exe'
+                if os.path.exists(final_updater_path):
+                    os.remove(final_updater_path)  # Eliminar si ya existe
+                shutil.move(updater_exe, final_updater_path)
+                print("[OK] updater_simple.exe renombrado a updater.exe en dist/")
+            
+            # Verificar tamaño
+            size_mb = os.path.getsize('dist/updater.exe') / (1024 * 1024)
+            print(f"[OK] Updater compilado: {size_mb:.1f} MB en dist/")
+            return True
+        else:
+            print("[ERROR] No se encontró el ejecutable compilado")
+    
+    return False
 
 if __name__ == "__main__":
     main()

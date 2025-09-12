@@ -123,7 +123,7 @@ class BusinessConfig:
 class AppConfig:
     """Configuración general de la aplicación."""
     app_name: str = "Autoforms"
-    version: str = "0.2.0"
+    version: str = "0.3.3"
     author: str = "Gerzahin Flores Martinez"
 
     # Configuraciones específicas
@@ -135,9 +135,7 @@ class AppConfig:
     log_level: str = "INFO"
     log_file: str = str(LOGS_DIR / "app.log")
     
-    # Configuración de actualizaciones automáticas
-    auto_update_enabled: bool = True
-    check_updates_on_startup: bool = True
+    # GitHub repo para actualizaciones
     github_repo: str = "GerzaFM/Autosol2"
     
     # Valores por defecto
