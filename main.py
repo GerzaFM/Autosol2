@@ -16,7 +16,7 @@ from app.core.application import Application
 from app.utils.logger import setup_logging
 from src.bd.database import db_manager
 from src.logapp import LoginWindow, SessionManager
-from src.utils.auto_updater import check_and_update
+from src.utils.auto_updater import check_and_update, check_and_update_silent
 
 def setup_environment(app=None):
     """Configura el entorno de la aplicación."""
@@ -79,10 +79,13 @@ def main():
         print("[INFO] Iniciando Autoforms...")
         
         # Verificar actualizaciones antes de iniciar la aplicación
-        print("[UPDATE] Verificando actualizaciones...")
-        if check_and_update():
-            # Si se aplicó una actualización, la aplicación se reiniciará automáticamente
-            return
+        if config.check_updates_on_startup and config.auto_update_enabled:
+            print("[UPDATE] Verificando actualizaciones automáticamente...")
+            if check_and_update_silent():
+                # Si se aplicó una actualización, la aplicación se reiniciará automáticamente
+                return
+        else:
+            print("[UPDATE] Actualizaciones automáticas deshabilitadas")
         
         # Crear la aplicación CON splash
         app = Application()

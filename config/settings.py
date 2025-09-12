@@ -93,7 +93,7 @@ class DatabaseConfig:
 @dataclass
 class UIConfig:
     """Configuración de la interfaz de usuario."""
-    theme: str = "darkly"
+    theme: str = "cosmo"
     window_size: str = "1200x900"
     #1200x768
     min_window_size: tuple = (800, 600)
@@ -123,7 +123,7 @@ class BusinessConfig:
 class AppConfig:
     """Configuración general de la aplicación."""
     app_name: str = "Autoforms"
-    version: str = "0.1.0"
+    version: str = "0.2.0"
     author: str = "Gerzahin Flores Martinez"
 
     # Configuraciones específicas
@@ -134,6 +134,11 @@ class AppConfig:
     # Configuración de logging
     log_level: str = "INFO"
     log_file: str = str(LOGS_DIR / "app.log")
+    
+    # Configuración de actualizaciones automáticas
+    auto_update_enabled: bool = True
+    check_updates_on_startup: bool = True
+    github_repo: str = "GerzaFM/Autosol2"
     
     # Valores por defecto
     default_values: Dict[str, str] = None

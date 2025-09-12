@@ -23,7 +23,7 @@ class AutoUpdater:
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        self.github_repo = "GerzaFM/Autosol2"
+        self.github_repo = config.github_repo
         self.current_version = config.version
         self.github_api_url = f"https://api.github.com/repos/{self.github_repo}/releases/latest"
         
@@ -275,6 +275,36 @@ def check_and_update() -> bool:
                 return False
         else:
             print("[SKIP] Actualización omitida")
+    
+    return False
+
+
+def check_and_update_silent() -> bool:
+    """
+    Función para verificar y aplicar actualizaciones automáticamente (sin interacción del usuario).
+    
+    Returns:
+        True si se aplicó una actualización (requiere reinicio), False si no
+    """
+    updater = AutoUpdater()
+    
+    # Verificar si hay actualizaciones
+    update_info = updater.check_for_updates()
+    
+    if update_info:
+        print(f"\n[AUTO-UPDATE] Nueva versión disponible: {update_info['version']}")
+        print(f"[AUTO-UPDATE] Cambios: {update_info.get('name', 'Actualización disponible')}")
+        print("[AUTO-UPDATE] Aplicando actualización automáticamente...")
+        
+        if updater.download_and_install_update(update_info):
+            print("[AUTO-UPDATE] Actualización completada. Reiniciando aplicación...")
+            updater.restart_application()
+            return True
+        else:
+            print("[AUTO-UPDATE] Error durante la actualización automática")
+            return False
+    else:
+        print("[AUTO-UPDATE] No hay actualizaciones disponibles")
     
     return False
 

@@ -16,30 +16,30 @@ from config.settings import config
 def compile_executable():
     """Compila el ejecutable usando crear_exe.py"""
     try:
-        print("🔄 Ejecutando crear_exe.py...")
+        print("[COMPILE] Ejecutando crear_exe.py...")
         result = subprocess.run([sys.executable, 'crear_exe.py'], 
                               capture_output=True, text=True, cwd=PROJECT_ROOT)
         
         if result.returncode == 0:
-            print("✅ Ejecutable compilado exitosamente")
+            print("[OK] Ejecutable compilado exitosamente")
             return True
         else:
-            print(f"❌ Error compilando ejecutable: {result.stderr}")
+            print(f"[ERROR] Error compilando ejecutable: {result.stderr}")
             return False
     except Exception as e:
-        print(f"❌ Error inesperado compilando ejecutable: {e}")
+        print(f"[ERROR] Error inesperado compilando ejecutable: {e}")
         return False
 
 def upload_asset_to_release(release_id, file_path, github_token=None):
     """Sube un asset (archivo) a una release existente en GitHub"""
     if not github_token:
-        print("⚠️ Token de GitHub no disponible, omitiendo subida de ejecutable")
+        print("[WARN] Token de GitHub no disponible, omitiendo subida de ejecutable")
         return True
     
     try:
         file_path = Path(file_path)
         if not file_path.exists():
-            print(f"❌ Archivo no encontrado: {file_path}")
+            print(f"[ERROR] Archivo no encontrado: {file_path}")
             return False
         
         # URL para subir assets
@@ -54,21 +54,21 @@ def upload_asset_to_release(release_id, file_path, github_token=None):
             'name': file_path.name
         }
         
-        print(f"📤 Subiendo {file_path.name}...")
+        print(f"[UPLOAD] Subiendo {file_path.name}...")
         
         with open(file_path, 'rb') as f:
             response = requests.post(upload_url, headers=headers, params=params, data=f)
         
         if response.status_code == 201:
-            print(f"✅ {file_path.name} subido exitosamente")
+            print(f"[OK] {file_path.name} subido exitosamente")
             return True
         else:
-            print(f"❌ Error subiendo {file_path.name}: {response.status_code}")
-            print(f"📄 Respuesta: {response.text}")
+            print(f"[ERROR] Error subiendo {file_path.name}: {response.status_code}")
+            print(f"[RESPONSE] Respuesta: {response.text}")
             return False
             
     except Exception as e:
-        print(f"❌ Error subiendo asset: {e}")
+        print(f"[ERROR] Error subiendo asset: {e}")
         return False
 
 def get_github_token():
@@ -78,12 +78,12 @@ def get_github_token():
     # Intentar obtener desde variable de entorno
     token = os.getenv('GITHUB_TOKEN')
     if token:
-        print("✅ Token de GitHub encontrado en variables de entorno")
+        print("[OK] Token de GitHub encontrado en variables de entorno")
         return token
     
     # Si no hay token, explicar al usuario
-    print("\n⚠️ Para subir el ejecutable se necesita un token de GitHub")
-    print("📋 Instrucciones:")
+    print("\n[WARN] Para subir el ejecutable se necesita un token de GitHub")
+    print("[INFO] Instrucciones:")
     print("1. Ve a: https://github.com/settings/tokens")
     print("2. Genera un token con permisos 'repo'")
     print("3. Configúralo como variable de entorno: GITHUB_TOKEN=tu_token")
@@ -97,15 +97,15 @@ def get_github_token():
             if token:
                 return token
             else:
-                print("❌ Token vacío")
+                print("[ERROR] Token vacío")
         elif choice in ['omitir', 'skip', 'o']:
-            print("⚠️ Omitiendo subida de ejecutable")
+            print("[WARN] Omitiendo subida de ejecutable")
             return None
         elif choice in ['n', 'no']:
-            print("⚠️ Continuando sin subir ejecutable")
+            print("[WARN] Continuando sin subir ejecutable")
             return None
         else:
-            print("❌ Respuesta no válida")
+            print("[ERROR] Respuesta no válida")
 
 def create_release(prerelease=False, include_exe=True):
     """Crea una nueva release en GitHub usando la API."""
@@ -115,62 +115,62 @@ def create_release(prerelease=False, include_exe=True):
     
     if prerelease:
         release_name += " (Pre-release)"
-        print(f"🧪 Creando PRE-RELEASE: {tag_name}")
+        print(f"[PRERELEASE] Creando PRE-RELEASE: {tag_name}")
     else:
-        print(f"🏷️ Creando release: {tag_name}")
+        print(f"[RELEASE] Creando release: {tag_name}")
     
-    print(f"📝 Nombre: {release_name}")
+    print(f"[INFO] Nombre: {release_name}")
     
     # Compilar ejecutable si se solicita
     exe_path = None
     if include_exe:
-        print(f"\n🔨 Compilando ejecutable...")
+        print(f"\n[BUILD] Compilando ejecutable...")
         if not compile_executable():
-            print("❌ Error al compilar ejecutable")
+            print("[ERROR] Error al compilar ejecutable")
             return False
         
         exe_path = Path('dist/Autoforms.exe')
         if not exe_path.exists():
-            print("❌ Ejecutable no encontrado después de compilar")
+            print("[ERROR] Ejecutable no encontrado después de compilar")
             return False
         
         size_mb = exe_path.stat().st_size / (1024 * 1024)
-        print(f"✅ Ejecutable compilado: {size_mb:.1f} MB")
+        print(f"[OK] Ejecutable compilado: {size_mb:.1f} MB")
     
     # Verificar si git está configurado
     try:
         result = subprocess.run(['git', 'status'], capture_output=True, text=True)
         if result.returncode != 0:
-            print("❌ Error: No es un repositorio git o git no está disponible")
+            print("[ERROR] Error: No es un repositorio git o git no está disponible")
             return False
     except FileNotFoundError:
-        print("❌ Error: Git no está instalado")
+        print("[ERROR] Error: Git no está instalado")
         return False
     
     # Crear tag local
-    print("🔖 Creando tag local...")
+    print("[TAG] Creando tag local...")
     result = subprocess.run(['git', 'tag', '-a', tag_name, '-m', release_name], 
                           capture_output=True, text=True)
     if result.returncode != 0:
         if "already exists" in result.stderr:
-            print("⚠️ Tag ya existe localmente, eliminando...")
+            print("[WARN] Tag ya existe localmente, eliminando...")
             subprocess.run(['git', 'tag', '-d', tag_name], capture_output=True)
             result = subprocess.run(['git', 'tag', '-a', tag_name, '-m', release_name], 
                                   capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"❌ Error creando tag: {result.stderr}")
+            print(f"[ERROR] Error creando tag: {result.stderr}")
             return False
     
     # Push tag
-    print("🚀 Subiendo tag a GitHub...")
+    print("[PUSH] Subiendo tag a GitHub...")
     result = subprocess.run(['git', 'push', 'origin', tag_name, '--force'], 
                           capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"❌ Error subiendo tag: {result.stderr}")
+        print(f"[ERROR] Error subiendo tag: {result.stderr}")
         return False
     
     # Crear release usando GitHub API
-    print("📦 Creando release en GitHub...")
+    print("[RELEASE] Creando release en GitHub...")
     
     # Obtener información del último commit
     result = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True)
@@ -182,22 +182,22 @@ def create_release(prerelease=False, include_exe=True):
         size_mb = exe_path.stat().st_size / (1024 * 1024)
         exe_info = f"""
 
-### 📦 Ejecutable incluido:
+### [EXECUTABLE] Ejecutable incluido:
 - **Autoforms.exe** ({size_mb:.1f} MB) - Versión standalone, no requiere Python instalado
 - Compatible con Windows 10/11
 - Incluye todas las dependencias"""
 
-    release_body = f"""## 🚀 Autoforms v{version}
+    release_body = f"""## [RELEASE] Autoforms v{version}
 
-### ✨ Características principales:
-- 🔄 Sistema de actualización automática desde GitHub Releases
-- 💡 Interfaz moderna con ttkbootstrap y tema darkly
-- 🗄️ Soporte para bases de datos PostgreSQL
-- 📊 Sistema de gestión de solicitudes y reportes
-- 🔐 Sistema de autenticación de usuarios
-- 📱 Pantalla de splash profesional{exe_info}
+### [FEATURES] Características principales:
+- [UPDATE] Sistema de actualización automática desde GitHub Releases
+- [UI] Interfaz moderna con ttkbootstrap y tema darkly
+- [DB] Soporte para bases de datos PostgreSQL
+- [REPORTS] Sistema de gestión de solicitudes y reportes
+- [AUTH] Sistema de autenticación de usuarios
+- [SPLASH] Pantalla de splash profesional{exe_info}
 
-### 🛠️ Tecnologías utilizadas:
+### [TECH] Tecnologías utilizadas:
 - Python 3.13+
 - ttkbootstrap (UI Framework)
 - PostgreSQL (Base de datos)
@@ -233,37 +233,49 @@ def create_release(prerelease=False, include_exe=True):
     # URL de la API de GitHub
     api_url = "https://api.github.com/repos/GerzaFM/Autosol2/releases"
     
+    # Obtener token para la API
+    github_token = get_github_token()
+    if not github_token:
+        print("[ERROR] No se puede crear release sin token de GitHub")
+        return False
+    
+    # Headers con autenticación
+    headers = {
+        'Authorization': f'token {github_token}',
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+    }
+    
     try:
-        response = requests.post(api_url, json=release_data)
+        response = requests.post(api_url, json=release_data, headers=headers)
         
         if response.status_code == 201:
             release_info = response.json()
-            print("✅ Release creada exitosamente!")
-            print(f"🌐 URL: {release_info['html_url']}")
-            print(f"📝 ID: {release_info['id']}")
+            print("[OK] Release creada exitosamente!")
+            print(f"[URL] URL: {release_info['html_url']}")
+            print(f"[ID] ID: {release_info['id']}")
             if prerelease:
-                print("🧪 Marcada como PRE-RELEASE")
+                print("[PRERELEASE] Marcada como PRE-RELEASE")
             
             # Subir ejecutable si está disponible
             if include_exe and exe_path and exe_path.exists():
-                print(f"\n📤 Subiendo ejecutable...")
-                # Obtener token desde variable de entorno o prompt
-                github_token = get_github_token()
+                print(f"\n[UPLOAD] Subiendo ejecutable...")
+                # Usar el mismo token que para crear la release
                 if upload_asset_to_release(release_info['id'], exe_path, github_token):
-                    print("✅ Ejecutable subido a la release")
+                    print("[OK] Ejecutable subido a la release")
                 else:
-                    print("⚠️ Release creada pero ejecutable no subido")
+                    print("[WARN] Release creada pero ejecutable no subido")
             
             return True
         else:
-            print(f"❌ Error creando release: {response.status_code}")
-            print(f"📄 Respuesta: {response.text}")
+            print(f"[ERROR] Error creando release: {response.status_code}")
+            print(f"[RESPONSE] Respuesta: {response.text}")
             return False
             
     except Exception as e:
-        print(f"❌ Error de conexión: {e}")
-        print("🏷️ Tag creado, pero release manual requerida")
-        print(f"🌐 Crear manualmente en: https://github.com/GerzaFM/Autosol2/releases/new?tag={tag_name}")
+        print(f"[ERROR] Error de conexión: {e}")
+        print("[TAG] Tag creado, pero release manual requerida")
+        print(f"[URL] Crear manualmente en: https://github.com/GerzaFM/Autosol2/releases/new?tag={tag_name}")
         return False
 
 if __name__ == "__main__":
@@ -279,41 +291,41 @@ if __name__ == "__main__":
         if "--confirm" in sys.argv:
             create_release(prerelease=prerelease, include_exe=include_exe)
         else:
-            print("⚠️ Este script creará una release en GitHub")
-            print(f"🏷️ Tag: v{config.version}")
-            print(f"📝 Nombre: Autoforms v{config.version}")
+            print("[WARN] Este script creará una release en GitHub")
+            print(f"[TAG] Tag: v{config.version}")
+            print(f"[NAME] Nombre: Autoforms v{config.version}")
             if prerelease:
-                print("🧪 Tipo: PRE-RELEASE")
+                print("[TYPE] Tipo: PRE-RELEASE")
             else:
-                print("🏷️ Tipo: RELEASE ESTABLE")
+                print("[TYPE] Tipo: RELEASE ESTABLE")
             if include_exe:
-                print("📦 Incluye: Ejecutable compilado automáticamente")
+                print("[INCLUDE] Incluye: Ejecutable compilado automáticamente")
             else:
-                print("📝 Incluye: Solo código fuente")
+                print("[INCLUDE] Incluye: Solo código fuente")
             print("")
-            print("📋 Opciones disponibles:")
+            print("[OPTIONS] Opciones disponibles:")
             print("  --confirm          Confirmar y crear release")
             print("  --prerelease       Marcar como pre-release")
             print("  --pre              Alias para --prerelease")
             print("  --no-exe           No incluir ejecutable (solo código fuente)")
             print("")
-            print("📝 Ejemplos:")
+            print("[EXAMPLES] Ejemplos:")
             print("  python create_release.py --confirm")
             print("  python create_release.py --prerelease --confirm")
             print("  python create_release.py --no-exe --confirm")
     else:
-        print("⚠️ Este script creará una release en GitHub")
-        print(f"🏷️ Tag: v{config.version}")
-        print(f"📝 Nombre: Autoforms v{config.version}")
-        print("📦 Incluye: Ejecutable compilado automáticamente")
+        print("[WARN] Este script creará una release en GitHub")
+        print(f"[TAG] Tag: v{config.version}")
+        print(f"[NAME] Nombre: Autoforms v{config.version}")
+        print("[INCLUDE] Incluye: Ejecutable compilado automáticamente")
         print("")
-        print("📋 Opciones disponibles:")
+        print("[OPTIONS] Opciones disponibles:")
         print("  --confirm          Confirmar y crear release")
         print("  --prerelease       Marcar como pre-release")
         print("  --pre              Alias para --prerelease")
         print("  --no-exe           No incluir ejecutable (solo código fuente)")
         print("")
-        print("📝 Ejemplos:")
+        print("[EXAMPLES] Ejemplos:")
         print("  python create_release.py --confirm")
         print("  python create_release.py --prerelease --confirm")
         print("  python create_release.py --no-exe --confirm")
