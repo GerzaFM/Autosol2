@@ -76,10 +76,10 @@ def authenticate_user(app=None):
 def main():
     """Función principal de la aplicación."""
     try:
-        print("🚀 Iniciando Autoforms...")
+        print("[INFO] Iniciando Autoforms...")
         
         # Verificar actualizaciones antes de iniciar la aplicación
-        print("🔍 Verificando actualizaciones...")
+        print("[UPDATE] Verificando actualizaciones...")
         if check_and_update():
             # Si se aplicó una actualización, la aplicación se reiniciará automáticamente
             return
@@ -112,14 +112,14 @@ def main():
         
         # Si no hay usuario autenticado, mostrar login modal
         if login_required:
-            print("🔐 Solicitando autenticación...")
+            print("[AUTH] Solicitando autenticación...")
             user_data = app.show_login_modal()
             if not user_data:
-                print("❌ Autenticación requerida. Cerrando aplicación...")
+                print("[ERROR] Autenticación requerida. Cerrando aplicación...")
                 sys.exit(0)
         
-        print(f"✅ Bienvenido, {user_data.get('nombre', user_data['username'])}!")
-        print(f"👤 Usuario: {user_data['username']} | 🏢 Empresa: {user_data.get('empresa', 'N/A')} | 🎭 Permisos: {user_data.get('permisos', 'Usuario')}")
+        print(f"[OK] Bienvenido, {user_data.get('nombre', user_data['username'])}!")
+        print(f"[USER] Usuario: {user_data['username']} | [COMPANY] Empresa: {user_data.get('empresa', 'N/A')} | [PERMS] Permisos: {user_data.get('permisos', 'Usuario')}")
         print("=" * 80)
         
         # Ejecutar la aplicación
@@ -127,7 +127,7 @@ def main():
         
     except Exception as e:
         logging.error(f"Error crítico en la aplicación: {e}", exc_info=True)
-        print(f"❌ ERROR CRÍTICO: {e}")
+        print(f"[CRITICAL ERROR]: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

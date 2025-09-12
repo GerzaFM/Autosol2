@@ -123,7 +123,7 @@ class BusinessConfig:
 class AppConfig:
     """Configuración general de la aplicación."""
     app_name: str = "Autoforms"
-    version: str = "0.0.0"
+    version: str = "0.1.0"
     author: str = "Gerzahin Flores Martinez"
 
     # Configuraciones específicas

@@ -257,24 +257,24 @@ def check_and_update() -> bool:
     update_info = updater.check_for_updates()
     
     if update_info:
-        print(f"\n🆕 Nueva versión disponible: {update_info['version']}")
-        print(f"📝 Cambios: {update_info.get('name', 'Actualización disponible')}")
+        print(f"\n[NEW] Nueva versión disponible: {update_info['version']}")
+        print(f"[INFO] Cambios: {update_info.get('name', 'Actualización disponible')}")
         
         # Preguntar al usuario si desea actualizar
         response = input("\n¿Desea actualizar ahora? (s/n): ").lower().strip()
         
         if response in ['s', 'si', 'sí', 'y', 'yes']:
-            print("\n🔄 Iniciando actualización...")
+            print("\n[UPDATE] Iniciando actualización...")
             
             if updater.download_and_install_update(update_info):
-                print("✅ Actualización completada. Reiniciando aplicación...")
+                print("[OK] Actualización completada. Reiniciando aplicación...")
                 updater.restart_application()
                 return True
             else:
-                print("❌ Error durante la actualización")
+                print("[ERROR] Error durante la actualización")
                 return False
         else:
-            print("📌 Actualización omitida")
+            print("[SKIP] Actualización omitida")
     
     return False
 

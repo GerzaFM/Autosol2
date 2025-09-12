@@ -125,7 +125,7 @@ class SplashWindow:
         # Versión en la esquina
         version_label = tb.Label(
             footer_frame,
-            text="v0.0.0",
+            text="v0.1.0",
             font=("Segoe UI", 8),
             anchor=CENTER
         )

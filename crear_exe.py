@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script automático para crear el ejecutable de TCM_Matehuala_Autosol2
+Script automático para crear el ejecutable de Autoforms
 Ejecutar: python crear_exe.py
 """
 
@@ -12,14 +12,14 @@ from pathlib import Path
 
 def ejecutar_comando(comando, descripcion):
     """Ejecuta un comando y maneja errores"""
-    print(f"\n🔄 {descripcion}...")
+    print(f"\n[EXEC] {descripcion}...")
     try:
         resultado = subprocess.run(comando, shell=True, check=True, 
                                  capture_output=True, text=True, encoding='utf-8')
-        print(f"✅ {descripcion} - Completado")
+        print(f"[OK] {descripcion} - Completado")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error en {descripcion}:")
+        print(f"[ERROR] Error en {descripcion}:")
         print(f"   Comando: {comando}")
         print(f"   Error: {e.stderr}")
         return False
@@ -29,15 +29,15 @@ def eliminar_directorio_seguro(directorio):
     if not os.path.exists(directorio):
         return
     
-    print(f"🧹 Eliminando directorio {directorio}...")
+    print(f"[CLEAN] Eliminando directorio {directorio}...")
     
     # Intentar primero con shutil.rmtree
     try:
         shutil.rmtree(directorio)
-        print(f"✅ {directorio} eliminado exitosamente")
+        print(f"[OK] {directorio} eliminado exitosamente")
         return
     except PermissionError:
-        print(f"⚠️  Archivos bloqueados en {directorio}, intentando método alternativo...")
+        print(f"[WARN] Archivos bloqueados en {directorio}, intentando método alternativo...")
     
     # Método alternativo usando comandos del sistema
     try:
@@ -45,9 +45,9 @@ def eliminar_directorio_seguro(directorio):
             subprocess.run(['rmdir', '/s', '/q', directorio], shell=True, check=True)
         else:  # Unix/Linux
             subprocess.run(['rm', '-rf', directorio], check=True)
-        print(f"✅ {directorio} eliminado con método alternativo")
+        print(f"[OK] {directorio} eliminado con método alternativo")
     except:
-        print(f"⚠️  No se pudo eliminar {directorio} completamente, continuando...")
+        print(f"[WARN] No se pudo eliminar {directorio} completamente, continuando...")
 
 def crear_spec_file():
     """Crea el archivo .spec para PyInstaller"""
@@ -133,7 +133,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='TCM_Matehuala_Autosol2',
+    name='Autoforms',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -152,38 +152,38 @@ exe = EXE(
     
     with open('autosol2.spec', 'w', encoding='utf-8') as f:
         f.write(spec_content)
-    print("✅ Archivo autosol2.spec creado")
+    print("[OK] Archivo autosol2.spec creado")
 
 def main():
     """Función principal que automatiza todo el proceso"""
-    print("🚀 Iniciando creación automática del ejecutable TCM_Matehuala_Autosol2")
+    print("[INFO] Iniciando creación automática del ejecutable Autoforms")
     print("=" * 70)
     
     # Verificar que estamos en el directorio correcto
     if not os.path.exists('main.py'):
-        print("❌ Error: No se encontró main.py. Ejecuta este script desde el directorio del proyecto.")
+        print("[ERROR] No se encontró main.py. Ejecuta este script desde el directorio del proyecto.")
         sys.exit(1)
     
     # Verificar entorno virtual
     venv_python = Path('.venv/Scripts/python.exe')
     if venv_python.exists():
         python_cmd = str(venv_python)
-        print("✅ Usando entorno virtual: .venv")
+        print("[OK] Usando entorno virtual: .venv")
     else:
         python_cmd = 'python'
-        print("⚠️  Usando Python del sistema (recomendado usar entorno virtual)")
+        print("[WARN] Usando Python del sistema (recomendado usar entorno virtual)")
     
     # Paso 1: Verificar PyInstaller
-    print(f"\n🔍 Verificando PyInstaller...")
+    print(f"\n[CHECK] Verificando PyInstaller...")
     try:
         result = subprocess.run([python_cmd, '-c', 'import PyInstaller; print(PyInstaller.__version__)'], 
                               capture_output=True, text=True)
         if result.returncode == 0:
-            print(f"✅ PyInstaller encontrado: v{result.stdout.strip()}")
+            print(f"[OK] PyInstaller encontrado: v{result.stdout.strip()}")
         else:
             raise ImportError
     except:
-        print("📦 Instalando PyInstaller...")
+        print("[INFO] Instalando PyInstaller...")
         if not ejecutar_comando(f'{python_cmd} -m pip install PyInstaller', 
                                "Instalación de PyInstaller"):
             sys.exit(1)
@@ -198,19 +198,19 @@ def main():
     # Paso 4: Crear el ejecutable
     build_cmd = f'{python_cmd} -m PyInstaller autosol2.spec --clean --noconfirm'
     if not ejecutar_comando(build_cmd, "Construcción del ejecutable"):
-        print("❌ Error al crear el ejecutable")
+        print("[ERROR] Error al crear el ejecutable")
         sys.exit(1)
     
     # Paso 5: Verificar resultado
-    exe_path = Path('dist/TCM_Matehuala_Autosol2.exe')
+    exe_path = Path('dist/Autoforms.exe')
     if exe_path.exists():
         size_mb = exe_path.stat().st_size / (1024 * 1024)
-        print(f"\n🎉 ¡Ejecutable creado exitosamente!")
-        print(f"📁 Ubicación: {exe_path.absolute()}")
-        print(f"📊 Tamaño: {size_mb:.1f} MB")
+        print(f"\n[SUCCESS] ¡Ejecutable creado exitosamente!")
+        print(f"[INFO] Ubicación: {exe_path.absolute()}")
+        print(f"[INFO] Tamaño: {size_mb:.1f} MB")
         
         # Paso 6: Probar el ejecutable
-        print(f"\n🧪 Probando el ejecutable...")
+        print(f"\n[TEST] Probando el ejecutable...")
         try:
             # Iniciar el proceso y verificar que se ejecute
             proceso = subprocess.Popen([str(exe_path)], 
@@ -223,19 +223,19 @@ def main():
             
             # Verificar si el proceso sigue corriendo
             if proceso.poll() is None:
-                print("✅ Ejecutable iniciado correctamente")
+                print("[OK] Ejecutable iniciado correctamente")
                 proceso.terminate()  # Cerrar el proceso de prueba
-                print("🎉 ¡Proceso de creación completado con éxito!")
+                print("[SUCCESS] ¡Proceso de creación completado con éxito!")
             else:
                 stdout, stderr = proceso.communicate()
-                print("⚠️  El ejecutable se cerró inmediatamente")
+                print("[WARN] El ejecutable se cerró inmediatamente")
                 if stderr:
                     print(f"Error: {stderr.decode('utf-8', errors='ignore')}")
         except Exception as e:
-            print(f"⚠️  No se pudo probar el ejecutable automáticamente: {e}")
+            print(f"[WARN] No se pudo probar el ejecutable automáticamente: {e}")
             print("   Prueba manualmente ejecutando el archivo .exe")
     else:
-        print("❌ No se pudo crear el ejecutable")
+        print("[ERROR] No se pudo crear el ejecutable")
         sys.exit(1)
 
 if __name__ == "__main__":
