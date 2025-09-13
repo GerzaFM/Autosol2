@@ -11,7 +11,7 @@ from decouple import config as env_config, Csv
 # CONFIGURACIÓN DE ENTORNO - CAMBIAR AQUÍ PARA ELEGIR BASE DE DATOS
 # =============================================================================
 # Opciones disponibles: 'test' o 'production'
-ENVIRONMENT = 'test'  # Cambiar a 'production' para usar la base centralizada
+ENVIRONMENT = 'production'  # Cambiar a 'production' para usar la base centralizada
 # =============================================================================
 
 # Rutas del proyecto

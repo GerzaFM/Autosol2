@@ -160,6 +160,7 @@ FormatosSolicitud/
 # Local configuration
 local_config.py
 config/local.py
+connections.py
 
 # Test files (mantener archivos de test existentes pero ignorar nuevos temporales)
 test_*.py.bak

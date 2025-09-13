@@ -7,6 +7,7 @@ import requests
 import json
 from pathlib import Path
 
+
 # Agregar directorios al path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
