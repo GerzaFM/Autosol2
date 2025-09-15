@@ -62,7 +62,7 @@ a = Analysis(
         # Dependencias principales
         'decouple', 'python_decouple',
         'ttkbootstrap', 'tkinter', 'tkinter.ttk', 'tkinter.messagebox', 'tkinter.filedialog',
-        'sqlite3', 'pandas', 'openpyxl', 'xlsxwriter', 'reportlab',
+        'pandas', 'openpyxl', 'xlsxwriter', 'reportlab',
         'PyPDF2', 'pdfplumber', 'PyPDFForm', 'xml.etree.ElementTree', 'requests',
         'lxml', 'lxml.etree', 'lxml.html',
         'Pillow', 'PIL', 'PIL.Image', 'PIL.ImageTk',

@@ -1,6 +1,6 @@
 """
 Modelos de base de datos usando Peewee ORM.
-Soporta SQLite y PostgreSQL.
+Sistema actualizado para PostgreSQL.
 """
 
 from peewee import (

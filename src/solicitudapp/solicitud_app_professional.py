@@ -149,7 +149,7 @@ class SolicitudApp(tb.Frame):
         self.lbl_sol_rest: Optional[tb.Label] = None
         self.dividir_var: Optional[tb.BooleanVar] = None
         
-        # ID del usuario actual (Usuario migrado de SQLite)
+        # ID del usuario actual
         self.usuario_actual_id = 294379  # Usuario Gerzahin Flores Martinez
         
         # Lista para guardar referencias a los botones de favoritos

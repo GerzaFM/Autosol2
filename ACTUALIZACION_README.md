@@ -58,7 +58,6 @@ Durante la actualización, estos archivos **NO** se sobrescriben:
 
 - `.env` - Variables de entorno
 - `config.ini` - Configuración local
-- `facturas.db` - Base de datos SQLite
 - `logs/` - Archivos de registro
 - `database/backups/` - Respaldos de base de datos
 - `.venv/` - Entorno virtual de Python

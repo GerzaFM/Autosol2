@@ -15,7 +15,7 @@ Arquitectura de datos:
 │         (Capa de abstracción)           │
 │                   │                     │
 │                   ▼                     │
-│        Peewee ORM + SQLite              │
+│        Peewee ORM + PostgreSQL          │
 │         (Persistencia física)           │
 └─────────────────────────────────────────┘
 

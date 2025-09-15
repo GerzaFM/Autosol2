@@ -1,13 +1,12 @@
 """
-Configuración y gestión de base de datos multi-plataforma.
-Soporta SQLite (desarrollo) y PostgreSQL (producción).
+Configuración y gestión de base de datos PostgreSQL.
+Sistema actualizado para usar exclusivamente PostgreSQL.
 """
 
 import os
 import logging
 from pathlib import Path
 from peewee import (
-    SqliteDatabase, 
     PostgresqlDatabase, 
     Database,
     OperationalError,
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     """
-    Gestor de conexiones de base de datos que soporta múltiples tipos.
+    Gestor de conexiones de base de datos PostgreSQL.
     """
     
     def __init__(self):
@@ -29,43 +28,36 @@ class DatabaseManager:
         self._initialize_database()
     
     def _initialize_database(self):
-        """Inicializa la conexión de base de datos según la configuración."""
-        db_type = self._connection_config.db_type.lower()
-        
+        """Inicializa la conexión de base de datos PostgreSQL."""
         # Obtener información de conexión
         conn_info = self._connection_config.get_connection_info()
         
-        if db_type == "postgresql":
-            logger.info(f"Configurando PostgreSQL para entorno: {conn_info['environment'].upper()}")
-            try:
-                db = PostgresqlDatabase(
-                    database=self._connection_config.pg_database,
-                    host=self._connection_config.pg_host,
-                    port=self._connection_config.pg_port,
-                    user=self._connection_config.pg_user,
-                    password=self._connection_config.pg_password,
-                    autorollback=True,
-                    autocommit=True,
-                    # Configuración de codificación para Windows
-                    options="-c client_encoding=utf8"
-                )
-                
-                # Probar conexión
-                db.connect()
-                logger.info(f"OK - Conectado a PostgreSQL: {conn_info['host']}:{conn_info['port']}/{conn_info['database']}")
-                db.close()
-                
-                self.db = db
-                logger.info(f"Base de datos inicializada: PostgreSQL ({conn_info['environment'].upper()})")
-                return
-                
-            except Exception as e:
-                logger.error(f"Error conectando a PostgreSQL ({conn_info['environment'].upper()}): {e}")
-                logger.info("Fallback a SQLite")
+        logger.info(f"Configurando PostgreSQL para entorno: {conn_info['environment'].upper()}")
         
-        # Fallback a SQLite
-        self.db = self._create_sqlite_connection()
-        logger.info(f"Base de datos inicializada: SQLite")
+        try:
+            db = PostgresqlDatabase(
+                database=self._connection_config.pg_database,
+                host=self._connection_config.pg_host,
+                port=self._connection_config.pg_port,
+                user=self._connection_config.pg_user,
+                password=self._connection_config.pg_password,
+                autorollback=True,
+                autocommit=True,
+                # Configuración de codificación para Windows
+                options="-c client_encoding=utf8"
+            )
+            
+            # Probar conexión
+            db.connect()
+            logger.info(f"OK - Conectado a PostgreSQL: {conn_info['host']}:{conn_info['port']}/{conn_info['database']}")
+            db.close()
+            
+            self.db = db
+            logger.info(f"Base de datos inicializada: PostgreSQL ({conn_info['environment'].upper()})")
+            
+        except Exception as e:
+            logger.error(f"Error conectando a PostgreSQL ({conn_info['environment'].upper()}): {e}")
+            raise Exception(f"No se pudo conectar a la base de datos PostgreSQL: {e}")
     
     def _create_postgresql_connection(self) -> PostgresqlDatabase:
         """Crea conexión a PostgreSQL."""
@@ -91,29 +83,7 @@ class DatabaseManager:
             
         except Exception as e:
             logger.error(f"Error conectando a PostgreSQL: {e}")
-            logger.info("Fallback a SQLite")
-            return self._create_sqlite_connection()
-    
-    def _create_sqlite_connection(self) -> SqliteDatabase:
-        """Crea conexión a SQLite."""
-        db_path = self._connection_config.sqlite_path
-        
-        # Crear directorio si no existe
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
-        db = SqliteDatabase(
-            db_path,
-            pragmas={
-                'journal_mode': 'wal',
-                'cache_size': -1 * 64000,  # 64MB
-                'foreign_keys': 1,
-                'ignore_check_constraints': 0,
-                'synchronous': 0
-            }
-        )
-        
-        logger.info(f"Configurado SQLite: {db_path}")
-        return db
+            raise Exception(f"No se pudo conectar a la base de datos PostgreSQL: {e}")
     
     def get_connection(self) -> Database:
         """Obtiene la conexión de base de datos."""
@@ -148,36 +118,8 @@ class DatabaseManager:
             return False
     
     def backup_database(self) -> str:
-        """Crea un backup de la base de datos."""
-        if isinstance(self.db, SqliteDatabase):
-            return self._backup_sqlite()
-        elif isinstance(self.db, PostgresqlDatabase):
-            return self._backup_postgresql()
-        else:
-            logger.warning("Backup no soportado para este tipo de base de datos")
-            return None
-    
-    def _backup_sqlite(self) -> str:
-        """Crea backup de SQLite."""
-        try:
-            from datetime import datetime
-            import shutil
-            
-            backup_dir = Path(self._connection_config.backup_dir)
-            backup_dir.mkdir(exist_ok=True)
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = backup_dir / f"facturas_backup_{timestamp}.db"
-            
-            # Copiar archivo de base de datos
-            shutil.copy2(self._connection_config.sqlite_path, backup_file)
-            
-            logger.info(f"Backup SQLite creado: {backup_file}")
-            return str(backup_file)
-            
-        except Exception as e:
-            logger.error(f"Error creando backup SQLite: {e}")
-            return None
+        """Crea un backup de la base de datos PostgreSQL."""
+        return self._backup_postgresql()
     
     def _backup_postgresql(self) -> str:
         """Crea backup de PostgreSQL usando pg_dump."""
@@ -226,7 +168,8 @@ class DatabaseManager:
     def migrate_data(self, source_db_path: str = None):
         """Migra datos desde otra base de datos."""
         if not source_db_path:
-            source_db_path = self._connection_config.sqlite_path
+            logger.warning("No se especificó ruta de base de datos origen para migración")
+            return
         
         logger.info(f"Iniciando migración desde: {source_db_path}")
         

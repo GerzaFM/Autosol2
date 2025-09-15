@@ -23,17 +23,14 @@ DATABASE_DIR = PROJECT_ROOT / "database"
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 LOGS_DIR = PROJECT_ROOT / "logs"
 
+
 # Crear directorios si no existen
 for directory in [DATABASE_DIR, LOGS_DIR]:
     directory.mkdir(exist_ok=True)
 
 @dataclass
 class DatabaseConfig:
-    """Configuración de la base de datos con soporte para TEST y PRODUCTION."""
-    # SQLite (desarrollo/fallback)
-    sqlite_path: str = str(DATABASE_DIR / "facturas.db")
-    backup_dir: str = str(DATABASE_DIR / "backups")
-    
+    """Configuración de la base de datos PostgreSQL con soporte para TEST y PRODUCTION."""
     # Configuración dinámica basada en ENVIRONMENT
     db_type: str = "postgresql"
     pg_host: str = ""
