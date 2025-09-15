@@ -161,6 +161,8 @@ FormatosSolicitud/
 local_config.py
 config/local.py
 connections.py
+connections.json
+user_session.json
 
 # Test files (mantener archivos de test existentes pero ignorar nuevos temporales)
 test_*.py.bak
