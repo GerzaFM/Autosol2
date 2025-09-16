@@ -162,7 +162,9 @@ local_config.py
 config/local.py
 connections.py
 connections.json
+connections_test.json
 user_session.json
+facturas.db
 
 # Test files (mantener archivos de test existentes pero ignorar nuevos temporales)
 test_*.py.bak

@@ -23,10 +23,50 @@ DATABASE_DIR = PROJECT_ROOT / "database"
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 LOGS_DIR = PROJECT_ROOT / "logs"
 
+DBCONF_PATH = PROJECT_ROOT / ("connections_test.json" if ENVIRONMENT == "test" else "connections.json")
 
 # Crear directorios si no existen
 for directory in [DATABASE_DIR, LOGS_DIR]:
     directory.mkdir(exist_ok=True)
+
+# Función para cargar configuración JSON
+def load_json_config():
+    """Carga la configuración desde el archivo JSON correspondiente al entorno."""
+    try:
+        config_data = json.loads(DBCONF_PATH.read_text(encoding='utf-8'))
+        return config_data
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"[WARNING] No se pudo cargar {DBCONF_PATH}: {e}")
+        return {}
+
+def write_version_to_json(version: str):
+    """Escribe la versión actual en el archivo JSON de configuración."""
+    try:
+        # Cargar configuración actual
+        if DBCONF_PATH.exists():
+            config_data = json.loads(DBCONF_PATH.read_text(encoding='utf-8'))
+        else:
+            print(f"[WARNING] Archivo {DBCONF_PATH} no existe, creando configuración básica")
+            config_data = {}
+        
+        # Agregar/actualizar versión
+        config_data['version'] = version
+        
+        # Escribir de vuelta al archivo con formato legible
+        DBCONF_PATH.write_text(
+            json.dumps(config_data, indent=4, ensure_ascii=False),
+            encoding='utf-8'
+        )
+        
+        print(f"[CONFIG] Versión {version} escrita en {DBCONF_PATH}")
+        return True
+        
+    except Exception as e:
+        print(f"[ERROR] No se pudo escribir versión en {DBCONF_PATH}: {e}")
+        return False
+
+# Cargar configuración global
+_json_config = load_json_config()
 
 @dataclass
 class DatabaseConfig:
@@ -38,29 +78,25 @@ class DatabaseConfig:
     pg_database: str = ""
     pg_user: str = ""
     pg_password: str = ""
+
+    config: Dict = None
     
     def __post_init__(self):
         """Configurar base de datos según el entorno elegido."""
         global ENVIRONMENT
         
-        if ENVIRONMENT.lower() == 'test':
-            # Configuración para TEST (tcm_matehuala local)
-            self.pg_host = "localhost"
-            self.pg_database = "tcm_matehuala"
-            self.pg_user = "postgres"
-            self.pg_password = "Nissan#2024"
-            
-        elif ENVIRONMENT.lower() == 'production':
-            # Configuración para PRODUCTION (autoforms servidor)
-            self.pg_host = "10.90.101.51"
-            self.pg_database = "autoforms"
-            self.pg_user = "sistemas"
-            self.pg_password = "Postgresql#495"
-            
+        # Usar configuración JSON global cargada
+        if _json_config:
+            # Usar configuración del archivo JSON
+            self.pg_host = _json_config.get('ip', '')
+            self.pg_port = int(_json_config.get('port', 5432))
+            self.pg_database = _json_config.get('dbname', '')
+            self.pg_user = _json_config.get('user', '')
+            self.pg_password = _json_config.get('password', '')
         else:
-            raise ValueError(f"ENVIRONMENT debe ser 'test' o 'production', recibido: {ENVIRONMENT}")
+            print(f"[FALLBACK] Usando configuración por defecto para entorno: {ENVIRONMENT}")
         
-        # Intentar leer desde variables de entorno (opcional)
+        # Las variables de entorno pueden sobrescribir la configuración del archivo JSON
         try:
             from decouple import config as env_config
             self.db_type = env_config('DB_TYPE', default=self.db_type)
@@ -70,7 +106,7 @@ class DatabaseConfig:
             self.pg_user = env_config('DB_USER', default=self.pg_user)
             self.pg_password = env_config('DB_PASSWORD', default=self.pg_password)
         except ImportError:
-            # python-decouple no disponible, usar valores configurados
+            # python-decouple no disponible, usar valores del archivo JSON
             pass
         
         # Log de configuración (sin mostrar contraseña)
@@ -91,12 +127,17 @@ class DatabaseConfig:
 @dataclass
 class UIConfig:
     """Configuración de la interfaz de usuario."""
-    theme: str = "cosmo"
+    theme: str = ""
     window_size: str = "1200x900"
     #1200x768
     min_window_size: tuple = (800, 600)
     sidebar_width_expanded: int = 200
     sidebar_width_collapsed: int = 60
+    
+    def __post_init__(self):
+        """Configurar UI usando el archivo JSON."""
+        # Cargar tema desde configuración JSON, con fallback a 'cosmo'
+        self.theme = _json_config.get("theme", "cosmo")
 
 @dataclass
 class BusinessConfig:
@@ -123,6 +164,9 @@ class AppConfig:
     app_name: str = "Autoforms"
     version: str = "0.3.3"
     author: str = "Gerzahin Flores Martinez"
+
+    # Escribir en JSON la versión actual
+    
 
     # Configuraciones específicas
     database: DatabaseConfig = None
@@ -153,6 +197,9 @@ class AppConfig:
                 "receptor_nombre": "TCM MATEHUALA",
                 "receptor_rfc": "TMM860630PH1"
             }
+        
+        # Escribir versión actual en el archivo JSON
+        write_version_to_json(self.version)
 
 # Instancia global de configuración
 config = AppConfig()
