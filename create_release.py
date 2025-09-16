@@ -214,18 +214,46 @@ def create_release(prerelease=False, include_exe=True):
     release_body = f"""## [PRE-RELEASE] Autoforms v{version} {'(Pre-release)' if prerelease else '(Release Estable)'}
 
 ### [NEW] Nuevas características en esta versión:
-- [AUTO-UPDATE] ✨ **Sistema de actualización automática completamente funcional**
-- [DUAL-EXE] 🔄 **Arquitectura dual-ejecutable** (updater.exe + Autoforms.exe)
-- [SEAMLESS] 🚀 **Actualizaciones transparentes sin intervención del usuario**
-- [SMART-LAUNCH] 🎯 **Lanzamiento inteligente con verificación de versiones**
+- [CONFIG] ✨ **Configuración externa de base de datos** - Credenciales y configuración ahora en archivos JSON externos
+- [SECURITY] � **Eliminadas contraseñas hardcodeadas** - Mayor seguridad y flexibilidad
+- [THEME] 🎨 **Temas configurables por entorno** - Diferentes temas para TEST y PRODUCTION
+- [VERSION] 📝 **Versionado automático en configuración** - Archivos JSON incluyen versión actual
+- [POSTGRESQL] 🗃️ **Migración completa a PostgreSQL** - Eliminado soporte SQLite legacy
 
 ### [FEATURES] Características principales:
 - [UPDATE] Sistema de actualización automática desde GitHub Releases
-- [UI] Interfaz moderna con ttkbootstrap y tema darkly
-- [DB] Soporte para bases de datos PostgreSQL con configuración dual (TEST/PRODUCTION)
+- [CONFIG] Configuración externa mediante archivos JSON (connections.json / connections_test.json)
+- [UI] Interfaz moderna con ttkbootstrap y temas configurables
+- [DB] Soporte exclusivo para PostgreSQL con configuración dual (TEST/PRODUCTION)
 - [REPORTS] Sistema de gestión de solicitudes y reportes
 - [AUTH] Sistema de autenticación de usuarios
 - [SPLASH] Pantalla de splash profesional{exe_info}
+
+### [TECH] Tecnologías utilizadas:
+- Python 3.13+
+- ttkbootstrap (UI Framework)
+- PostgreSQL (Base de datos exclusiva)
+- Peewee ORM
+- PyPDF2 (Procesamiento PDF)
+- PyInstaller (Compilación de ejecutables)
+- Configuración JSON externa
+
+### [CONFIG] Sistema de configuración:
+1. **Archivos de configuración**: `connections.json` (PRODUCTION) y `connections_test.json` (TEST)
+2. **Estructura JSON**:
+   ```json
+   {
+       "theme": "darkly",
+       "ip": "servidor",
+       "port": "5432",
+       "user": "usuario",
+       "password": "contraseña",
+       "dbname": "base_datos",
+       "version": "0.3.3"
+   }
+   ```
+3. **Cambio de entorno**: Modificar `ENVIRONMENT` en `config/settings.py`
+4. **Seguridad**: Archivos de configuración en `.gitignore` - no se commitean credenciales
 
 ### [TECH] Tecnologías utilizadas:
 - Python 3.13+
@@ -242,22 +270,40 @@ def create_release(prerelease=False, include_exe=True):
 4. Reemplaza la versión anterior automáticamente
 5. Lanza la aplicación actualizada
 
-### 📥 Instalación:
+### 📥 Instalación y Configuración:
 
 #### 🚀 Opción 1: Ejecutables (Recomendado)
 1. Descargar **AMBOS** ejecutables de los assets: `updater.exe` y `Autoforms.exe`
 2. Colocar ambos archivos en la misma carpeta
-3. Ejecutar **`updater.exe`** como programa principal
-4. El updater verificará actualizaciones y lanzará Autoforms automáticamente
+3. **Configurar base de datos**: Crear archivo `connections.json` con credenciales PostgreSQL
+4. Ejecutar **`updater.exe`** como programa principal
+5. El updater verificará actualizaciones y lanzará Autoforms automáticamente
 
 #### 🛠️ Opción 2: Código fuente
 1. Descargar el código fuente
 2. Instalar dependencias: `pip install -r requirements.txt`
-3. Configurar base de datos en `config/settings.py`
-4. Ejecutar: `python main.py`
+3. Configurar archivos JSON: `connections.json` y/o `connections_test.json`
+4. Configurar entorno en `config/settings.py` (ENVIRONMENT = 'test' o 'production')
+5. Ejecutar: `python main.py`
+
+#### 🔧 Configuración de Base de Datos:
+Crear archivo `connections.json` (PRODUCTION) o `connections_test.json` (TEST):
+```json
+{
+    "theme": "darkly",
+    "ip": "tu_servidor_postgresql",
+    "port": "5432",
+    "user": "tu_usuario",
+    "password": "tu_contraseña",
+    "dbname": "tu_base_datos",
+    "version": "0.3.3"
+}
+```
 
 ⚠️ **IMPORTANTE**: 
 - Para el funcionamiento del auto-updater, ambos ejecutables deben estar en la misma carpeta
+- **REQUIERE PostgreSQL**: Ya no soporta SQLite
+- **Configuración obligatoria**: Debe crear archivos JSON con credenciales de base de datos
 - {'Esta es una PRE-RELEASE para pruebas y desarrollo' if prerelease else 'Esta es una RELEASE ESTABLE para producción'}
 
 ---

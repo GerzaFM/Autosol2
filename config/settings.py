@@ -16,7 +16,17 @@ ENVIRONMENT = 'production'  # Cambiar a 'production' para usar la base centraliz
 # =============================================================================
 
 # Rutas del proyecto
-PROJECT_ROOT = Path(__file__).parent.parent
+def get_base_path():
+    """Obtiene la ruta base de la aplicación, funciona tanto en desarrollo como en ejecutable."""
+    import sys
+    if getattr(sys, 'frozen', False):
+        # Ejecutándose como ejecutable empaquetado
+        return Path(sys.executable).parent
+    else:
+        # Ejecutándose como script de Python
+        return Path(__file__).parent.parent
+
+PROJECT_ROOT = get_base_path()
 APP_DIR = PROJECT_ROOT / "app"
 CONFIG_DIR = PROJECT_ROOT / "config"
 DATABASE_DIR = PROJECT_ROOT / "database"

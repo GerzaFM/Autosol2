@@ -57,7 +57,13 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('src', 'src')],
+    datas=[
+        ('src', 'src'),
+        ('config', 'config'),
+        ('.env.example', '.'),
+        ('connections.json', '.'),
+        ('connections_test.json', '.'),
+    ],
     hiddenimports=[
         # Dependencias principales
         'decouple', 'python_decouple',
@@ -79,6 +85,11 @@ a = Analysis(
         'defusedxml',
         'chardet',
         'idna',
+        
+        # Dependencias PostgreSQL
+        'peewee',
+        'psycopg2',
+        'psycopg2-binary',
         
         # Módulos del proyecto
         'app', 'app.core', 'app.core.application', 'app.core.database',
